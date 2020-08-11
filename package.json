@@ -1,0 +1,27 @@
+{
+  "name": "tactics",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "dependencies": {
+    "cannon": "^0.6.2",
+    "express": "^4.17.1",
+    "reload": "^3.1.0",
+    "three": "^0.119.1",
+    "three-csg": "github:callumhay/three-csg",
+    "watch": "^1.0.2",
+    "webpack": "^4.44.1",
+    "webpack-node-externals": "^2.5.1"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.4",
+    "webpack-cli": "^3.3.12"
+  },
+  "scripts": {
+    "start": "node ./dist/server.js",
+    "start_dev": "nodemon ./dist/server.js",
+    "dev": "webpack --config webpack.development.config.js"
+  },
+  "author": "Callum Hay",
+  "license": "MIT"
+}
