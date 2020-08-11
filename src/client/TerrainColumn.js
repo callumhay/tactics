@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import CSG from 'three-csg';
+//import * as CANNON from 'cannon';
 
 import Debug from '../debug';
 
@@ -8,6 +10,8 @@ class TerrainColumn {
   static get EPSILON() { return 0.0001; }
 
   constructor(terrainGrp, u, v, landingRanges) {
+    this.terrainGrp = terrainGrp;
+
     this.xIndex = u;
     this.zIndex = v;
     this.landingRanges = landingRanges;
@@ -16,38 +20,39 @@ class TerrainColumn {
     this.meshes = [];
     this.material = new THREE.MeshLambertMaterial({color: 0xffffff});
 
-    this.landingRanges.forEach(range => {
+    this.landingRanges.forEach((range,rangeIdx) => {
       const [startY, endY] = range;
       const height = endY-startY;
 
       const geometry = new THREE.BoxBufferGeometry(TerrainColumn.SIZE, height*TerrainColumn.SIZE, TerrainColumn.SIZE);
-      const mesh = new THREE.Mesh(geometry, this.material);
-      mesh.translateX(this.xIndex*TerrainColumn.SIZE + TerrainColumn.HALF_SIZE);
-      mesh.translateZ(this.zIndex*TerrainColumn.SIZE + TerrainColumn.HALF_SIZE);
-      mesh.translateY(startY + height/2);
-      mesh.terrainColumn = this;
-
+      const mesh = this._buildTerrainMesh(geometry, rangeIdx);
+      
       this.geometries.push(geometry);
       this.meshes.push(mesh);
 
-      terrainGrp.add(mesh);
+      this.terrainGrp.add(mesh);
     });
+  }
 
-    // Debug AABBs
-    /*
-    const aabbs = this.calcAABBs();
-    const currCenter = new THREE.Vector3();
-    aabbs.forEach(aabb => {
-      const edges = new THREE.EdgesGeometry(new THREE.BoxBufferGeometry(aabb.max.x-aabb.min.x, aabb.max.y-aabb.min.y, aabb.max.z-aabb.min.z));
-      const mesh = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0xFF00FF, linewidth: 0.1, depthFunc: THREE.AlwaysDepth}));
-      
-      aabb.getCenter(currCenter)
-      mesh.translateX(currCenter.x);
-      mesh.translateZ(currCenter.z);
-      mesh.translateY(currCenter.y);
-      terrainGrp.add(mesh);
-    });
-    */
+  getTerrainSpaceTranslation(rangeIdx) {
+    const [startY, endY] = this.landingRanges[rangeIdx];
+    const height = endY - startY;
+    return new THREE.Vector3(
+      this.xIndex * TerrainColumn.SIZE + TerrainColumn.HALF_SIZE,
+      startY + height / 2,
+      this.zIndex * TerrainColumn.SIZE + TerrainColumn.HALF_SIZE
+    );
+  }
+
+  _buildTerrainMesh(geometry, rangeIdx) {
+    const translation = this.getTerrainSpaceTranslation(rangeIdx);
+    const mesh = new THREE.Mesh(geometry, this.material);
+    mesh.translateX(translation.x);
+    mesh.translateY(translation.y);
+    mesh.translateZ(translation.z);
+    mesh.terrainColumn = this;
+    mesh.terrainLandingRangeIdx = rangeIdx;
+    return mesh;
   }
 
   calcAABBs(epsilon=TerrainColumn.EPSILON) {
@@ -77,11 +82,52 @@ class TerrainColumn {
     return false;
   }
 
-  debugDrawAABBs(terrainGrp, show=true) {
+  // NOTE: We assume that the subtractGeometry is in the same coord space as the terrain
+  blowup(subtractGeometry) {
+    const {boundingBox} = subtractGeometry;
+
+    // Figure out what terrain geometry will be affected in this column
+    let collidingIndices = [];
+    const minY = Math.floor(boundingBox.min.y);
+    const maxY = Math.floor(boundingBox.max.y);
+    for (let i = 0; i < this.landingRanges.length; i++) {
+      const [startY, endY] = this.landingRanges[i];
+      if (startY >= minY && startY <= maxY || 
+          endY >= minY && endY <= maxY || 
+          startY <= minY && endY >= maxY) { 
+        collidingIndices.push(i);
+      }
+    }
+
+    collidingIndices.forEach(index => {
+      const collidingGeometry = this.geometries[index];
+      const collidingMesh = this.meshes[index];
+
+      // The geometry needs to be placed into the terrain space
+      const translation = this.getTerrainSpaceTranslation(index);
+      collidingGeometry.translate(translation.x, translation.y, translation.z);
+
+      const csgGeometry = CSG.subtract([collidingGeometry, subtractGeometry]);
+      const newGeometry = CSG.BufferGeometry(csgGeometry);
+      newGeometry.translate(-translation.x, -translation.y, -translation.z);
+      const newMesh = this._buildTerrainMesh(newGeometry, index);
+
+      // Clean-up and replace the appropriate THREE objects
+      this.terrainGrp.remove(collidingMesh);
+      collidingGeometry.dispose();
+      this.terrainGrp.add(newMesh);
+
+      this.geometries[index] = newGeometry;
+      this.meshes[index] = newMesh;
+    });
+
+  }
+
+  debugDrawAABBs(show=true) {
     if (show && this.debugAABBGroup || !show && !this.debugAABBGroup) { return; }
 
     if (this.debugAABBGroup) {
-      terrainGrp.remove(this.debugAABBGroup);
+      this.terrainGrp.remove(this.debugAABBGroup);
       this.debugAABBGroup.children.forEach(child => {
         child.geometry.dispose();
       });
@@ -102,7 +148,7 @@ class TerrainColumn {
         this.debugAABBGroup.add(mesh);
       });
       this.debugAABBGroup.renderOrder = Debug.TERRAIN_AABB_RENDER_ORDER;
-      terrainGrp.add(this.debugAABBGroup);
+      this.terrainGrp.add(this.debugAABBGroup);
     }
   }
 }

@@ -61,9 +61,6 @@ function onMouseClick(event) {
   raycaster.setFromCamera(mousePos, camera);
 
   const intersects = raycaster.intersectObjects(battlefield.terrainGroup.children, true);
-  //if (intersectedObj) {
-  //  intersectedObj.material.emissive.setHex(intersectedObj.currentHex);
-  //}
   if (intersects.length > 0) {
     let intersectingTerrain = null;
     for (let i = 0; i < intersects.length; i++) {
@@ -75,40 +72,21 @@ function onMouseClick(event) {
 
     const {object, point} = intersectingTerrain;
 
+    const group = object.parent;
+    const groupInvTransform = new THREE.Matrix4();
+    groupInvTransform.getInverse(group.matrixWorld);
+
     const BLAST_RADIUS = 1;
-    // Based on where the point is intersecting, it's easy to find all the terrain squares that might be caught in the sphere (blast radius)
-
-
-
     const sphere = new THREE.SphereBufferGeometry(BLAST_RADIUS, 10, 10);
     sphere.translate(point.x, point.y, point.z);
+    sphere.applyMatrix4(groupInvTransform);
     //scene.add(new THREE.Mesh(sphere));
-
-    const group = object.parent;
-    const groupTransform = group.matrixWorld;
-
-    object.geometry.applyMatrix4(object.matrixWorld);
-    let csgGeometry = CSG.subtract([object.geometry, sphere]);
-    
-    group.remove(object);
-
-    let newGeometry = CSG.BufferGeometry(csgGeometry);
-    newGeometry.applyMatrix4(groupTransform.getInverse(groupTransform));
- 
-    const newMesh = new THREE.Mesh(newGeometry, new THREE.MeshPhongMaterial({color: 0xffffff}));
-    newMesh.terrainColumn = object.terrainColumn;
-    group.add(newMesh);
-
-    object.geometry.dispose();
+    battlefield.blowupTerrain(sphere);
+    sphere.dispose();
 
     //intersectedObj = newMesh;
     //intersectedObj.currentHex = intersectedObj.material.emissive.getHex();
     //intersectedObj.material.emissive.setHex( 0xff0000 );
-
-
-  }
-  else {
-    //intersectedObj = null; 
   }
 }
 

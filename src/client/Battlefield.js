@@ -28,7 +28,7 @@ export default class Battlefield {
     this.terrainGroup.translateZ(-depth/2);
     this._scene.add(this.terrainGroup);
 
-    this.debugDrawRigidBodyLattice();
+    //this.debugDrawRigidBodyLattice();
   }
 
   _buildDebugTerrain(width, depth) {
@@ -48,8 +48,33 @@ export default class Battlefield {
     this.rigidBodyLattice.buildFromTerrain(this.terrain);
   }
 
-  debugDrawRigidBodyLattice() {
-    this.rigidBodyLattice.debugDrawNodes(this.terrainGroup, true);
+  // NOTE: We assume that the subtractGeometry is in the same coord space as the terrain
+  blowupTerrain(subtractGeometry) {
+    if (!subtractGeometry.boundingBox) subtractGeometry.computeBoundingBox();
+    const {boundingBox} = subtractGeometry;
+    const {clamp} = THREE.MathUtils;
+
+    // Get all the terrain columns that might be modified
+    const minX = clamp(Math.floor(boundingBox.min.x), 0, this.terrain.length-1);
+    const maxX = clamp(Math.floor(boundingBox.max.x), 0, this.terrain.length-1);
+    
+    const terrainCols = [];
+    for (let x = minX; x <= maxX; x++) {
+      const terrainZ = this.terrain[x];
+      const minZ = clamp(Math.floor(boundingBox.min.z), 0, terrainZ.length-1);
+      const maxZ = clamp(Math.floor(boundingBox.max.z), 0, terrainZ.length-1);
+      for (let z = minZ; z <= maxZ; z++) {
+        terrainCols.push(terrainZ[z]);
+      }
+    }
+
+    terrainCols.forEach(terrainCol => {
+      terrainCol.blowup(subtractGeometry);
+    });
+  }
+
+  debugDrawRigidBodyLattice(show=true) {
+    this.rigidBodyLattice.debugDrawNodes(this.terrainGroup, show);
   }
 
   
