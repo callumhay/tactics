@@ -1,11 +1,12 @@
 import * as THREE from 'three';
 
 import TerrainColumn from './TerrainColumn';
+import Debug from '../debug';
 
 class LatticeNode {
-  constructor(pos, terrainCol) {
+  constructor(pos, terrainColumns) {
     this.pos = pos;
-    this.terrainCol = terrainCol;
+    this.terrainColumns = terrainColumns;
   }
 }
 
@@ -20,7 +21,7 @@ class LatticeEdge {
   }
 }
 
-const DEFAULT_NODES_PER_TERRAIN_SQUARE_UNIT = 3;
+const DEFAULT_NODES_PER_TERRAIN_SQUARE_UNIT = 5;
 
 export default class RigidBodyLattice {
   constructor() {
@@ -30,6 +31,7 @@ export default class RigidBodyLattice {
   clear() {
     this.nodes = [];
     this.edges = [];
+    this.unitsBetweenNodes = 0;
   }
 
   numNodes() {
@@ -45,36 +47,36 @@ export default class RigidBodyLattice {
   buildFromTerrain(terrain, numNodesPerUnit=DEFAULT_NODES_PER_TERRAIN_SQUARE_UNIT) {
     this.clear();
 
-    const unitsBetweenNodes = TerrainColumn.SIZE / (numNodesPerUnit-1);
+    this.unitsBetweenNodes = TerrainColumn.SIZE / (numNodesPerUnit-1);
+     
 
     // Nodes are built to reflect the same coordinate system as the terrain
     const numNodesX = terrain.length * numNodesPerUnit + 1 - terrain.length;
-    
     this.nodes = new Array(numNodesX).fill(null);
 
-    
     for (let x = 0; x < numNodesX; x++) {
-      const nodeXPos = x*unitsBetweenNodes;
+      const nodeXPos = x*this.unitsBetweenNodes;
 
       // The node might be associated with more than one part of the terrain
       const currTerrainXIndices = [];
-      const floorXIdx = Math.floor(x/numNodesPerUnit);
+      const floorXIdx = Math.max(0,Math.floor((x-1)/(numNodesPerUnit-1)));
+      const terrainZ = terrain[floorXIdx];
       currTerrainXIndices.push(floorXIdx);
-      if (x % numNodesPerUnit === numNodesPerUnit-1 && x < numNodesX-1) {
+      if (x % (numNodesPerUnit - 1) === 0 && floorXIdx+1 < terrain.length) {
         currTerrainXIndices.push(floorXIdx+1);
       }
 
-      const terrainZ = terrain[floorXIdx];
+      
       const numNodesZ = terrainZ.length * numNodesPerUnit + 1 - terrainZ.length;
       const nodesZ = this.nodes[x] = new Array(numNodesZ).fill(null);
       
       for (let z = 0; z < numNodesZ; z++) {
-        const nodeZPos = z*unitsBetweenNodes;
+        const nodeZPos = z*this.unitsBetweenNodes;
 
         const currTerrainZIndices = [];
-        const floorZIdx = Math.floor(z/numNodesPerUnit);
+        const floorZIdx = Math.max(0, Math.floor((z - 1) / (numNodesPerUnit - 1)));
         currTerrainZIndices.push(floorZIdx);
-        if (z % numNodesPerUnit === numNodesPerUnit-1 && z < numNodesZ-1) {
+        if (z % (numNodesPerUnit-1) === 0 && z > 0 && floorZIdx+1 < terrainZ.length) {
           currTerrainZIndices.push(floorZIdx+1);
         }
 
@@ -85,37 +87,26 @@ export default class RigidBodyLattice {
             columns.push(terrain[currTerrainXIndices[i]][currTerrainZIndices[j]]);
           }
         }
-
-
-
+        
         // TODO: Deal with irregular (non-rectangular prism) geometry
 
-/*
-        // Deal with the landings of each terrain column, create nodes at each precision interval on the 
-        // interior of the terrain that makes up the square
-
-        const {landingRanges} = column;
-        const maxHeight = landingRanges[landingRanges.length-1][1];
+        let maxHeight = 0;
+        for (let i = 0; i < columns.length; i++) {
+          const {landingRanges} = columns[i];
+          maxHeight = Math.max(landingRanges[landingRanges.length-1][1], maxHeight);
+        }
         const numNodesY = maxHeight * numNodesPerUnit;
         const nodesY = nodesZ[z] = new Array(numNodesY).fill(null);
 
-
-        for (let r = 0; r < landingRanges.length; r++) {
-          const [start, end] = landingRanges[r];
-
-          const nodeYIdx = Math.max(0, Math.floor(start * numNodesPerUnit)-1);
-          let nodeYPos = start*unitsBetweenNodes;
-
-          const height = end-start;
-          const numNodesYInRange = height*numNodesPerUnit;
-
-          for (let i = 0; i < numNodesYInRange; i++) {
-            nodesY[nodeYIdx+i] = new LatticeNode(new THREE.Vector3(nodeXPos, nodeYPos, nodeZPos), column);
-            nodeYPos += unitsBetweenNodes;
+        for (let y = 0; y < numNodesY; y++) {
+          const nodeYPos = y*this.unitsBetweenNodes;
+          const currNodePos = new THREE.Vector3(nodeXPos, nodeYPos, nodeZPos);
+          const columnsContainingNode = columns.filter(column => column.containsPoint(currNodePos));
+          if (columnsContainingNode.length > 0) {
+            nodesY[y] = new LatticeNode(currNodePos, columnsContainingNode);
           }
         }
-        */
-      
+
       }
     }
 
@@ -126,32 +117,35 @@ export default class RigidBodyLattice {
   }
 
   debugDrawNodes(terrainGroup, show=true) {
-    if (show && this.debugNodeGroup || !show && !this.debugNodeGroup) { return; }
-    if (!show) {
-      terrainGroup.remove(this.debugNodeGroup);
-      this.debugNodeGroup = null;
+    if (show && this.debugNodePoints || !show && !this.debugNodePoints) { return; }
+
+    if (this.debugNodePoints) {
+      terrainGroup.remove(this.debugNodePoints);
+      this.debugNodePoints.geometry.dispose();
+      this.debugNodePoints = null;
     }
-    else {
+
+    if (show) {
       const nodeGeometry = new THREE.BufferGeometry();
-      const vertices = new Float32Array(this.numNodes()*3);
-      let vertexIdx = 0;
+      const vertices = [];
       for (let x = 0; x < this.nodes.length; x++) {
-        for (let z = 0; z < this.nodes[x].length; z++) {
-          for (let y = 0; y < this.nodes[x][z].length; y++) {
-            const currNode = this.nodes[x][z][y];
+        for (let y = 0; y < this.nodes[x].length; y++) {
+          for (let z = 0; z < this.nodes[x][y].length; z++) {
+            const currNode = this.nodes[x][y][z];
             if (currNode) {
               const nodePos = currNode.pos;
-              vertices[vertexIdx++] = nodePos.x;
-              vertices[vertexIdx++] = nodePos.y;
-              vertices[vertexIdx++] = nodePos.z;
+              vertices.push(nodePos.x);
+              vertices.push(nodePos.y);
+              vertices.push(nodePos.z);
             }
           }
         }
       }
 
-      nodeGeometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
-      this.debugNodeGroup = new THREE.Points(nodeGeometry, new THREE.PointsMaterial({color:0xFF0000, size:0.1, depthFunc:THREE.AlwaysDepth}));
-      terrainGroup.add(this.debugNodeGroup);
+      nodeGeometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(vertices), 3));
+      this.debugNodePoints = new THREE.Points(nodeGeometry, new THREE.PointsMaterial({color:0xFF0000, size:this.unitsBetweenNodes/5, depthFunc:THREE.AlwaysDepth}));
+      this.debugNodePoints.renderOrder = Debug.NODE_DEBUG_RENDER_ORDER;
+      terrainGroup.add(this.debugNodePoints);
     }
   }
 
