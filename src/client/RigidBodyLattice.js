@@ -26,7 +26,8 @@ class LatticeEdge {
 const DEFAULT_NODES_PER_TERRAIN_SQUARE_UNIT = 5;
 
 export default class RigidBodyLattice {
-  constructor() {
+  constructor(terrainGroup) {
+    this.terrainGroup = terrainGroup;
     this.clear();
   }
 
@@ -34,6 +35,7 @@ export default class RigidBodyLattice {
     this.nodes = [];
     this.edges = [];
     this.unitsBetweenNodes = 0;
+    this._clearDebugDraw();
   }
 
   numNodes() {
@@ -63,7 +65,7 @@ export default class RigidBodyLattice {
       const floorXIdx = Math.max(0,Math.floor((x-1)/(numNodesPerUnit-1)));
       const terrainZ = terrain[floorXIdx];
       currTerrainXIndices.push(floorXIdx);
-      if (x % (numNodesPerUnit - 1) === 0 && floorXIdx+1 < terrain.length) {
+      if (x % (numNodesPerUnit - 1) === 0 && x > 0 && floorXIdx+1 < terrain.length) {
         currTerrainXIndices.push(floorXIdx+1);
       }
 
@@ -84,7 +86,11 @@ export default class RigidBodyLattice {
         const columns = [];
         for (let i = 0; i < currTerrainXIndices.length; i++) {
           for (let j = 0; j < currTerrainZIndices.length; j++) {
-            columns.push(terrain[currTerrainXIndices[i]][currTerrainZIndices[j]]);
+            // NOTE: The terrain column might not exist if the map is uneven
+            const currColumn = terrain[currTerrainXIndices[i]][currTerrainZIndices[j]];
+            if (currColumn) {
+              columns.push(currColumn);
+            }
           }
         }
         
@@ -110,20 +116,21 @@ export default class RigidBodyLattice {
       }
     }
 
-    // Initialize the edges
-    // TODO
-
-
+    // NOTE: No need for edges, we assume that every node is connected to all its neighbors immediate
+    // orthogonal neighbours (i.e., +/- x,y,z)
   }
 
-  debugDrawNodes(terrainGroup, show=true) {
-    if (show && this.debugNodePoints || !show && !this.debugNodePoints) { return; }
-
+  _clearDebugDraw() {
     if (this.debugNodePoints) {
-      terrainGroup.remove(this.debugNodePoints);
+      this.terrainGroup.remove(this.debugNodePoints);
       this.debugNodePoints.geometry.dispose();
       this.debugNodePoints = null;
     }
+  }
+  debugDrawNodes(show=true) {
+    if (show && this.debugNodePoints || !show && !this.debugNodePoints) { return; }
+
+    this._clearDebugDraw();
 
     if (show) {
       const nodeGeometry = new THREE.BufferGeometry();
@@ -145,7 +152,7 @@ export default class RigidBodyLattice {
       nodeGeometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(vertices), 3));
       this.debugNodePoints = new THREE.Points(nodeGeometry, new THREE.PointsMaterial({color:0xFF0000, size:this.unitsBetweenNodes/5, depthFunc:THREE.AlwaysDepth}));
       this.debugNodePoints.renderOrder = Debug.NODE_DEBUG_RENDER_ORDER;
-      terrainGroup.add(this.debugNodePoints);
+      this.terrainGroup.add(this.debugNodePoints);
     }
   }
 

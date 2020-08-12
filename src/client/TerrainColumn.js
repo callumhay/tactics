@@ -7,10 +7,10 @@ import Debug from '../debug';
 class TerrainColumn {
   static get SIZE() { return 1; }
   static get HALF_SIZE() { return TerrainColumn.SIZE/2; }
-  static get EPSILON() { return 0.0001; }
+  static get EPSILON() { return 1e-6; }
 
-  constructor(terrainGrp, u, v, landingRanges) {
-    this.terrainGrp = terrainGrp;
+  constructor(terrainGroup, u, v, landingRanges) {
+    this.terrainGroup = terrainGroup;
 
     this.xIndex = u;
     this.zIndex = v;
@@ -30,13 +30,13 @@ class TerrainColumn {
       this.geometries.push(geometry);
       this.meshes.push(mesh);
 
-      this.terrainGrp.add(mesh);
+      this.terrainGroup.add(mesh);
     });
   }
 
   clear() {
     this.meshes.forEach(mesh => {
-      this.terrainGrp.remove(mesh);
+      this.terrainGroup.remove(mesh);
     });
     this.meshes = [];
 
@@ -49,6 +49,8 @@ class TerrainColumn {
     this.xIndex = -1;
     this.zIndex = -1;
     this.landingRanges = [];
+
+    this._clearDebugAABBGroup();
   }
 
   getTerrainSpaceTranslation(rangeIdx) {
@@ -130,26 +132,28 @@ class TerrainColumn {
       const newMesh = this._buildTerrainMesh(newGeometry, index);
 
       // Clean-up and replace the appropriate THREE objects
-      this.terrainGrp.remove(collidingMesh);
+      this.terrainGroup.remove(collidingMesh);
       collidingGeometry.dispose();
-      this.terrainGrp.add(newMesh);
+      this.terrainGroup.add(newMesh);
 
       this.geometries[index] = newGeometry;
       this.meshes[index] = newMesh;
     });
-
   }
 
-  debugDrawAABBs(show=true) {
-    if (show && this.debugAABBGroup || !show && !this.debugAABBGroup) { return; }
-
+  _clearDebugAABBGroup() {
     if (this.debugAABBGroup) {
-      this.terrainGrp.remove(this.debugAABBGroup);
+      this.terrainGroup.remove(this.debugAABBGroup);
       this.debugAABBGroup.children.forEach(child => {
         child.geometry.dispose();
       });
       this.debugAABBGroup = null;
     }
+  }
+  debugDrawAABBs(show=true) {
+    if (show && this.debugAABBGroup || !show && !this.debugAABBGroup) { return; }
+
+    this._clearDebugAABBGroup();
 
     if (show) {
       const aabbs = this.calcAABBs();
@@ -165,7 +169,7 @@ class TerrainColumn {
         this.debugAABBGroup.add(mesh);
       });
       this.debugAABBGroup.renderOrder = Debug.TERRAIN_AABB_RENDER_ORDER;
-      this.terrainGrp.add(this.debugAABBGroup);
+      this.terrainGroup.add(this.debugAABBGroup);
     }
   }
 }
