@@ -1,12 +1,13 @@
 
 import GameProtocol from '../shared/GameProtocol';
+import BattlefieldLoader from './BattlefieldLoader';
 
 class GameClient {
   constructor() {
     this.socket = new WebSocket('ws://' + GameProtocol.WEBSOCKET_HOST + ':' + GameProtocol.WEBSOCKET_PORT);
   }
 
-  start() {
+  start(battlefield) {
     const self = this;
 
     this.socket.addEventListener('open', (event) => {
@@ -19,14 +20,19 @@ class GameClient {
       console.log("Websocket closed.");
     });
     this.socket.addEventListener('message', (event) => {
-      console.log(event.data);
+      //console.log(event.data);
       const dataObj = JSON.parse(event.data);
-      self._readPacket(dataObj);
+      self._readPacket(dataObj, battlefield);
     });
   }
 
-  _readPacket(dataObj) {
-
+  _readPacket(dataObj, battlefield) {
+    switch (dataObj.type) {
+      case GameProtocol.BATTLEFIELD_PACKET_TYPE:
+      default:
+        BattlefieldLoader.loadFromString(dataObj.fileText, battlefield);
+        break;
+    }
   }
 
 

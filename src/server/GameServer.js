@@ -1,7 +1,6 @@
 import fs from 'fs';
 import ws from 'ws';
 
-
 import GameProtocol from '../shared/GameProtocol';
 
 class GameServer {

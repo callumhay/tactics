@@ -4,11 +4,6 @@ import * as CANNON from 'cannon';
 import Battlefield from './Battlefield';
 import GameClient from './GameClient';
 
-// Setup the client, connect to the game server
-const client = new GameClient();
-client.start();
-
-
 // Setup Cannon library
 const physicsWorld = new CANNON.World();
 physicsWorld.gravity.set(0,0,0);
@@ -108,8 +103,12 @@ const material = new THREE.MeshBasicMaterial({ color: 0xff0000, wireframe: true 
 const mesh = new THREE.Mesh(geometry, material);
 scene.add(mesh);
 */
+
 const battlefield = new Battlefield(scene);
-//BattlefieldLoader.load("test", battlefield);
+// Setup the client, connect to the game server
+const client = new GameClient();
+client.start(battlefield);
+
 
 const updatePhysics = (dt) => {
   // Step the physics world
