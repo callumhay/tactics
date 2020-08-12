@@ -10,6 +10,7 @@ class LatticeNode {
   }
 }
 
+/*
 class LatticeEdge {
   constructor(n0, n1) {
     this.nodes = [n0, n1];
@@ -20,6 +21,7 @@ class LatticeEdge {
     return (this.nodes[0] === nodeA && this.nodes[1] === nodeB || this.nodes[0] === nodeB && this.nodes[1] === nodeA);
   }
 }
+*/
 
 const DEFAULT_NODES_PER_TERRAIN_SQUARE_UNIT = 5;
 
@@ -49,7 +51,6 @@ export default class RigidBodyLattice {
 
     this.unitsBetweenNodes = TerrainColumn.SIZE / (numNodesPerUnit-1);
      
-
     // Nodes are built to reflect the same coordinate system as the terrain
     const numNodesX = terrain.length * numNodesPerUnit + 1 - terrain.length;
     this.nodes = new Array(numNodesX).fill(null);
@@ -66,7 +67,6 @@ export default class RigidBodyLattice {
         currTerrainXIndices.push(floorXIdx+1);
       }
 
-      
       const numNodesZ = terrainZ.length * numNodesPerUnit + 1 - terrainZ.length;
       const nodesZ = this.nodes[x] = new Array(numNodesZ).fill(null);
       

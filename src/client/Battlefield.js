@@ -48,6 +48,15 @@ export default class Battlefield {
     this.rigidBodyLattice.buildFromTerrain(this.terrain);
   }
 
+  clear() {
+    for (let x = 0; x < this.terrain.length; x++) {
+      for (let z = 0; z < this.terrain[x].length; z++) {
+        this.terrain[x][z].clear();
+      }
+    }
+    this.terrain = [];
+  }
+
   // NOTE: We assume that the subtractGeometry is in the same coord space as the terrain
   blowupTerrain(subtractGeometry) {
     if (!subtractGeometry.boundingBox) subtractGeometry.computeBoundingBox();
@@ -69,7 +78,7 @@ export default class Battlefield {
     }
 
     terrainCols.forEach(terrainCol => {
-      terrainCol.blowup(subtractGeometry);
+      terrainCol.blowupTerrain(subtractGeometry);
     });
   }
 

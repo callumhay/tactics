@@ -4,6 +4,8 @@ import watch from 'watch';
 import http from 'http';
 import reload from 'reload';
 
+import GameServer from './GameServer';
+
 const LOCALHOST_WEB_PORT = 4001;
 const DISTRIBUTION_DIRNAME = "dist";
 
@@ -36,3 +38,5 @@ reload(app).then((reloadReturned) => {
 }).catch(function (err) {
   console.error('Reload could not start, could not start server/sample app', err)
 });
+
+const gameServer = new GameServer();

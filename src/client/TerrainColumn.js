@@ -34,6 +34,23 @@ class TerrainColumn {
     });
   }
 
+  clear() {
+    this.meshes.forEach(mesh => {
+      this.terrainGrp.remove(mesh);
+    });
+    this.meshes = [];
+
+    this.geometries.forEach(geometry => {
+      geometry.dispose();
+    });
+    this.geometries = [];
+
+    this.material = null;
+    this.xIndex = -1;
+    this.zIndex = -1;
+    this.landingRanges = [];
+  }
+
   getTerrainSpaceTranslation(rangeIdx) {
     const [startY, endY] = this.landingRanges[rangeIdx];
     const height = endY - startY;
@@ -83,7 +100,7 @@ class TerrainColumn {
   }
 
   // NOTE: We assume that the subtractGeometry is in the same coord space as the terrain
-  blowup(subtractGeometry) {
+  blowupTerrain(subtractGeometry) {
     const {boundingBox} = subtractGeometry;
 
     // Figure out what terrain geometry will be affected in this column

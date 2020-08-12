@@ -1,9 +1,12 @@
 import * as THREE from 'three';
-import CSG from 'three-csg';
 import {OrbitControls} from 'three/examples/jsm/controls/OrbitControls';
-import {BufferGeometryUtils} from 'three/examples/jsm/utils/BufferGeometryUtils';
 import * as CANNON from 'cannon';
 import Battlefield from './Battlefield';
+import GameClient from './GameClient';
+
+// Setup the client, connect to the game server
+const client = new GameClient();
+client.start();
 
 
 // Setup Cannon library
@@ -77,12 +80,12 @@ function onMouseClick(event) {
     groupInvTransform.getInverse(group.matrixWorld);
 
     const BLAST_RADIUS = 1;
-    const sphere = new THREE.SphereBufferGeometry(BLAST_RADIUS, 10, 10);
-    sphere.translate(point.x, point.y, point.z);
-    sphere.applyMatrix4(groupInvTransform);
-    //scene.add(new THREE.Mesh(sphere));
-    battlefield.blowupTerrain(sphere);
-    sphere.dispose();
+    const blastGeometry = new THREE.DodecahedronBufferGeometry(BLAST_RADIUS, 0);
+    blastGeometry.translate(point.x, point.y, point.z);
+    blastGeometry.applyMatrix4(groupInvTransform);
+    //scene.add(new THREE.Mesh(blastGeometry));
+    battlefield.blowupTerrain(blastGeometry);
+    blastGeometry.dispose();
 
     //intersectedObj = newMesh;
     //intersectedObj.currentHex = intersectedObj.material.emissive.getHex();
@@ -106,6 +109,7 @@ const mesh = new THREE.Mesh(geometry, material);
 scene.add(mesh);
 */
 const battlefield = new Battlefield(scene);
+//BattlefieldLoader.load("test", battlefield);
 
 const updatePhysics = (dt) => {
   // Step the physics world
