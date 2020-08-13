@@ -1,0 +1,14 @@
+{
+  "terrain": [
+    [
+      {"type":"rock", "landingRanges":[[0,4],[6,7]]},
+      {"type":"rock", "landingRanges":[[0,7]]}
+    ],
+    [
+      {"type":"rock", "landingRanges":[[0,1],[4,5]]}
+    ],
+    [
+      {"type":"rock", "landingRanges":[[0,4],[6,7]]}
+    ]
+  ]
+}

@@ -1,0 +1,56 @@
+{
+  "terrain": [
+    [
+      {"type": "rock", "landingRanges": [[0,8]]},
+      {"type": "rock", "landingRanges": [[0,7]]},
+      {"type": "rock", "landingRanges": [[0,6]]},
+      {"type": "rock", "landingRanges": [[0,5]]},
+      {"type": "rock", "landingRanges": [[0,4]]},
+      {"type": "rock", "landingRanges": [[0,3]]},
+      {"type": "rock", "landingRanges": [[0,2]]},
+      {"type": "rock", "landingRanges": [[0,1]]} 
+    ],
+    [
+     {"type": "rock", "landingRanges": [[0,7]]},
+     {"type": "rock", "landingRanges": [[0,6]]},
+     {"type": "rock", "landingRanges": [[0,5]]},
+     {"type": "rock", "landingRanges": [[0,4]]},
+     {"type": "rock", "landingRanges": [[0,3]]},
+     {"type": "rock", "landingRanges": [[0,2]]},
+     {"type": "rock", "landingRanges": [[0,1]]} 
+    ],
+    [
+     {"type": "rock", "landingRanges": [[0,6]]},
+     {"type": "rock", "landingRanges": [[0,5]]},
+     {"type": "rock", "landingRanges": [[0,4]]},
+     {"type": "rock", "landingRanges": [[0,3]]},
+     {"type": "rock", "landingRanges": [[0,2]]},
+     {"type": "rock", "landingRanges": [[0,1]]} 
+    ],
+    [
+     {"type": "rock", "landingRanges": [[0,5]]},
+     {"type": "rock", "landingRanges": [[0,4]]},
+     {"type": "rock", "landingRanges": [[0,3]]},
+     {"type": "rock", "landingRanges": [[0,2]]},
+     {"type": "rock", "landingRanges": [[0,1]]} 
+    ],
+    [
+     {"type": "rock", "landingRanges": [[0,4]]},
+     {"type": "rock", "landingRanges": [[0,3]]},
+     {"type": "rock", "landingRanges": [[0,2]]},
+     {"type": "rock", "landingRanges": [[0,1]]} 
+    ],
+    [
+     {"type": "rock", "landingRanges": [[0,3]]},
+     {"type": "rock", "landingRanges": [[0,2]]},
+     {"type": "rock", "landingRanges": [[0,1]]} 
+    ],
+    [
+     {"type": "rock", "landingRanges": [[0,2]]},
+     {"type": "rock", "landingRanges": [[0,1]]} 
+    ],
+    [
+     {"type": "rock", "landingRanges": [[0,1]]} 
+    ]
+  ]
+}

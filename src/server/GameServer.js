@@ -27,7 +27,7 @@ class GameServer {
         self.webClientSockets.splice(self.webClientSockets.indexOf(socket), 1);
       });
 
-      const bfFilepath = 'test/maps/gravity/connected_terrain_1.bf'; 
+      const bfFilepath = 'test/maps/gravity/connected_terrain_1.json';
       fs.readFile(bfFilepath, (err, data) => {
         if (err) {
           console.error(`Failed to read file '${bfFilepath}': ${err}`);
@@ -36,7 +36,7 @@ class GameServer {
 
         const battlefieldData = {
           type: GameProtocol.BATTLEFIELD_PACKET_TYPE,
-          fileText: data.toString('utf8'),
+          data: JSON.parse(data.toString('utf8')),
         };
         socket.send(JSON.stringify(battlefieldData));
       });

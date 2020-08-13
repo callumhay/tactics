@@ -2,6 +2,7 @@
 const path = require('path');
 const nodeExternals = require('webpack-node-externals');
 const distPath = path.resolve(__dirname, 'dist');
+const CopyPlugin = require('copy-webpack-plugin');
 
 const commonConfig = {
   mode: 'development',
@@ -27,6 +28,13 @@ const serverConfig = {...commonConfig,
     filename: 'server.js',
     path: distPath,
   },
+  plugins: [
+    new CopyPlugin({
+      patterns: [
+        { from: 'index.html' }
+      ]
+    })
+  ]
 };
 const clientConfig = {...commonConfig,
   target: 'web',

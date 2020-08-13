@@ -32,6 +32,7 @@ export default class Battlefield {
 
     // TODO: Do a basic terrain check for floating "islands" (i.e., terrain blobs that aren't connected to the ground), 
     // remove them from the terrain and turn them into physics objects
+    this._preloadCleanupTerrain();
 
     this._buildRigidbodyLattice();
   }
@@ -84,7 +85,12 @@ export default class Battlefield {
   _preloadCleanupTerrain() {
     for (let x = 0; x < this._terrain.length; x++) {
       for (let z = 0; z < this._terrain[x].length; z++) {
+
         const terrainCol = this._terrain[x][z];
+        const {landingRanges} = terrainCol;
+        if (landingRanges.length === 0) {
+          continue;
+        }
 
         const neighbours = [];
         if (x > 0) { neighbours.push(this._terrain[x-1][z]); }
@@ -92,9 +98,43 @@ export default class Battlefield {
         if (z > 0) { neighbours.push(this._terrain[x][z-1]); }
         if (z < this._terrain[x].length-1) { neighbours.push(this._terrain[x][z+1]); }
 
+        // For each of the non-grounded terrainCol ranges, count the overlaps of neighbouring ranges
+        // This is a 2D array where each element is 2 values: [rangeIdx_in_terrainCol, count]
+        const rangeCounts = [];
+        let prevRangeGrounded = false;
+        for (let i = 0; i < landingRanges.length; i++) {
+          const [startY, endY] = landingRanges[i];
+          if (startY === 0) {
+            prevRangeGrounded = true;
+          }
+          else {
+            rangeCounts.push([i, 0]);
+          }
+        }
+
         neighbours.forEach(neighbour => {
           if (neighbour) {
-            
+            // Is there an overlap of this neighbours ranges with any of the ungrounded ranges of terrainCol?
+            neighbour.landingRanges.forEach(neighbourRange => {
+              const [neighbourRangeStart, neighbourRangeEnd] = neighbourRange;
+              for (let i = 0; i < rangeCounts.length; i++) {
+                const currRangeCountPair = rangeCounts[i];
+                const [currRangeStart, currRangeEnd] = landingRanges[currRangeCountPair[0]];
+                if (currRangeStart > neighbourRangeEnd) { break; } // No possible overlap (assuming sorted, mutually exclusive ranges)
+                if (currRangeStart < neighbourRangeEnd && currRangeEnd > neighbourRangeStart) {
+                  currRangeCountPair[1]++;
+                }
+              }
+            });
+          }
+        });
+
+        // If any of the terrainCol ranges have no overlaps with neighbours and they aren't grounded
+        // then they are stranded and should be removed
+        rangeCounts.forEach(rangeCountPair => {
+          const [rangeIdx, count] = rangeCountPair;
+          if (count === 0) {
+            terrainCol.detachLandingRange(rangeIdx);
           }
         });
       }

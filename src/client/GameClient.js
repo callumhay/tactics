@@ -30,7 +30,7 @@ class GameClient {
     switch (dataObj.type) {
       case GameProtocol.BATTLEFIELD_PACKET_TYPE:
       default:
-        BattlefieldLoader.loadFromString(dataObj.fileText, battlefield);
+        BattlefieldLoader.loadFromJsonObj(dataObj.data, battlefield);
         break;
     }
   }

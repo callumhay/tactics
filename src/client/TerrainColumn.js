@@ -20,6 +20,12 @@ class TerrainColumn {
     this.meshes = [];
     this.material = new THREE.MeshLambertMaterial({color: 0xffffff});
 
+    // Sort the landing ranges by their starting ("startY") coordinate
+    this.landingRanges.sort((a,b) => a[0]-b[0]);
+    // Basic clean-up: Merge together any overlaps
+    this.landingRanges = TerrainColumn.mergeLandingRanges(this.landingRanges);
+
+    // Build the THREE geometry and meshes for each interval
     this.landingRanges.forEach((range,rangeIdx) => {
       const [startY, endY] = range;
       const height = endY-startY;
@@ -32,6 +38,30 @@ class TerrainColumn {
 
       this.terrainGroup.add(mesh);
     });
+  }
+
+  // NOTE: landingRanges must be sorted by the starting element of each range in ascending order
+  static mergeLandingRanges(landingRanges) {
+    if (landingRanges.length === 0) { return landingRanges; }
+    const stack = [landingRanges[0]];
+    let top = null;
+
+    // Start from the next interval and merge if needed
+    for (let i = 1; i < landingRanges.length; i++) {
+      top = stack[stack.length - 1]; // Get the top element
+
+      // If the current interval doesn't overlap with the stack top element, push it to the stack
+      if (top[1] < landingRanges[i][0]) {
+        stack.push(landingRanges[i]);
+      }
+      else if (top[1] <= landingRanges[i][1]) {
+        // Otherwise update the end value of the top element if end of current interval is higher
+        top[1] = landingRanges[i][1];
+        stack.pop();
+        stack.push(top);
+      }
+    }
+    return stack;
   }
 
   clear() {
@@ -62,6 +92,8 @@ class TerrainColumn {
       this.zIndex * TerrainColumn.SIZE + TerrainColumn.HALF_SIZE
     );
   }
+
+
 
   _buildTerrainMesh(geometry, rangeIdx) {
     const translation = this.getTerrainSpaceTranslation(rangeIdx);
@@ -101,6 +133,11 @@ class TerrainColumn {
     return false;
   }
 
+  detachLandingRange(rangeIdx) {
+    const rangeToRemove = this.landingRanges[rangeIdx];
+    console.log(`Removing landing range (${rangeToRemove[0]}, ${rangeToRemove[1]}) in TerrainColumn (${this.xIndex}, ${this.zIndex}).`);
+  }
+
   // NOTE: We assume that the subtractGeometry is in the same coord space as the terrain
   blowupTerrain(subtractGeometry) {
     const {boundingBox} = subtractGeometry;
@@ -111,9 +148,7 @@ class TerrainColumn {
     const maxY = Math.floor(boundingBox.max.y);
     for (let i = 0; i < this.landingRanges.length; i++) {
       const [startY, endY] = this.landingRanges[i];
-      if (startY >= minY && startY <= maxY || 
-          endY >= minY && endY <= maxY || 
-          startY <= minY && endY >= maxY) { 
+      if (startY <= maxY && endY >= minY) {
         collidingIndices.push(i);
       }
     }
