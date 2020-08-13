@@ -5,8 +5,11 @@ import TerrainColumn from './TerrainColumn';
 import RigidBodyLattice from './RigidBodyLattice'
 
 export default class Battlefield {
-  constructor(scene) {
+  constructor(scene, physics) {
     this._scene = scene;
+    this.physics = physics;
+
+    this.debris = [];
 
     this.sunLight = new THREE.DirectionalLight(0xffffff, 0.5);
     //this.sunLight.castShadow = true;
@@ -29,11 +32,7 @@ export default class Battlefield {
     this._terrain = terrain;
     const terrainSize = terrain.length * TerrainColumn.SIZE;
     this.terrainGroup.position.set(0, -terrainSize / 2, 0, -terrainSize / 2);
-
-    // TODO: Do a basic terrain check for floating "islands" (i.e., terrain blobs that aren't connected to the ground), 
-    // remove them from the terrain and turn them into physics objects
     this._preloadCleanupTerrain();
-
     this._buildRigidbodyLattice();
   }
 
@@ -82,6 +81,14 @@ export default class Battlefield {
     });
   }
 
+  convertTerrainToDebris(debrisMesh, config) {
+    
+    const debrisObj = this.physics.addObject(debrisMesh, config);
+    this.debris.push(debrisObj);
+  }
+
+  // Do a basic terrain check for floating "islands" (i.e., terrain blobs that aren't connected to the ground), 
+  // remove them from the terrain and turn them into physics objects
   _preloadCleanupTerrain() {
     for (let x = 0; x < this._terrain.length; x++) {
       for (let z = 0; z < this._terrain[x].length; z++) {
@@ -149,7 +156,7 @@ export default class Battlefield {
       for (let z = 0; z < depth; z++) {
         const firstLandingEnd = Math.floor(1 + Math.random() * 2);
         const secondLandingStart = Math.floor(firstLandingEnd + 1 + Math.random() * 2);
-        terrainZ[z] = new TerrainColumn(this.terrainGroup, x, z, [[0, firstLandingEnd], [secondLandingStart, secondLandingStart + Math.floor(1 + Math.random() * 3)]]);
+        terrainZ[z] = new TerrainColumn(this, x, z, [[0, firstLandingEnd], [secondLandingStart, secondLandingStart + Math.floor(1 + Math.random() * 3)]]);
       }
     }
     this.setTerrain(terrain);

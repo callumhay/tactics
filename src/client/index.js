@@ -1,15 +1,8 @@
 import * as THREE from 'three';
 import {OrbitControls} from 'three/examples/jsm/controls/OrbitControls';
-import * as CANNON from 'cannon';
+import GamePhysics from './GamePhysics';
 import Battlefield from './Battlefield';
 import GameClient from './GameClient';
-
-// Setup Cannon library
-const physicsWorld = new CANNON.World();
-physicsWorld.gravity.set(0,0,0);
-physicsWorld.broadphase = new CANNON.NaiveBroadphase();
-physicsWorld.solver.iterations = 10;
-
 
 // Setup THREE library boilerplate for getting a scene + camera + basic controls up and running
 const renderer = new THREE.WebGLRenderer();
@@ -88,47 +81,23 @@ function onMouseClick(event) {
   }
 }
 
+// Setup game objects
+const physics = new GamePhysics(scene);
+const battlefield = new Battlefield(scene, physics);
 
-/*
-// Temporary stuff just to get this working / test
-const shape = new CANNON.Box(new CANNON.Vec3(1,1,1));
-const body = new CANNON.Body({mass: 1});
-body.addShape(shape);
-body.angularVelocity.set(0,10,0);
-body.angularDamping = 0.1;
-physicsWorld.addBody(body);
-
-const geometry = new THREE.BoxGeometry(2, 2, 2);
-const material = new THREE.MeshBasicMaterial({ color: 0xff0000, wireframe: true });
-const mesh = new THREE.Mesh(geometry, material);
-scene.add(mesh);
-*/
-
-const battlefield = new Battlefield(scene);
 // Setup the client, connect to the game server
 const client = new GameClient();
 client.start(battlefield);
 
-
-const updatePhysics = (dt) => {
-  // Step the physics world
-  physicsWorld.step(dt);
-
-  // Copy coordinates from Cannon.js to Three.js
-  // TODO
-  //mesh.position.copy(body.position);
-  //mesh.quaternion.copy(body.quaternion);
-}
-
-let lastFrameTime = Date.now();
+// Setup and execute the game loop
+const clock = new THREE.Clock(true);
 const render = function () {
-  let currFrameTime = Date.now();
-  let dt = (currFrameTime - lastFrameTime) / 1000;
+  let dt = clock.getDelta();
 
   requestAnimationFrame(render);
 
   // Updates for physics/controls/sound/etc.
-  updatePhysics(dt);
+  physics.update(dt);
   controls.update();
 
   // Render the scene

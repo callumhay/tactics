@@ -9,17 +9,19 @@ class TerrainColumn {
   static get HALF_SIZE() { return TerrainColumn.SIZE/2; }
   static get EPSILON() { return 1e-6; }
 
-  constructor(terrainGroup, u, v, landingRanges) {
-    this.terrainGroup = terrainGroup;
+  constructor(battlefield, u, v, landingRanges) {
+    this.battlefield = battlefield;
+    const {terrainGroup, physics} = this.battlefield;
 
     this.xIndex = u;
     this.zIndex = v;
     this.landingRanges = landingRanges;
+    this.meshes = []; // Corresponding to each landingRange
 
-    this.geometries = [];
-    this.meshes = [];
     this.material = new THREE.MeshLambertMaterial({color: 0xffffff});
 
+    // If there are any zero/negative sized ranges they must be removed
+    this.landingRanges = this.landingRanges.filter(range => range[1] - range[0] > 0);
     // Sort the landing ranges by their starting ("startY") coordinate
     this.landingRanges.sort((a,b) => a[0]-b[0]);
     // Basic clean-up: Merge together any overlaps
@@ -29,15 +31,26 @@ class TerrainColumn {
     this.landingRanges.forEach((range,rangeIdx) => {
       const [startY, endY] = range;
       const height = endY-startY;
-
       const geometry = new THREE.BoxBufferGeometry(TerrainColumn.SIZE, height*TerrainColumn.SIZE, TerrainColumn.SIZE);
       const mesh = this._buildTerrainMesh(geometry, rangeIdx);
-      
-      this.geometries.push(geometry);
       this.meshes.push(mesh);
-
-      this.terrainGroup.add(mesh);
+      terrainGroup.add(mesh);
     });
+
+    // Build the physical representation of the terrain
+    this.physicsObjs = [];
+    const physicsConfig = {
+      type: 'kinematic',
+      shape: "box",
+      size: [1,1,1],
+    };
+    for (let i = 0; i < this.landingRanges.length; i++) {
+      const {size} = physicsConfig;
+      const [startY, endY] = this.landingRanges[i];
+      const mesh = this.meshes[i];
+      size[1] = endY - startY;
+      this.physicsObjs.push(physics.addObject(mesh, physicsConfig));
+    }
   }
 
   // NOTE: landingRanges must be sorted by the starting element of each range in ascending order
@@ -65,15 +78,12 @@ class TerrainColumn {
   }
 
   clear() {
+    const {terrainGroup} = this.battlefield;
     this.meshes.forEach(mesh => {
-      this.terrainGroup.remove(mesh);
+      terrainGroup.remove(mesh);
+      mesh.geometry.dispose();
     });
     this.meshes = [];
-
-    this.geometries.forEach(geometry => {
-      geometry.dispose();
-    });
-    this.geometries = [];
 
     this.material = null;
     this.xIndex = -1;
@@ -92,8 +102,6 @@ class TerrainColumn {
       this.zIndex * TerrainColumn.SIZE + TerrainColumn.HALF_SIZE
     );
   }
-
-
 
   _buildTerrainMesh(geometry, rangeIdx) {
     const translation = this.getTerrainSpaceTranslation(rangeIdx);
@@ -136,10 +144,35 @@ class TerrainColumn {
   detachLandingRange(rangeIdx) {
     const rangeToRemove = this.landingRanges[rangeIdx];
     console.log(`Removing landing range (${rangeToRemove[0]}, ${rangeToRemove[1]}) in TerrainColumn (${this.xIndex}, ${this.zIndex}).`);
+    
+    // We'll need to convert the landing range into debris that is physics-based
+    const detachedMesh = this.meshes[rangeIdx];
+    const detachedPhysObj = this.physicsObjs[rangeIdx];
+
+    // Remove the range from this
+    this.landingRanges.splice(rangeIdx, 1);
+    this.meshes.splice(rangeIdx, 1);
+    this.physicsObjs.splice(rangeIdx, 1);
+
+    // We need to remove the old physical object for the terrain
+    const {physics} = this.battlefield;
+    physics.removeObject(detachedPhysObj);
+
+    // TODO: Do we treat the debris as a box? a mesh? does it break apart? etc.
+    const size = [1, rangeToRemove[1] - rangeToRemove[0], 1];
+    const config = {
+      type: 'dynamic',
+      mass: size[0] * size[1] * size[2], // TODO: material mass??
+      shape: "box",
+      size: size,
+    };
+    this.battlefield.convertTerrainToDebris(detachedMesh, config);
   }
+
 
   // NOTE: We assume that the subtractGeometry is in the same coord space as the terrain
   blowupTerrain(subtractGeometry) {
+    const {terrainGroup} = this.battlefield;
     const {boundingBox} = subtractGeometry;
 
     // Figure out what terrain geometry will be affected in this column
@@ -154,8 +187,8 @@ class TerrainColumn {
     }
 
     collidingIndices.forEach(index => {
-      const collidingGeometry = this.geometries[index];
       const collidingMesh = this.meshes[index];
+      const collidingGeometry = collidingMesh.geometry;
 
       // The geometry needs to be placed into the terrain space
       const translation = this.getTerrainSpaceTranslation(index);
@@ -167,18 +200,18 @@ class TerrainColumn {
       const newMesh = this._buildTerrainMesh(newGeometry, index);
 
       // Clean-up and replace the appropriate THREE objects
-      this.terrainGroup.remove(collidingMesh);
+      terrainGroup.remove(collidingMesh);
       collidingGeometry.dispose();
-      this.terrainGroup.add(newMesh);
+      terrainGroup.add(newMesh);
 
-      this.geometries[index] = newGeometry;
       this.meshes[index] = newMesh;
     });
   }
 
   _clearDebugAABBGroup() {
     if (this.debugAABBGroup) {
-      this.terrainGroup.remove(this.debugAABBGroup);
+      const {terrainGroup} = this.battlefield;
+      terrainGroup.remove(this.debugAABBGroup);
       this.debugAABBGroup.children.forEach(child => {
         child.geometry.dispose();
       });
@@ -191,6 +224,7 @@ class TerrainColumn {
     this._clearDebugAABBGroup();
 
     if (show) {
+      const {terrainGroup} = this.battlefield;
       const aabbs = this.calcAABBs();
       const currCenter = new THREE.Vector3();
       aabbs.forEach(aabb => {
@@ -204,7 +238,7 @@ class TerrainColumn {
         this.debugAABBGroup.add(mesh);
       });
       this.debugAABBGroup.renderOrder = Debug.TERRAIN_AABB_RENDER_ORDER;
-      this.terrainGroup.add(this.debugAABBGroup);
+      terrainGroup.add(this.debugAABBGroup);
     }
   }
 }
