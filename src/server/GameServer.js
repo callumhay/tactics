@@ -27,7 +27,7 @@ class GameServer {
         self.webClientSockets.splice(self.webClientSockets.indexOf(socket), 1);
       });
 
-      const bfFilepath = 'test/maps/unequal_width_height.bf'; 
+      const bfFilepath = 'test/maps/gravity/connected_terrain_1.bf'; 
       fs.readFile(bfFilepath, (err, data) => {
         if (err) {
           console.error(`Failed to read file '${bfFilepath}': ${err}`);

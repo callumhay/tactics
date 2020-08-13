@@ -10,23 +10,32 @@ class BattlefieldLoader {
 
       // Each line defines the x-axis (width) of terrain columns in the map
       const lines = bfFileStr.split(/\r\n|\r|\n/g);
-      lines.forEach(line => {
+      lines.forEach((line, idx) => {
         const terrainColumns = [];
 
         // Seperate out all of the terrain columns on the current row
-        const terrainColEntries = line.match(/\{(\w+\(\d+\,\d+\))(,\w+\(\d+\,\d+\))*\}/g);
+        const terrainColEntries = line.match(/\{(\w+(\(\d+\,\d+\))+)*\}/g);
+        if (!terrainColEntries) {
+          throw `Invalid terrain column formats on line ${idx+1}.`;
+        }
         terrainColEntries.forEach(terrainColEntry => {
           // Match the type of terrain and the landing sites for the current terrain col
-          const entryComponents = terrainColEntry.match(/\{(\w+)\((\d+)\,(\d+)\)\}/);
-          if (entryComponents.length < 3 || (entryComponents.length-2) % 2 !== 0) {
-            throw `Invalid terrain column entry found: ${terrainColEntry} could not parse.`;
+          const typeComponent = terrainColEntry.match(/([a-zA-Z]+)/g);
+          if (!typeComponent || !typeComponent[0]) {
+            throw `Invalid terrain column entry found: ${terrainColEntry} could not parse type name.`;
+          }
+          const terrainType = typeComponent[0];
+
+          const rangeComponents = terrainColEntry.match(/(\(\d+\,\d+\))/g);
+          if (!rangeComponents) {
+            throw `Invalid terrain column entry found: ${terrainColEntry} could not parse range components.`;
           }
           
-          const terrainType = entryComponents[1];
           const landingRanges = [];
-          for (let i = 2; i < entryComponents.length; i += 2) {
-            landingRanges.push([parseFloat(entryComponents[i]), parseFloat(entryComponents[i+1])]);
-          }
+          rangeComponents.forEach((rangeStr) => {
+            const rangeNumbers = rangeStr.match(/(\d+),(\d+)/);
+            landingRanges.push([parseFloat(rangeNumbers[1]), parseFloat(rangeNumbers[2])]);
+          });
 
           const terrainColumn = new TerrainColumn(
             battlefield.terrainGroup, terrain.length, terrainColumns.length, landingRanges

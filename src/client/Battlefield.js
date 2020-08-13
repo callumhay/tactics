@@ -21,7 +21,7 @@ export default class Battlefield {
     this.terrainGroup = new THREE.Group();
     this._scene.add(this.terrainGroup);
 
-    this._buildDebugTerrain(10, 10);
+    //this._buildDebugTerrain(10, 10);
   }
 
   setTerrain(terrain) {
@@ -29,6 +29,10 @@ export default class Battlefield {
     this._terrain = terrain;
     const terrainSize = terrain.length * TerrainColumn.SIZE;
     this.terrainGroup.position.set(0, -terrainSize / 2, 0, -terrainSize / 2);
+
+    // TODO: Do a basic terrain check for floating "islands" (i.e., terrain blobs that aren't connected to the ground), 
+    // remove them from the terrain and turn them into physics objects
+
     this._buildRigidbodyLattice();
   }
 
@@ -36,7 +40,7 @@ export default class Battlefield {
     if (this.rigidBodyLattice) { this.rigidBodyLattice.clear(); }
     this.rigidBodyLattice = new RigidBodyLattice(this.terrainGroup);
     this.rigidBodyLattice.buildFromTerrain(this._terrain);
-    this.debugDrawRigidBodyLattice();
+    //this.rigidBodyLattice.debugDrawNodes();
   }
 
   clear() {
@@ -77,9 +81,26 @@ export default class Battlefield {
     });
   }
 
-  debugDrawRigidBodyLattice(show=true) {
-    this.rigidBodyLattice.debugDrawNodes(show);
+  _preloadCleanupTerrain() {
+    for (let x = 0; x < this._terrain.length; x++) {
+      for (let z = 0; z < this._terrain[x].length; z++) {
+        const terrainCol = this._terrain[x][z];
+
+        const neighbours = [];
+        if (x > 0) { neighbours.push(this._terrain[x-1][z]); }
+        if (x < this._terrain.length-1) { neighbours.push(this._terrain[x+1][z]); }
+        if (z > 0) { neighbours.push(this._terrain[x][z-1]); }
+        if (z < this._terrain[x].length-1) { neighbours.push(this._terrain[x][z+1]); }
+
+        neighbours.forEach(neighbour => {
+          if (neighbour) {
+            
+          }
+        });
+      }
+    }
   }
+
 
   _buildDebugTerrain(width, depth) {
     const terrain = new Array(width);
