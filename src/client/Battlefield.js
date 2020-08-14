@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-//import * as CANNON from 'cannon';
 
 import TerrainColumn from './TerrainColumn';
 import RigidBodyLattice from './RigidBodyLattice'
@@ -23,8 +22,6 @@ export default class Battlefield {
 
     this.terrainGroup = new THREE.Group();
     this._scene.add(this.terrainGroup);
-
-    //this._buildDebugTerrain(10, 10);
   }
 
   setTerrain(terrain) {
@@ -82,9 +79,9 @@ export default class Battlefield {
   }
 
   convertTerrainToDebris(debrisMesh, config) {
-    
     const debrisObj = this.physics.addObject(debrisMesh, config);
     this.debris.push(debrisObj);
+    return debrisObj;
   }
 
   // Do a basic terrain check for floating "islands" (i.e., terrain blobs that aren't connected to the ground), 
@@ -110,7 +107,7 @@ export default class Battlefield {
         const rangeCounts = [];
         let prevRangeGrounded = false;
         for (let i = 0; i < landingRanges.length; i++) {
-          const [startY, endY] = landingRanges[i];
+          const {startY, endY} = landingRanges[i];
           if (startY === 0) {
             prevRangeGrounded = true;
           }
@@ -123,10 +120,10 @@ export default class Battlefield {
           if (neighbour) {
             // Is there an overlap of this neighbours ranges with any of the ungrounded ranges of terrainCol?
             neighbour.landingRanges.forEach(neighbourRange => {
-              const [neighbourRangeStart, neighbourRangeEnd] = neighbourRange;
+              const {startY:neighbourRangeStart, endY:neighbourRangeEnd} = neighbourRange;
               for (let i = 0; i < rangeCounts.length; i++) {
                 const currRangeCountPair = rangeCounts[i];
-                const [currRangeStart, currRangeEnd] = landingRanges[currRangeCountPair[0]];
+                const {startY:currRangeStart, endY:currRangeEnd} = landingRanges[currRangeCountPair[0]];
                 if (currRangeStart > neighbourRangeEnd) { break; } // No possible overlap (assuming sorted, mutually exclusive ranges)
                 if (currRangeStart < neighbourRangeEnd && currRangeEnd > neighbourRangeStart) {
                   currRangeCountPair[1]++;
@@ -146,19 +143,5 @@ export default class Battlefield {
         });
       }
     }
-  }
-
-
-  _buildDebugTerrain(width, depth) {
-    const terrain = new Array(width);
-    for (let x = 0; x < width; x++) {
-      const terrainZ = terrain[x] = new Array(depth).fill(null);
-      for (let z = 0; z < depth; z++) {
-        const firstLandingEnd = Math.floor(1 + Math.random() * 2);
-        const secondLandingStart = Math.floor(firstLandingEnd + 1 + Math.random() * 2);
-        terrainZ[z] = new TerrainColumn(this, x, z, [[0, firstLandingEnd], [secondLandingStart, secondLandingStart + Math.floor(1 + Math.random() * 3)]]);
-      }
-    }
-    this.setTerrain(terrain);
   }
 }

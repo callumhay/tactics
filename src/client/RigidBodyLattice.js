@@ -106,7 +106,7 @@ export default class RigidBodyLattice {
         let maxHeight = 0;
         for (let i = 0; i < columns.length; i++) {
           const {landingRanges} = columns[i];
-          maxHeight = Math.max(landingRanges[landingRanges.length-1][1], maxHeight);
+          maxHeight = Math.max(landingRanges[landingRanges.length-1].endY, maxHeight);
         }
         const numNodesY = maxHeight * numNodesPerUnit;
         const nodesY = nodesZ[z] = new Array(numNodesY).fill(null);
@@ -119,7 +119,6 @@ export default class RigidBodyLattice {
             nodesY[y] = new LatticeNode(currNodeId++, currNodePos, columnsContainingNode);
           }
         }
-
       }
     }
 

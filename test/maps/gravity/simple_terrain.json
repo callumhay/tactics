@@ -1,5 +1,10 @@
 {
   "terrain": [
-    [{"type":"rock", "landingRanges":[[0,4],[6,7]]}]
+    [{
+      "matgroups": [
+        {"type":"rock", "landingRanges":[[0,4]]},
+        {"type":"dirt", "landingRanges":[[6,7]]}
+      ]
+    }]
   ]
 }

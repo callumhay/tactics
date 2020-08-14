@@ -1,5 +1,12 @@
 import * as CANNON from 'cannon';
 
+const MATERIAL_TYPE_ROCK = "rock";
+// NOTE: Material density is measured in kg/m^3
+const materials = {
+  MATERIAL_TYPE_ROCK: {density: 1600, cannonMaterial: new CANNON.Material(MATERIAL_TYPE_ROCK)},
+};
+
+
 class GamePhysics {
   constructor(scene) {
     this.scene = scene; // THREE.js scene
@@ -19,8 +26,8 @@ class GamePhysics {
       this.terrainMaterial, 
       this.terrainMaterial, 
       {
-        friction:1,
-        restitution:0,
+        friction:0.4,
+        restitution:0.01,
       }
     ));
 
