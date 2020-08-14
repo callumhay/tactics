@@ -29,7 +29,6 @@ const TRAVERSAL_UNVISITED_STATE     = 0;
 const TRAVERSAL_BEING_VISITED_STATE = 1;
 const TRAVERSAL_FINISHED_STATE      = 2;
 
-
 export default class RigidBodyLattice {
   constructor(terrainGroup) {
     this.terrainGroup = terrainGroup;
@@ -63,7 +62,6 @@ export default class RigidBodyLattice {
     this.nodes = new Array(numNodesX).fill(null);
 
     let currNodeId = 0;
-
     for (let x = 0; x < numNodesX; x++) {
       const nodeXPos = x*this.unitsBetweenNodes;
 
@@ -124,7 +122,6 @@ export default class RigidBodyLattice {
 
     // NOTE: No need for edges, we assume that every node is connected to all its neighbors immediate
     // orthogonal neighbours (i.e., +/- x,y,z)
-
 
     // Traverse the lattice, find anything that might not be connected to the ground, 
     // remove it from the terrain and turn it into a physical object
