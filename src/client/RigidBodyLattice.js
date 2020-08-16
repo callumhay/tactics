@@ -4,25 +4,15 @@ import TerrainColumn from './TerrainColumn';
 import Debug from '../debug';
 
 class LatticeNode {
-  constructor(id, pos, terrainColumns) {
+  constructor(id, xIdx, zIdx, yIdx, pos, terrainColumns) {
     this.id = id;
+    this.xIdx = xIdx;
+    this.zIdx = zIdx;
+    this.yIdx = yIdx;
     this.pos = pos;
     this.terrainColumns = terrainColumns;
   }
 }
-
-/*
-class LatticeEdge {
-  constructor(n0, n1) {
-    this.nodes = [n0, n1];
-    this.line = new THREE.Line3(n0.pos, n1.pos);
-  }
-
-  connects(nodeA, nodeB) {
-    return (this.nodes[0] === nodeA && this.nodes[1] === nodeB || this.nodes[0] === nodeB && this.nodes[1] === nodeA);
-  }
-}
-*/
 
 const DEFAULT_NODES_PER_TERRAIN_SQUARE_UNIT = 5;
 const TRAVERSAL_UNVISITED_STATE     = 0;
@@ -114,7 +104,7 @@ export default class RigidBodyLattice {
           const currNodePos = new THREE.Vector3(nodeXPos, nodeYPos, nodeZPos);
           const columnsContainingNode = columns.filter(column => column.containsPoint(currNodePos));
           if (columnsContainingNode.length > 0) {
-            nodesY[y] = new LatticeNode(currNodeId++, currNodePos, columnsContainingNode);
+            nodesY[y] = new LatticeNode(currNodeId++, x, z, y, currNodePos, columnsContainingNode);
           }
         }
       }
@@ -129,10 +119,45 @@ export default class RigidBodyLattice {
     this.debugDrawNodes(true, traversalInfo);
   }
 
+  getNeighboursForNodes(nodes) {
+    const result = new Set();
+    const nodesToIgnore = new Set(nodes);
+    nodes.forEach(node => {
+      const currNeighbours = this.getNeighboursForNode(node).filter(n => !nodesToIgnore.has(n));
+      currNeighbours.forEach(n => result.add(n));
+    });
+    return result;
+  }
+
+  getNeighboursForNode(node) {
+    const {xIdx, yIdx, zIdx} = node;
+    // There are 6 potential neighbours...
+    const neighbours = [];
+    if (xIdx > 0 && this.nodes[xIdx - 1][zIdx]) {
+      neighbours.push(this.nodes[xIdx - 1][zIdx][yIdx]);
+    }
+    if (xIdx < this.nodes.length - 1 && this.nodes[xIdx + 1][zIdx]) {
+      neighbours.push(this.nodes[xIdx + 1][zIdx][yIdx]);
+    }
+    if (zIdx > 0 && this.nodes[xIdx][zIdx - 1]) {
+      neighbours.push(this.nodes[xIdx][zIdx - 1][yIdx]);
+    }
+    if (zIdx < this.nodes[xIdx].length - 1 && this.nodes[xIdx][zIdx + 1]) {
+      neighbours.push(this.nodes[xIdx][zIdx + 1][yIdx]);
+    }
+    if (yIdx > 0) {
+      neighbours.push(this.nodes[xIdx][zIdx][yIdx - 1]);
+    }
+    if (yIdx < this.nodes[xIdx][zIdx].length - 1) {
+      neighbours.push(this.nodes[xIdx][zIdx][yIdx + 1])
+    }
+    return neighbours;
+  }
+
   traverseToGround() {
     const traversalInfo = {};
 
-    const isConnectedToGround = (node, xIdx, zIdx, yIdx) => {
+    const isConnectedToGround = (node) => {
       const nodeTraversalInfo = traversalInfo[node.id];
 
       // Check to see if the node is grounded, if so then return immediately
@@ -140,39 +165,18 @@ export default class RigidBodyLattice {
         nodeTraversalInfo.visitState = TRAVERSAL_FINISHED_STATE;
         return true;
       }
-
       nodeTraversalInfo.visitState = TRAVERSAL_BEING_VISITED_STATE;
 
-      // There are 6 potential neighbours...
-      const neighbours = [];
-      if (xIdx > 0 && this.nodes[xIdx-1][zIdx]) {
-        neighbours.push([this.nodes[xIdx-1][zIdx][yIdx], xIdx-1, zIdx, yIdx]);
-      }
-      if (xIdx < this.nodes.length-1 && this.nodes[xIdx+1][zIdx]) {
-        neighbours.push([this.nodes[xIdx+1][zIdx][yIdx], xIdx+1, zIdx, yIdx]);
-      }
-      if (zIdx > 0 && this.nodes[xIdx][zIdx-1]){
-        neighbours.push([this.nodes[xIdx][zIdx-1][yIdx], xIdx, zIdx-1, yIdx]);
-      }
-      if (zIdx < this.nodes[xIdx].length-1 && this.nodes[xIdx][zIdx+1]) {
-        neighbours.push([this.nodes[xIdx][zIdx+1][yIdx], xIdx, zIdx+1, yIdx]);
-      }
-      if (yIdx > 0) {
-        neighbours.push([this.nodes[xIdx][zIdx][yIdx-1], xIdx, zIdx, yIdx-1]);
-      }
-      if (yIdx < this.nodes[xIdx][zIdx].length-1) {
-        neighbours.push([this.nodes[xIdx][zIdx][yIdx+1], xIdx, zIdx, yIdx+1])
-      }
-
+      const neighbours = this.getNeighboursForNode(node);
       let grounded = false;
       for (let i = 0; i < neighbours.length; i++) {
-        const [neighbourNode, neighbourXIdx, neighbourYIdx, neighbourZIdx] = neighbours[i];
+        const neighbourNode = neighbours[i];
         if (neighbourNode) {
           const neighbourNodeTraversalInfo = traversalInfo[neighbourNode.id];
           // If the neighbour is connected to the ground then we're done, otherwise check whether it's already been traversed and
           // if not then traverse it to see if it's connected to the ground
           if (neighbourNodeTraversalInfo.grounded || (neighbourNodeTraversalInfo.visitState === TRAVERSAL_UNVISITED_STATE && 
-            isConnectedToGround(neighbourNode, neighbourXIdx, neighbourYIdx, neighbourZIdx))) {
+            isConnectedToGround(neighbourNode))) {
             grounded = true;
             break;
           }
@@ -207,7 +211,7 @@ export default class RigidBodyLattice {
           if (node) {
             const nodeTraversalInfo = traversalInfo[node.id];
             if (nodeTraversalInfo.visitState === TRAVERSAL_UNVISITED_STATE) {
-              nodeTraversalInfo.grounded = isConnectedToGround(node, x, z, y);
+              nodeTraversalInfo.grounded = isConnectedToGround(node);
             }
           }
         }

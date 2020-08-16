@@ -7,7 +7,7 @@ import TerrainColumn from './TerrainColumn';
 class LandingRange {
   static get defaultPhysicsConfig() {
     return {
-      type: 'kinematic',
+      physicsBodyType: 'kinematic',
       shape: "box",
       size: [1, 1, 1],
     };
@@ -117,11 +117,14 @@ class LandingRange {
     mesh.terrainLandingRange = this;
     return mesh;
   }
+
   _buildPhysicsObj() {
     const { physics } = this.terrainColumn.battlefield;
     const config = LandingRange.defaultPhysicsConfig;
+    config.material = this.material;
     const { size } = config;
     size[1] = this.height;
+
     return physics.addObject(this.mesh, config);
   }
 }

@@ -18,9 +18,21 @@ const materials = {
   }
 };
 
+const ROCK_FRICTION = 0.4;
+const ROCK_RESTITUTION = 0.315;
+const DIRT_FRICTION = 0.562;
+const DIRT_RESTITUTION = 0.3;
+
+const contactMaterials = [
+  new CANNON.ContactMaterial(materials[MATERIAL_TYPE_ROCK], materials[MATERIAL_TYPE_ROCK], { friction: ROCK_FRICTION, restitution: ROCK_RESTITUTION}),
+  new CANNON.ContactMaterial(materials[MATERIAL_TYPE_DIRT], materials[MATERIAL_TYPE_DIRT], { friction: DIRT_FRICTION, restitution: DIRT_RESTITUTION}),
+  new CANNON.ContactMaterial(materials[MATERIAL_TYPE_ROCK], materials[MATERIAL_TYPE_DIRT], { friction: (ROCK_FRICTION+DIRT_FRICTION)/2, restitution: (ROCK_RESTITUTION+DIRT_RESTITUTION)/2})
+];
+
 class GameMaterials {
   static get MATERIAL_TYPE_ROCK() { return MATERIAL_TYPE_ROCK; }
   static get materials() { return materials; }
+  static get contactMaterials() { return contactMaterials; }
 }
 
 export default GameMaterials;

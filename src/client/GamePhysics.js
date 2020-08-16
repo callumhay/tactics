@@ -1,11 +1,6 @@
 import * as CANNON from 'cannon';
 
-const MATERIAL_TYPE_ROCK = "rock";
-// NOTE: Material density is measured in kg/m^3
-const materials = {
-  MATERIAL_TYPE_ROCK: {density: 1600, cannonMaterial: new CANNON.Material(MATERIAL_TYPE_ROCK)},
-};
-
+import GameMaterials from './GameMaterials';
 
 class GamePhysics {
   constructor(scene) {
@@ -16,21 +11,15 @@ class GamePhysics {
     this.world.gravity.set(0, -9.8, 0);
     this.world.broadphase = new CANNON.NaiveBroadphase();
     this.world.solver.iterations = 10;
+    this.world.allowSleep = true;
+
+    // Setup all the contact materials...
+    GameMaterials.contactMaterials.forEach(contactMaterial => this.world.addContactMaterial(contactMaterial));
 
     this.gameObjects = {};
-    this.nextId = 0;
 
-    // Materials
-    this.terrainMaterial = new CANNON.Material("terrain");
-    this.world.addContactMaterial(new CANNON.ContactMaterial(
-      this.terrainMaterial, 
-      this.terrainMaterial, 
-      {
-        friction:0.4,
-        restitution:0.01,
-      }
-    ));
-
+    this.onBodyCollision = this.onBodyCollision.bind(this);
+    this.onBodySleep = this.onBodySleep.bind(this);
   }
 
   update(dt) {
@@ -46,7 +35,7 @@ class GamePhysics {
   }
 
   addObject(mesh, config) {
-    const {type, mass, shape, size} = config;
+    const { physicsBodyType, mass, shape, size, material} = config;
     let bodyShape = null;
     switch (shape) {
       case 'box':
@@ -55,7 +44,7 @@ class GamePhysics {
         break;
     }
     let bodyType = null;
-    switch (type) {
+    switch (physicsBodyType) {
       case 'dynamic':
         bodyType = CANNON.Body.DYNAMIC; break;
       case 'kinematic':
@@ -73,12 +62,15 @@ class GamePhysics {
       quaternion: mesh.quaternion,
       velocity: new CANNON.Vec3(0,0,0),
       angularVelocity: new CANNON.Vec3(0,0,0),
-      material: this.terrainMaterial, // TODO: Add dynamic materials
+      material: material,
+      allowSleep: true,
     });
+    body.addEventListener('collide', this.onBodyCollision);
+    body.addEventListener('sleep', this.onBodySleep);
     this.world.addBody(body);
 
-    const id = this._generateId();
-    const gameObj = { id: id, mesh: mesh, body: body };
+    const id = body.id
+    const gameObj = { id, mesh, body };
     this.gameObjects[id] = gameObj;
     return gameObj;
   }
@@ -89,8 +81,18 @@ class GamePhysics {
     delete this.gameObjects[id];
   }
 
-  _generateId() {
-    return this.nextId++;
+  onBodyCollision(e) {
+    //const {body, target, contact} = e;
+    //console.log("Collision: " + target.id);
+  }
+  onBodySleep(e) {
+    const {target} = e;
+    if (target.mass <= 0) { return; }
+
+    // When a dynamic chunk of terrain of sufficient size falls asleep we need to merge
+    // it back into the environment
+    // TODO
+    
   }
 }
 

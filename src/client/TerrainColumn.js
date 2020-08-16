@@ -134,16 +134,18 @@ class TerrainColumn {
     physics.removeObject(detachedPhysObj);
 
     // TODO: Do we treat the debris as a box? a mesh? does it break apart? etc.
+
     // NOTE: Removing a small epsilon from the side size is important too avoid
     // friction and collision anomolies with the rest of the terrain
     const sideWidthEpsilon = TerrainColumn.SIZE - TerrainColumn.EPSILON;
-    const size = [sideWidthEpsilon, height, sideWidthEpsilon];
+    const size = [sideWidthEpsilon, height - TerrainColumn.EPSILON, sideWidthEpsilon];
     const mass = material.density * size[0] * size[1] * size[2];
     const config = {
-      type: 'dynamic',
+      physicsBodyType: 'dynamic',
       mass: mass,
       shape: "box",
       size: size,
+      material: material.cannonMaterial,
     };
     rangeToRemove.physicsObj = this.battlefield.convertTerrainToDebris(detachedMesh, config);
   }
