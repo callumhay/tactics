@@ -145,11 +145,14 @@ export default class RigidBodyLattice {
           const nodeYPos = y*this.unitsBetweenNodes;
           const currNodePos = new THREE.Vector3(nodeXPos, nodeYPos, nodeZPos);
 
-          const columnsAndLandingRanges = columns.map(column => ({
-              column: column, 
-              landingRanges: column.landingRangesContainingPoint(currNodePos)
-            })).filter(obj => obj.landingRanges.length > 0);
-
+          const columnsAndLandingRanges = [];
+          for (let i = 0; i < columns.length; i++) {
+            const column = columns[i];
+            const landingRanges = column.landingRangesContainingPoint(currNodePos);
+            if (landingRanges.length > 0) {
+              columnsAndLandingRanges.push({column,landingRanges});
+            }
+          }
           if (columnsAndLandingRanges.length > 0) {
             nodesY[y] = new LatticeNode(currNodeId++, x, z, y, currNodePos, columnsAndLandingRanges);
           }
@@ -207,7 +210,7 @@ export default class RigidBodyLattice {
     });
   }
 
-  updateNodesForLandingRange(landingRange) {
+  updateNodesForLandingRange(landingRange, epsilon=TerrainColumn.EPSILON) {
     const {mesh} = landingRange;
     const nodes = this.getNodesInLandingRange(landingRange);
 
@@ -220,37 +223,47 @@ export default class RigidBodyLattice {
     const temp = mesh.material.side;
     mesh.material.side = THREE.DoubleSide;
 
+    const remove = (node, landingRange) => {
+      const {xIdx,zIdx,yIdx} = node;
+      node.removeLandingRange(landingRange);
+      if (node.columnsAndLandingRanges.length === 0) {
+        this.nodes[xIdx][zIdx][yIdx] = null;
+      }
+    };
+
     for (let i = 0; i < nodes.length; i++) {
       const node = nodes[i];
       let intersections = [];
-      const {pos, xIdx, zIdx, yIdx} = node;
+      const {pos} = node;
       rayPos.set(pos.x, pos.y, pos.z);
       raycaster.set(rayPos, rayDir);
       mesh.raycast(raycaster, intersections);
-      intersections = intersections.filter(obj => obj.distance > TerrainColumn.EPSILON);
-
-      if (intersections.length > 0) {
-        // Sort the intersections by their distance in ascending order
-        intersections.sort((a,b) => a.distance-b.distance);
-        const {face} = intersections[0];
-
-        // If the closest intersection is the backface of a triangle then we're still inside the
-        // landing range's mesh and we should keep the node. 
-        if (rayDir.dot(face.normal) < 0) {
-          // Not inside the mesh - remove the current landing range from the node,
-          // if there are no more landing ranges left then the node is no longer
-          // attached to anything and should be removed
-          node.removeLandingRange(landingRange);
-          if (node.columnsAndLandingRanges.length === 0) {
-            this.nodes[xIdx][zIdx][yIdx] = null;
+      if (intersections.length === 0) {
+        // If there are zero intersections then we should remove the node
+        remove(node, landingRange);
+      }
+      else {
+        intersections = intersections.filter(obj => obj.distance > 0);
+        if (intersections.length > 0) { 
+          // Sort the intersections by their distance in ascending order
+          intersections.sort((a,b) => a.distance-b.distance);
+          const {face} = intersections[0];
+          // If the closest intersection is the backface of a triangle then we're still inside the
+          // landing range's mesh and we should keep the node. 
+          if (rayDir.dot(face.normal) < 0) {
+            // Not inside the mesh - remove the current landing range from the node,
+            // if there are no more landing ranges left then the node is no longer
+            // attached to anything and should be removed
+            remove(node, landingRange);
           }
         }
       }
     }
     
     mesh.material.side = temp;
-    this.debugDrawNodes();
-    //this.traverseToGround();
+    
+    const traversalInfo = this.traverseToGround();
+    this.debugDrawNodes(true, traversalInfo);
   }
 
   getNeighboursForNodes(nodes) {
@@ -290,37 +303,7 @@ export default class RigidBodyLattice {
 
   traverseToGround() {
     const traversalInfo = {};
-
-    const isConnectedToGround = (node) => {
-      const nodeTraversalInfo = traversalInfo[node.id];
-
-      // Check to see if the node is grounded, if so then return immediately
-      if (nodeTraversalInfo.grounded) {
-        nodeTraversalInfo.visitState = TRAVERSAL_FINISHED_STATE;
-        return true;
-      }
-      nodeTraversalInfo.visitState = TRAVERSAL_BEING_VISITED_STATE;
-
-      const neighbours = this.getNeighboursForNode(node);
-      let grounded = false;
-      for (let i = 0; i < neighbours.length; i++) {
-        const neighbourNode = neighbours[i];
-        if (neighbourNode) {
-          const neighbourNodeTraversalInfo = traversalInfo[neighbourNode.id];
-          // If the neighbour is connected to the ground then we're done, otherwise check whether it's already been traversed and
-          // if not then traverse it to see if it's connected to the ground
-          if (neighbourNodeTraversalInfo.grounded || (neighbourNodeTraversalInfo.visitState === TRAVERSAL_UNVISITED_STATE && 
-            isConnectedToGround(neighbourNode))) {
-            grounded = true;
-            break;
-          }
-        }
-      }
-
-      nodeTraversalInfo.grounded = grounded;
-      nodeTraversalInfo.visitState = TRAVERSAL_FINISHED_STATE;
-      return grounded;
-    };
+    const queue = [];
 
     // Initialize the node traversal info
     for (let x = 0; x < this.nodes.length; x++) {
@@ -330,31 +313,30 @@ export default class RigidBodyLattice {
           if (node) {
             traversalInfo[node.id] = {
               node: node,
-              visitState: y === 0 ? TRAVERSAL_FINISHED_STATE : TRAVERSAL_UNVISITED_STATE,
-              grounded: y === 0,
+              visitState: TRAVERSAL_UNVISITED_STATE,
+              grounded: false,
             };
+            // Fill the queue with all the ground nodes
+            if (y <= 0) { queue.push(node); }
           }
         }
       }
     }
 
-    for (let x = 0; x < this.nodes.length; x++) {
-      for (let z = 0; z < this.nodes[x].length; z++) {
-        for (let y = 1; y < this.nodes[x][z].length; y++) {
-          const node = this.nodes[x][z][y];
-          if (node) {
-            const nodeTraversalInfo = traversalInfo[node.id];
-            if (nodeTraversalInfo.visitState === TRAVERSAL_UNVISITED_STATE) {
-              nodeTraversalInfo.grounded = isConnectedToGround(node);
-            }
-          }
+    while (queue.length > 0) {
+      const node = queue.shift();
+      if (node) {
+        const nodeTraversalInfo = traversalInfo[node.id];
+        if (nodeTraversalInfo.visitState === TRAVERSAL_UNVISITED_STATE) {
+          nodeTraversalInfo.grounded = true;
+          nodeTraversalInfo.visitState = TRAVERSAL_FINISHED_STATE;
+          queue.push(...this.getNeighboursForNode(node));
         }
       }
     }
 
     return traversalInfo;
   }
-
 
   _clearDebugDraw() {
     if (this.debugNodePoints) {
