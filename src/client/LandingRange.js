@@ -53,6 +53,7 @@ class LandingRange {
     }
   }
   regenerate(geometry = null) {
+    // IMPORTANT: Order matters here, various regeneration routines depend on others finishing first!!
     this.clear();
     this.mesh = this._buildTerrainMesh(geometry || new THREE.BoxBufferGeometry(TerrainColumn.SIZE, this.height * TerrainColumn.SIZE, TerrainColumn.SIZE));
     const {terrainGroup, rigidBodyLattice} = this.terrainColumn.battlefield;
@@ -112,6 +113,7 @@ class LandingRange {
     mesh.translateX(translation.x);
     mesh.translateY(translation.y);
     mesh.translateZ(translation.z);
+    mesh.updateMatrixWorld(); // IMPORTANT: We may use the matrix of this mesh sometime before rendering
     mesh.terrainLandingRange = this;
     return mesh;
   }

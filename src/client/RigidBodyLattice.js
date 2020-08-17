@@ -175,20 +175,12 @@ export default class RigidBodyLattice {
     const temp = mesh.material.side;
     mesh.material.side = THREE.DoubleSide;
 
-    const {terrainGroup} = landingRange.terrainColumn.battlefield;
-    const transform = terrainGroup.matrixWorld;//new THREE.Matrix4();
-    //transform.getInverse(terrainGroup.matrixWorld);
-    //rayDir.applyMatrix4(transform);
-    
     for (let i = 0; i < nodes.length; i++) {
       if (!nodes[i]) { continue; }
+      const intersections = [];
       const {pos, xIdx, zIdx, yIdx} = nodes[i];
       rayPos.set(pos.x, pos.y, pos.z);
-      //rayPos.applyMatrix4(transform);
-      
-
       raycaster.set(rayPos, rayDir);
-      let intersections = [];
       mesh.raycast(raycaster, intersections);
 
       // If the closest intersection is the backface of a triangle then we're still inside the
