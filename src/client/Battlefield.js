@@ -28,7 +28,7 @@ export default class Battlefield {
     this._clearTerrain();
     this._terrain = terrain;
     const terrainSize = terrain.length * TerrainColumn.SIZE;
-    this.terrainGroup.position.set(0, -terrainSize / 2, 0, -terrainSize / 2);
+    this.terrainGroup.position.set(-terrainSize / 2, 0, -terrainSize / 2);
     this._preloadCleanupTerrain();
     this._buildRigidbodyLattice();
   }
@@ -37,7 +37,8 @@ export default class Battlefield {
     if (this.rigidBodyLattice) { this.rigidBodyLattice.clear(); }
     this.rigidBodyLattice = new RigidBodyLattice(this.terrainGroup);
     this.rigidBodyLattice.buildFromTerrain(this._terrain);
-    //this.rigidBodyLattice.debugDrawNodes();
+    //this.rigidBodyLattice.removeNodesInsideLandingRange(this._terrain[0][1].landingRanges[0]);
+    //this.rigidBodyLattice.debugDrawNodes(true);
   }
 
   clear() {

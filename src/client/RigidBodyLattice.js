@@ -2,15 +2,16 @@ import * as THREE from 'three';
 
 import TerrainColumn from './TerrainColumn';
 import Debug from '../debug';
+import { Vector3 } from 'three';
 
 class LatticeNode {
-  constructor(id, xIdx, zIdx, yIdx, pos, terrainColumns) {
+  constructor(id, xIdx, zIdx, yIdx, pos, columnsAndLandingRanges) {
     this.id = id;
     this.xIdx = xIdx;
     this.zIdx = zIdx;
     this.yIdx = yIdx;
     this.pos = pos;
-    this.terrainColumns = terrainColumns;
+    this.columnsAndLandingRanges = columnsAndLandingRanges;
   }
 }
 
@@ -25,10 +26,14 @@ export default class RigidBodyLattice {
     this.clear();
   }
 
+  get unitsBetweenNodes() {
+    return TerrainColumn.SIZE / (this.numNodesPerUnit-1);
+  }
+
   clear() {
     this.nodes = [];
     this.edges = [];
-    this.unitsBetweenNodes = 0;
+    this.numNodesPerUnit = 0;
     this._clearDebugDraw();
   }
 
@@ -45,8 +50,8 @@ export default class RigidBodyLattice {
   buildFromTerrain(terrain, numNodesPerUnit=DEFAULT_NODES_PER_TERRAIN_SQUARE_UNIT) {
     this.clear();
 
-    this.unitsBetweenNodes = TerrainColumn.SIZE / (numNodesPerUnit-1);
-     
+    this.numNodesPerUnit = numNodesPerUnit;
+
     // Nodes are built to reflect the same coordinate system as the terrain
     const numNodesX = terrain.length * numNodesPerUnit + 1 - terrain.length;
     this.nodes = new Array(numNodesX).fill(null);
@@ -102,9 +107,10 @@ export default class RigidBodyLattice {
         for (let y = 0; y < numNodesY; y++) {
           const nodeYPos = y*this.unitsBetweenNodes;
           const currNodePos = new THREE.Vector3(nodeXPos, nodeYPos, nodeZPos);
-          const columnsContainingNode = columns.filter(column => column.containsPoint(currNodePos));
-          if (columnsContainingNode.length > 0) {
-            nodesY[y] = new LatticeNode(currNodeId++, x, z, y, currNodePos, columnsContainingNode);
+
+          const columnsAndLandingRanges = columns.map(column => ({column: column, landingRanges: column.landingRangesContainingPoint(currNodePos)})).filter(obj => obj.landingRanges.length > 0);
+          if (columnsAndLandingRanges.length > 0) {
+            nodesY[y] = new LatticeNode(currNodeId++, x, z, y, currNodePos, columnsAndLandingRanges);
           }
         }
       }
@@ -117,6 +123,92 @@ export default class RigidBodyLattice {
     // remove it from the terrain and turn it into a physical object
     const traversalInfo = this.traverseToGround();
     this.debugDrawNodes(true, traversalInfo);
+  }
+
+  getNodesInLandingRange(landingRange) {
+    // Grab all of the nodes that would be within the landing range (but might be tied to other landing ranges as well)
+    const {terrainColumn, startY, endY} = landingRange;
+    const {xIndex, zIndex} = terrainColumn;
+
+    const numNodesPerUnitMinusOne = (this.numNodesPerUnit-1);
+
+    const nodeXIdxStart = xIndex*numNodesPerUnitMinusOne;
+    const nodeXIdxEnd   = nodeXIdxStart + numNodesPerUnitMinusOne;
+    const nodeZIdxStart = zIndex*numNodesPerUnitMinusOne;
+    const nodeZIdxEnd   = nodeZIdxStart + numNodesPerUnitMinusOne;
+    const nodeYIdxStart = Math.floor(startY*numNodesPerUnitMinusOne);
+    const nodeYIdxEnd   = Math.floor(endY*numNodesPerUnitMinusOne);
+
+    const result = [];
+    for (let x = nodeXIdxStart; x <= nodeXIdxEnd; x++) {
+      for (let z = nodeZIdxStart; z <= nodeZIdxEnd; z++) {
+        for (let y = nodeYIdxStart; y <= nodeYIdxEnd; y++) {
+          const node = this.nodes[x][z][y];
+          if (node) { result.push(node); }
+        }
+      }
+    }
+    return result;
+  }
+
+  removeNodesInsideLandingRange(landingRange) {
+    const nodes = this.getNodesInLandingRange(landingRange);
+    nodes.forEach(node => {
+      // If the node ONLY contains the given landing range then we remove it
+      if (node && node.columnsAndLandingRanges.filter(obj => obj.landingRanges.length === 1 && obj.landingRanges[0] === landingRange).length === node.columnsAndLandingRanges.length) {
+        const {xIdx, zIdx, yIdx} = node;
+        this.nodes[xIdx][zIdx][yIdx] = null;
+      }
+    });
+  }
+
+  updateNodesForLandingRange(landingRange) {
+    const {mesh} = landingRange;
+    const nodes = this.getNodesInLandingRange(landingRange).filter(n => n !== null);
+    
+    const raycaster = new THREE.Raycaster();
+    //raycaster.near = 0;
+    //raycaster.far = landingRange.height;
+    const rayPos = new Vector3();
+    const rayDir = new Vector3(0,1,0);
+    
+    const temp = mesh.material.side;
+    mesh.material.side = THREE.DoubleSide;
+
+    const {terrainGroup} = landingRange.terrainColumn.battlefield;
+    const transform = terrainGroup.matrixWorld;//new THREE.Matrix4();
+    //transform.getInverse(terrainGroup.matrixWorld);
+    //rayDir.applyMatrix4(transform);
+    
+    for (let i = 0; i < nodes.length; i++) {
+      if (!nodes[i]) { continue; }
+      const {pos, xIdx, zIdx, yIdx} = nodes[i];
+      rayPos.set(pos.x, pos.y, pos.z);
+      //rayPos.applyMatrix4(transform);
+      
+
+      raycaster.set(rayPos, rayDir);
+      let intersections = [];
+      mesh.raycast(raycaster, intersections);
+
+      // If the closest intersection is the backface of a triangle then we're still inside the
+      // landing range's mesh and we should keep the node. Otherwise we discard the node.
+      if (intersections.length > 0) {
+        console.log("Intersection!");
+        // Sort the intersections by their distance in ascending order
+        intersections.sort((a,b) => a.distance-b.distance);
+        const {face} = intersections[0];
+        if (rayDir.dot(face.normal) < 0) {
+          // Not inside the mesh
+          this.nodes[xIdx][zIdx][yIdx] = null;
+          console.log("Removing node.");
+        }
+      }
+    }
+    
+    mesh.material.side = temp;
+    this.debugDrawNodes();
+    //this.traverseToGround();
   }
 
   getNeighboursForNodes(nodes) {
@@ -230,10 +322,7 @@ export default class RigidBodyLattice {
     }
   }
   debugDrawNodes(show=true, traversalInfo=null) {
-    if (show && this.debugNodePoints || !show && !this.debugNodePoints) { return; }
-
     this._clearDebugDraw();
-
     if (show) {
       const nodeGeometry = new THREE.BufferGeometry();
       const vertices = [];

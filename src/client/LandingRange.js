@@ -55,9 +55,12 @@ class LandingRange {
   regenerate(geometry = null) {
     this.clear();
     this.mesh = this._buildTerrainMesh(geometry || new THREE.BoxBufferGeometry(TerrainColumn.SIZE, this.height * TerrainColumn.SIZE, TerrainColumn.SIZE));
-    const { terrainGroup } = this.terrainColumn.battlefield;
+    const {terrainGroup, rigidBodyLattice} = this.terrainColumn.battlefield;
     terrainGroup.add(this.mesh);
     this.physicsObj = this._buildPhysicsObj();
+
+    // We need to remove all rigid body nodes that are no longer inside this geometry...
+    if (rigidBodyLattice) { rigidBodyLattice.updateNodesForLandingRange(this); }
   }
 
   getTerrainSpaceTranslation() {
@@ -67,11 +70,6 @@ class LandingRange {
       this.startY + this.height / 2,
       zIndex * TerrainColumn.SIZE + TerrainColumn.HALF_SIZE
     );
-  }
-
-  collidesAABB(aabb) {
-    const { startY, endY } = this;
-    return startY <= aabb.max.y && endY >= aabb.min.y;
   }
 
   blowupTerrain(subtractGeometry) {

@@ -110,15 +110,22 @@ class TerrainColumn {
   calcAABBs(epsilon=TerrainColumn.EPSILON) {
     return this.landingRanges.map(landingRange => landingRange.calcAABB(epsilon));
   }
-
   containsPoint(pt, aabbs=[]) {
     const boundingBoxes = aabbs && aabbs.length > 0 ? aabbs : this.calcAABBs();
     for (let i = 0; i < boundingBoxes.length; i++) {
-      if (boundingBoxes[i].containsPoint(pt)) {
-        return true;
-      }
+      if (boundingBoxes[i].containsPoint(pt)) { return true; }
     }
     return false;
+  }
+  landingRangesContainingPoint(pt) {
+    const result = [];
+    const boundingBoxes = this.calcAABBs();
+    for (let i = 0; i < boundingBoxes.length; i++) {
+      if (boundingBoxes[i].containsPoint(pt)) {
+        result.push(this.landingRanges[i])
+      }
+    }
+    return result;
   }
 
   detachLandingRange(rangeIdx) {
@@ -132,6 +139,11 @@ class TerrainColumn {
     // We need to remove the old physical object for the terrain
     const {physics} = this.battlefield;
     physics.removeObject(detachedPhysObj);
+
+    // Make sure there are no longer any nodes associated with the detached range - it's possible that this
+    // is being called during initialization (in which case there isn't a lattice yet so we don't need to worry about it)
+    const {rigidBodyLattice} = this.battlefield;
+    if (rigidBodyLattice) { rigidBodyLattice.removeNodesInsideLandingRange(rangeToRemove); }
 
     // TODO: Do we treat the debris as a box? a mesh? does it break apart? etc.
 
@@ -154,7 +166,7 @@ class TerrainColumn {
   blowupTerrain(subtractGeometry) {
     const {boundingBox} = subtractGeometry;
     // Figure out what terrain geometry will be affected in this column
-    const collidingRanges = this.landingRanges.filter(landingRange => landingRange.collidesAABB(boundingBox));
+    const collidingRanges = this.landingRanges.filter(range => range.startY <= boundingBox.max.y && range.endY >= boundingBox.min.y);
     // BLOW IT UP!
     collidingRanges.forEach(landingRange => {
       landingRange.blowupTerrain(subtractGeometry);

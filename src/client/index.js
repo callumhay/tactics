@@ -55,7 +55,7 @@ function onMouseClick(event) {
   if (intersects.length > 0) {
     let intersectingTerrain = null;
     for (let i = 0; i < intersects.length; i++) {
-      if (intersects[i].object && intersects[i].object.terrainColumn) { intersectingTerrain = intersects[i]; break; }
+      if (intersects[i].object && intersects[i].object.terrainLandingRange) { intersectingTerrain = intersects[i]; break; }
     }
     if (!intersectingTerrain) {
       return;
