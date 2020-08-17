@@ -13,6 +13,43 @@ class LatticeNode {
     this.pos = pos;
     this.columnsAndLandingRanges = columnsAndLandingRanges;
   }
+  hasLandingRange(landingRange) {
+    for (let i = 0; i < this.columnsAndLandingRanges.length; i++) {
+      // Make sure the node is part of the given landingRange
+      const obj = this.columnsAndLandingRanges[i];
+      for (let j = 0; j < obj.landingRanges.length; j++) {
+        if (obj.landingRanges[j] === landingRange) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  removeLandingRange(landingRange) {
+    for (let i = 0; i < this.columnsAndLandingRanges.length; i++) {
+      const obj = this.columnsAndLandingRanges[i];
+      const { landingRanges } = obj;
+      obj.landingRanges = landingRanges.filter(range => range !== landingRange);
+    }
+    this.columnsAndLandingRanges = this.columnsAndLandingRanges.filter(obj => obj.landingRanges.length > 0);
+  }
+
+  debugColourForLandingRanges() {
+    const colour = new THREE.Color(0,0,0);
+    let count = 0;
+    for (let i = 0; i < this.columnsAndLandingRanges.length; i++) {
+      const obj = this.columnsAndLandingRanges[i];
+      for (let j = 0; j < obj.landingRanges.length; j++) {
+        const landingRange = obj.landingRanges[j];
+        colour.add(landingRange.debugColour());
+        count++;
+      }
+    }
+
+    colour.multiplyScalar(1/Math.max(1, count));
+    return colour;
+  }
 }
 
 const DEFAULT_NODES_PER_TERRAIN_SQUARE_UNIT = 5;
@@ -108,7 +145,11 @@ export default class RigidBodyLattice {
           const nodeYPos = y*this.unitsBetweenNodes;
           const currNodePos = new THREE.Vector3(nodeXPos, nodeYPos, nodeZPos);
 
-          const columnsAndLandingRanges = columns.map(column => ({column: column, landingRanges: column.landingRangesContainingPoint(currNodePos)})).filter(obj => obj.landingRanges.length > 0);
+          const columnsAndLandingRanges = columns.map(column => ({
+              column: column, 
+              landingRanges: column.landingRangesContainingPoint(currNodePos)
+            })).filter(obj => obj.landingRanges.length > 0);
+
           if (columnsAndLandingRanges.length > 0) {
             nodesY[y] = new LatticeNode(currNodeId++, x, z, y, currNodePos, columnsAndLandingRanges);
           }
@@ -144,7 +185,11 @@ export default class RigidBodyLattice {
       for (let z = nodeZIdxStart; z <= nodeZIdxEnd; z++) {
         for (let y = nodeYIdxStart; y <= nodeYIdxEnd; y++) {
           const node = this.nodes[x][z][y];
-          if (node) { result.push(node); }
+          if (node) { 
+            if (node.hasLandingRange(landingRange)) {
+              result.push(node);
+            }
+          }
         }
       }
     }
@@ -164,11 +209,11 @@ export default class RigidBodyLattice {
 
   updateNodesForLandingRange(landingRange) {
     const {mesh} = landingRange;
-    const nodes = this.getNodesInLandingRange(landingRange).filter(n => n !== null);
-    
+    const nodes = this.getNodesInLandingRange(landingRange);
+
     const raycaster = new THREE.Raycaster();
-    //raycaster.near = 0;
-    //raycaster.far = landingRange.height;
+    raycaster.near = 0;
+    raycaster.far = landingRange.height;
     const rayPos = new Vector3();
     const rayDir = new Vector3(0,1,0);
     
@@ -176,24 +221,29 @@ export default class RigidBodyLattice {
     mesh.material.side = THREE.DoubleSide;
 
     for (let i = 0; i < nodes.length; i++) {
-      if (!nodes[i]) { continue; }
-      const intersections = [];
-      const {pos, xIdx, zIdx, yIdx} = nodes[i];
+      const node = nodes[i];
+      let intersections = [];
+      const {pos, xIdx, zIdx, yIdx} = node;
       rayPos.set(pos.x, pos.y, pos.z);
       raycaster.set(rayPos, rayDir);
       mesh.raycast(raycaster, intersections);
+      intersections = intersections.filter(obj => obj.distance > TerrainColumn.EPSILON);
 
-      // If the closest intersection is the backface of a triangle then we're still inside the
-      // landing range's mesh and we should keep the node. Otherwise we discard the node.
       if (intersections.length > 0) {
-        console.log("Intersection!");
         // Sort the intersections by their distance in ascending order
         intersections.sort((a,b) => a.distance-b.distance);
         const {face} = intersections[0];
+
+        // If the closest intersection is the backface of a triangle then we're still inside the
+        // landing range's mesh and we should keep the node. 
         if (rayDir.dot(face.normal) < 0) {
-          // Not inside the mesh
-          this.nodes[xIdx][zIdx][yIdx] = null;
-          console.log("Removing node.");
+          // Not inside the mesh - remove the current landing range from the node,
+          // if there are no more landing ranges left then the node is no longer
+          // attached to anything and should be removed
+          node.removeLandingRange(landingRange);
+          if (node.columnsAndLandingRanges.length === 0) {
+            this.nodes[xIdx][zIdx][yIdx] = null;
+          }
         }
       }
     }
@@ -328,10 +378,12 @@ export default class RigidBodyLattice {
               const nodePos = currNode.pos;
               vertices.push(nodePos.x); vertices.push(nodePos.y); vertices.push(nodePos.z);
               if (traversalInfo && traversalInfo[currNode.id] && !traversalInfo[currNode.id].grounded) {
-                colours.push(1); colours.push(0); colours.push(0);
+                colours.push(0); colours.push(0); colours.push(0); // Detached nodes are black
               }
               else {
-                colours.push(defaultColour.r); colours.push(defaultColour.g); colours.push(defaultColour.b);
+                const c = currNode.debugColourForLandingRanges();
+                colours.push(c.r); colours.push(c.g); colours.push(c.b);
+                //colours.push(defaultColour.r); colours.push(defaultColour.g); colours.push(defaultColour.b);
               }
             }
           }

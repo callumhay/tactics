@@ -63,14 +63,18 @@ export default class Battlefield {
     // Get all the terrain columns that might be modified
     const minX = clamp(Math.floor(boundingBox.min.x), 0, this._terrain.length-1);
     const maxX = clamp(Math.floor(boundingBox.max.x), 0, this._terrain.length-1);
+
+    const minZ = Math.max(0, Math.floor(boundingBox.min.z));
+    const floorMaxZ = Math.floor(boundingBox.max.z);
     
     const terrainCols = [];
     for (let x = minX; x <= maxX; x++) {
       const terrainZ = this._terrain[x];
-      const minZ = clamp(Math.floor(boundingBox.min.z), 0, terrainZ.length-1);
-      const maxZ = clamp(Math.floor(boundingBox.max.z), 0, terrainZ.length-1);
-      for (let z = minZ; z <= maxZ; z++) {
-        terrainCols.push(terrainZ[z]);
+      const maxZ = Math.min(terrainZ.length - 1, floorMaxZ);
+      if (maxZ >= 0 && minZ < terrainZ.length) {
+        for (let z = minZ; z <= maxZ; z++) {
+          terrainCols.push(terrainZ[z]);
+        }
       }
     }
 

@@ -107,6 +107,16 @@ class LandingRange {
     return `(${startY},${endY})`;
   }
 
+  debugColour() {
+    const { startY } = this;
+    const { xIndex, zIndex, battlefield, landingRanges } = this.terrainColumn; 
+    return new THREE.Color(
+      (xIndex + 1) / battlefield._terrain.length,
+      startY / landingRanges[landingRanges.length-1].startY,
+      (zIndex+1) / battlefield._terrain[xIndex].length,
+    );
+  }
+
   _buildTerrainMesh(geometry) {
     const translation = this.getTerrainSpaceTranslation();
     const mesh = new THREE.Mesh(geometry, this.material.threeMaterial);
