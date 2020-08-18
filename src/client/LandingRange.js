@@ -1,13 +1,16 @@
 import * as THREE from 'three';
+import * as CANNON from 'cannon';
 import CSG from 'three-csg';
 
 import GameMaterials from './GameMaterials';
 import TerrainColumn from './TerrainColumn';
+import GameTypes from './GameTypes';
 
 class LandingRange {
   static get defaultPhysicsConfig() {
     return {
-      physicsBodyType: 'kinematic',
+      physicsBodyType: CANNON.Body.KINEMATIC,
+      gameType: GameTypes.ATTACHED_TERRAIN,
       shape: "box",
       size: [1, 1, 1],
     };
@@ -65,12 +68,9 @@ class LandingRange {
   }
 
   getTerrainSpaceTranslation() {
-    const { xIndex, zIndex } = this.terrainColumn;
-    return new THREE.Vector3(
-      xIndex * TerrainColumn.SIZE + TerrainColumn.HALF_SIZE,
-      this.startY + this.height / 2,
-      zIndex * TerrainColumn.SIZE + TerrainColumn.HALF_SIZE
-    );
+    const translation = this.terrainColumn.getTerrainSpaceTranslation();
+    translation.y = this.startY + this.height / 2;
+    return translation;
   }
 
   blowupTerrain(subtractGeometry) {

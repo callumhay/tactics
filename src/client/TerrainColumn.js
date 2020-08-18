@@ -1,13 +1,15 @@
 import * as THREE from 'three';
+import * as CANNON from 'cannon';
 
 import LandingRange from './LandingRange';
 import Debug from '../debug';
+import GameTypes from './GameTypes';
 
 class TerrainColumn {
   static get SIZE() { return 1; }
   static get HALF_SIZE() { return TerrainColumn.SIZE/2; }
-  static get EPSILON() { return 1e-6; }
-
+  static get EPSILON() { return 1e-8; }
+  
   constructor(battlefield, u, v, materialGroups) {
     this.battlefield = battlefield;
     this.xIndex = u;
@@ -107,6 +109,15 @@ class TerrainColumn {
     this._clearDebugAABBGroup();
   }
 
+  getTerrainSpaceTranslation() {
+    const { xIndex, zIndex } = this;
+    return new THREE.Vector3(
+      xIndex * TerrainColumn.SIZE + TerrainColumn.HALF_SIZE,
+      0,
+      zIndex * TerrainColumn.SIZE + TerrainColumn.HALF_SIZE
+    );
+  }
+
   calcAABBs(epsilon=TerrainColumn.EPSILON) {
     return this.landingRanges.map(landingRange => landingRange.calcAABB(epsilon));
   }
@@ -147,13 +158,15 @@ class TerrainColumn {
 
     // TODO: Do we treat the debris as a box? a mesh? does it break apart? etc.
 
-    // NOTE: Removing a small epsilon from the side size is important too avoid
+    // IMPORTANT: Removing a small epsilon from the size avoids
     // friction and collision anomolies with the rest of the terrain
     const sideWidthEpsilon = TerrainColumn.SIZE - TerrainColumn.EPSILON;
     const size = [sideWidthEpsilon, height - TerrainColumn.EPSILON, sideWidthEpsilon];
     const mass = material.density * size[0] * size[1] * size[2];
     const config = {
-      physicsBodyType: 'dynamic',
+      gameType: GameTypes.DETACHED_TERRAIN,
+      gameObject: rangeToRemove,
+      physicsBodyType: CANNON.Body.DYNAMIC,
       mass: mass,
       shape: "box",
       size: size,
@@ -161,6 +174,12 @@ class TerrainColumn {
     };
     rangeToRemove.physicsObj = this.battlefield.convertTerrainToDebris(detachedMesh, config);
   }
+
+  /*
+  attachLandingRange(landingRange) {
+    // Figure out where the landing range needs to be inserted
+  }
+  */
 
   // NOTE: We assume that the subtractGeometry is in the same coord space as the terrain
   blowupTerrain(subtractGeometry) {

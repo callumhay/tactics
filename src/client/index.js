@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import {OrbitControls} from 'three/examples/jsm/controls/OrbitControls';
-import GamePhysics from './GamePhysics';
-import Battlefield from './Battlefield';
+
+import GameModel from './GameModel';
 import GameClient from './GameClient';
 
 // Setup THREE library boilerplate for getting a scene + camera + basic controls up and running
@@ -41,7 +41,9 @@ function onWindowResize(event) {
   renderer.render(scene, camera);
 }
 
-//let intersectedObj = null;
+// Setup game objects
+const gameModel = new GameModel(scene);
+
 const raycaster = new THREE.Raycaster();
 window.addEventListener('click', onMouseClick, false);
 function onMouseClick(event) {
@@ -51,7 +53,7 @@ function onMouseClick(event) {
   camera.updateMatrixWorld();
   raycaster.setFromCamera(mousePos, camera);
 
-  const intersects = raycaster.intersectObjects(battlefield.terrainGroup.children, true);
+  const intersects = raycaster.intersectObjects(gameModel.battlefield.terrainGroup.children, true);
   if (intersects.length > 0) {
     let intersectingTerrain = null;
     for (let i = 0; i < intersects.length; i++) {
@@ -72,22 +74,14 @@ function onMouseClick(event) {
     blastGeometry.translate(point.x, point.y, point.z);
     blastGeometry.applyMatrix4(groupInvTransform);
     //scene.add(new THREE.Mesh(blastGeometry));
-    battlefield.blowupTerrain(blastGeometry);
+    gameModel.battlefield.blowupTerrain(blastGeometry);
     blastGeometry.dispose();
-
-    //intersectedObj = newMesh;
-    //intersectedObj.currentHex = intersectedObj.material.emissive.getHex();
-    //intersectedObj.material.emissive.setHex( 0xff0000 );
   }
 }
 
-// Setup game objects
-const physics = new GamePhysics(scene);
-const battlefield = new Battlefield(scene, physics);
-
 // Setup the client, connect to the game server
 const client = new GameClient();
-client.start(battlefield);
+client.start(gameModel);
 
 // Setup and execute the game loop
 const clock = new THREE.Clock(true);
@@ -97,7 +91,7 @@ const render = function () {
   requestAnimationFrame(render);
 
   // Updates for physics/controls/sound/etc.
-  physics.update(dt);
+  gameModel.update(dt);
   controls.update();
 
   // Render the scene

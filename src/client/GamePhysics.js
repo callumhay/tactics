@@ -1,10 +1,12 @@
 import * as CANNON from 'cannon';
 
 import GameMaterials from './GameMaterials';
+import GameTypes from './GameTypes';
 
 class GamePhysics {
-  constructor(scene) {
+  constructor(scene, gameModel) {
     this.scene = scene; // THREE.js scene
+    this.gameModel = gameModel;
 
     // Setup the cannon physics world
     this.world = new CANNON.World();
@@ -27,15 +29,18 @@ class GamePhysics {
     this.world.step(cleandt);
 
     // Copy transforms from cannon to three
+    const toRemove = [];
     Object.values(this.gameObjects).forEach(gameObject => {
-      const {mesh, body} = gameObject;
+      const {mesh, body, remove} = gameObject;
+      if (remove) { toRemove.push(gameObject); console.log("Removing physics object: " + gameObject.id); }
       mesh.position.copy(body.position);
       mesh.quaternion.copy(body.quaternion);
     });
+    toRemove.forEach(gameObject => this.removeObject(gameObject));
   }
 
   addObject(mesh, config) {
-    const { physicsBodyType, mass, shape, size, material} = config;
+    const {gameType, gameObject, physicsBodyType, mass, shape, size, material} = config;
     let bodyShape = null;
     switch (shape) {
       case 'box':
@@ -43,20 +48,10 @@ class GamePhysics {
         bodyShape = new CANNON.Box(new CANNON.Vec3(size[0]/2, size[1]/2, size[2]/2));
         break;
     }
-    let bodyType = null;
-    switch (physicsBodyType) {
-      case 'dynamic':
-        bodyType = CANNON.Body.DYNAMIC; break;
-      case 'kinematic':
-        bodyType = CANNON.Body.KINEMATIC; break;
-      case 'static':
-      default:
-        bodyType = CANNON.Body.STATIC; break;
-    }
 
     const body = new CANNON.Body({
       mass: mass || 0,
-      type: bodyType,
+      type: physicsBodyType,
       shape: bodyShape,
       position: mesh.position,
       quaternion: mesh.quaternion,
@@ -65,20 +60,31 @@ class GamePhysics {
       material: material,
       allowSleep: true,
     });
+
     body.addEventListener('collide', this.onBodyCollision);
     body.addEventListener('sleep', this.onBodySleep);
     this.world.addBody(body);
 
     const id = body.id
-    const gameObj = { id, mesh, body };
+    const gameObj = { id, mesh, body, gameType, gameObject };
     this.gameObjects[id] = gameObj;
     return gameObj;
   }
 
   removeObject(gameObj) {
     const {body, id} = gameObj;
-    this.world.remove(body);
+    this.world.removeBody(body);
     delete this.gameObjects[id];
+  }
+
+  clear(force) {
+    if (force) {
+      Object.values(this.gameObjects).forEach(obj => this.removeObject(obj));
+      this.gameObjects = {};
+    }
+    else {
+      Object.values(this.gameObjects).forEach(obj => obj.remove = true);
+    }
   }
 
   onBodyCollision(e) {
@@ -86,13 +92,20 @@ class GamePhysics {
     //console.log("Collision: " + target.id);
   }
   onBodySleep(e) {
-    const {target} = e;
-    if (target.mass <= 0) { return; }
+    const {target:body} = e;
+    if (body.mass <= 0) { return; }
 
-    // When a dynamic chunk of terrain of sufficient size falls asleep we need to merge
-    // it back into the environment
-    // TODO
-    
+    const gameObj = this.gameObjects[body.id];
+    switch (gameObj.gameType) {
+      case GameTypes.DETACHED_TERRAIN:
+        // When a dynamic chunk of terrain falls asleep we need to merge it back into the environment
+        this.gameModel.reattachTerrain(gameObj);
+        gameObj.remove = true;
+        break;
+
+      default:
+        break;
+    }  
   }
 }
 

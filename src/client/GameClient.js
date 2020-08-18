@@ -7,7 +7,7 @@ class GameClient {
     this.socket = new WebSocket('ws://' + GameProtocol.WEBSOCKET_HOST + ':' + GameProtocol.WEBSOCKET_PORT);
   }
 
-  start(battlefield) {
+  start(gameModel) {
     const self = this;
 
     this.socket.addEventListener('open', (event) => {
@@ -22,7 +22,7 @@ class GameClient {
     this.socket.addEventListener('message', (event) => {
       //console.log(event.data);
       const dataObj = JSON.parse(event.data);
-      self._readPacket(dataObj, battlefield);
+      self._readPacket(dataObj, gameModel.battlefield);
     });
   }
 

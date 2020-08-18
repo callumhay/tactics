@@ -1,7 +1,9 @@
 import * as THREE from 'three';
+import * as CANNON from 'cannon';
 
 import TerrainColumn from './TerrainColumn';
 import RigidBodyLattice from './RigidBodyLattice'
+import GameTypes from './GameTypes';
 
 export default class Battlefield {
   constructor(scene, physics) {
@@ -37,8 +39,6 @@ export default class Battlefield {
     if (this.rigidBodyLattice) { this.rigidBodyLattice.clear(); }
     this.rigidBodyLattice = new RigidBodyLattice(this.terrainGroup);
     this.rigidBodyLattice.buildFromTerrain(this._terrain);
-    //this.rigidBodyLattice.removeNodesInsideLandingRange(this._terrain[0][1].landingRanges[0]);
-    //this.rigidBodyLattice.debugDrawNodes(true);
   }
 
   clear() {
@@ -87,6 +87,61 @@ export default class Battlefield {
     const debrisObj = this.physics.addObject(debrisMesh, config);
     this.debris.push(debrisObj);
     return debrisObj;
+  }
+  convertDebrisToTerrain(debrisObj) {
+    if (debrisObj.gameType !== GameTypes.DETACHED_TERRAIN) {
+      console.error("Attempting to convert invalid game type back into terrain, ignoring."); return;
+    }
+
+    this.debris.splice(this.debris.indexOf(debrisObj), 1);
+
+    // We need to reattach the landing range associated with this piece of detached terrain
+    const {gameObject:landingRange, mesh, body} = debrisObj;
+    const {position, rotation} = mesh;
+
+    const ANGLE_SNAP_EPSILON = 20 * Math.PI / 180;
+    const PI_OVER_2 = Math.PI / 2;
+
+    // Start with the simplest case: a box
+    if (body.shapes.length === 1 && body.shapes[0].type === CANNON.Shape.types.BOX) {
+
+      // The landing range may have shifted its position, figure out what terrain column it's closest to in the grid...
+      const closestXIdx = Math.floor(position.x/TerrainColumn.SIZE);
+      const closestZIdx = Math.floor(position.z/TerrainColumn.SIZE);
+      const closestTerrainCol = this._terrain[closestXIdx][closestZIdx];
+      if (!closestTerrainCol) {
+        // There is no terrain column where this will work...
+        console.error("Failed to find terrain column for placement, removing terrain.");
+        landingRange.clear();
+        return;
+      }
+
+      // Snap the position to the nearest terrain column
+      const closestCenter = closestTerrainCol.getTerrainSpaceTranslation();
+      position.x = closestCenter.x;
+      position.z = closestCenter.z;
+      position.y = Math.round((position.y + Number.EPSILON) * 100) / 100; // Make sure the y-coordinate snaps within a precision of 1mm of the environment 
+
+      // We will need to clean up the position and orientation so that the box lies cleanly in the terrain column
+      for (const coord of ['x','y','z']) {
+        // Snap the rotation to the nearest 90 degree angle
+        const truncDiv = Math.trunc(rotation[coord]/PI_OVER_2);
+        const snapped  = truncDiv*PI_OVER_2;
+        if (Math.abs(rotation[coord] - snapped) <= ANGLE_SNAP_EPSILON) {
+          rotation[coord] = snapped;
+        }
+      }
+      mesh.setRotationFromEuler(rotation);
+      mesh.updateMatrixWorld();
+
+      // TODO
+      //closestTerrainCol.attachLandingRange(landingRange);
+    }
+    else {
+      // TODO: Deal with cases where the mesh is too big for just one terrain column, split it up, etc.
+      console.warn("Need to write code to deal with this type of debris-to-terrain situation.");
+    }
+
   }
 
   // Do a basic terrain check for floating "islands" (i.e., terrain blobs that aren't connected to the ground), 
