@@ -206,20 +206,34 @@ class TerrainColumn {
       rigidBodyLattice.addLandingRangeNodes(landingRange);
     }
 
+    // Re-traverse the rigid body node lattice, find out if anything is no longer attached to the ground
+    rigidBodyLattice.traverseGroundedNodes();
     rigidBodyLattice.debugDrawNodes(true);
-    //this.debugDrawAABBs(true);
   }
   
-
   // NOTE: We assume that the subtractGeometry is in the same coord space as the terrain
   blowupTerrain(subtractGeometry) {
     const {boundingBox} = subtractGeometry;
     // Figure out what terrain geometry will be affected in this column
     const collidingRanges = this.landingRanges.filter(range => range.startY <= boundingBox.max.y && range.endY >= boundingBox.min.y);
     // BLOW IT UP!
-    collidingRanges.forEach(landingRange => {
+    for (const landingRange of collidingRanges) {
       landingRange.blowupTerrain(subtractGeometry);
-    });
+    }
+
+    // Re-traverse the rigid body node lattice, find out if anything is no longer attached to the ground
+    const {rigidBodyLattice} = this.battlefield;
+    rigidBodyLattice.traverseGroundedNodes();
+    
+    /*
+    // Figure out what's no longer attached and detach it as a separated landing range
+    for (const landingRange of collidingRanges) {
+      const nodes = rigidBodyLattice.getNodesInLandingRange(landingRange);
+      // TODO
+    }
+    */
+
+    rigidBodyLattice.debugDrawNodes(true);
   }
 
   toString() {

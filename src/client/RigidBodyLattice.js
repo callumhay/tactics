@@ -2,8 +2,6 @@ import * as THREE from 'three';
 
 import TerrainColumn from './TerrainColumn';
 import Debug from '../debug';
-import { Vector3 } from 'three';
-import LandingRange from './LandingRange';
 
 class LatticeNode {
   constructor(id, xIdx, zIdx, yIdx, pos, columnsAndLandingRanges) {
@@ -13,6 +11,7 @@ class LatticeNode {
     this.yIdx = yIdx;
     this.pos = pos;
     this.columnsAndLandingRanges = columnsAndLandingRanges;
+    this.grounded = false;
   }
   hasLandingRange(landingRange) {
     const {terrainColumn} = landingRange;
@@ -183,8 +182,8 @@ export default class RigidBodyLattice {
 
     // Traverse the lattice, find anything that might not be connected to the ground, 
     // remove it from the terrain and turn it into a physical object
-    const traversalInfo = this.traverseToGround();
-    this.debugDrawNodes(true, traversalInfo);
+    this.traverseGroundedNodes();
+    this.debugDrawNodes(true);
   }
 
   _getNodeIndicesForLandingRange(landingRange) {
@@ -285,8 +284,8 @@ export default class RigidBodyLattice {
     const raycaster = new THREE.Raycaster();
     raycaster.near = 0;
     raycaster.far = landingRange.height;
-    const rayPos = new Vector3();
-    const rayDir = new Vector3(0,1,0);
+    const rayPos = new THREE.Vector3();
+    const rayDir = new THREE.Vector3(0,1,0);
     
     const temp = mesh.material.side;
     mesh.material.side = THREE.DoubleSide;
@@ -329,19 +328,6 @@ export default class RigidBodyLattice {
     }
     
     mesh.material.side = temp;
-    
-    const traversalInfo = this.traverseToGround();
-    this.debugDrawNodes(true, traversalInfo);
-  }
-
-  getNeighboursForNodes(nodes) {
-    const result = new Set();
-    const nodesToIgnore = new Set(nodes);
-    nodes.forEach(node => {
-      const currNeighbours = this.getNeighboursForNode(node).filter(n => !nodesToIgnore.has(n));
-      currNeighbours.forEach(n => result.add(n));
-    });
-    return result;
   }
 
   getNeighboursForNode(node) {
@@ -369,7 +355,7 @@ export default class RigidBodyLattice {
     return neighbours;
   }
 
-  traverseToGround() {
+  traverseGroundedNodes() {
     const traversalInfo = {};
     const queue = [];
 
@@ -379,10 +365,9 @@ export default class RigidBodyLattice {
         for (let y = 0; y < this.nodes[x][z].length; y++) {
           const node = this.nodes[x][z][y];
           if (node) {
+            node.grounded = false;
             traversalInfo[node.id] = {
-              node: node,
               visitState: TRAVERSAL_UNVISITED_STATE,
-              grounded: false,
             };
             // Fill the queue with all the ground nodes
             if (y <= 0) { queue.push(node); }
@@ -396,14 +381,12 @@ export default class RigidBodyLattice {
       if (node) {
         const nodeTraversalInfo = traversalInfo[node.id];
         if (nodeTraversalInfo.visitState === TRAVERSAL_UNVISITED_STATE) {
-          nodeTraversalInfo.grounded = true;
+          node.grounded = true;
           nodeTraversalInfo.visitState = TRAVERSAL_FINISHED_STATE;
           queue.push(...this.getNeighboursForNode(node));
         }
       }
     }
-
-    return traversalInfo;
   }
 
   _clearDebugDraw() {
@@ -413,13 +396,12 @@ export default class RigidBodyLattice {
       this.debugNodePoints = null;
     }
   }
-  debugDrawNodes(show=true, traversalInfo=null) {
+  debugDrawNodes(show=true) {
     this._clearDebugDraw();
     if (show) {
       const nodeGeometry = new THREE.BufferGeometry();
       const vertices = [];
       const colours  = [];
-      const defaultColour = new THREE.Color(0,1,0);
       for (let x = 0; x < this.nodes.length; x++) {
         for (let y = 0; y < this.nodes[x].length; y++) {
           for (let z = 0; z < this.nodes[x][y].length; z++) {
@@ -427,13 +409,12 @@ export default class RigidBodyLattice {
             if (currNode) {
               const nodePos = currNode.pos;
               vertices.push(nodePos.x); vertices.push(nodePos.y); vertices.push(nodePos.z);
-              if (traversalInfo && traversalInfo[currNode.id] && !traversalInfo[currNode.id].grounded) {
+              if (!currNode.grounded) {
                 colours.push(0); colours.push(0); colours.push(0); // Detached nodes are black
               }
               else {
                 const c = currNode.debugColourForLandingRanges();
                 colours.push(c.r); colours.push(c.g); colours.push(c.b);
-                //colours.push(defaultColour.r); colours.push(defaultColour.g); colours.push(defaultColour.b);
               }
             }
           }
