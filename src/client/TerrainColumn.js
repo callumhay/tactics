@@ -55,9 +55,9 @@ class TerrainColumn {
           console.log(`Merging landing ranges [${top},${currRng}] in TerrainColumn (${this.xIndex},${this.zIndex}).`);
           // Materials are the same and they are both on top of one another, 
           // merge them into the top and discard currRng
-          top.endY = currRng.startY;
+          const newTopGeometry = LandingRange.buildBasicGeometry(currRng.startY-top.startY);
           currRng.clear();
-          top.regenerate();
+          top.regenerate(top.startY, newTopGeometry);
           //stack.pop(); stack.push(top);
         }
       }
@@ -71,8 +71,8 @@ class TerrainColumn {
           else {
             // ...otherwise, we split up the top into two ranges that straddle the currRng on top and bottom
             const bottom = new LandingRange(this, {startY:top.startY, endY:currRng.startY, type:top.type});
-            top.startY = currRng.endY;
-            top.regenerate();
+            const newTopGeometry = LandingRange.buildBasicGeometry(top.endY-currRng.endY);
+            top.regenerate(currRng.endY, newTopGeometry);
             stack.pop(); stack.push(bottom); stack.push(currRng); stack.push(top);
           }
         }
@@ -80,15 +80,15 @@ class TerrainColumn {
           // There is an overlap of the top and currRng
           if (currRng.materialType === top.materialType) {
             // If the materials are the same then merge the two ranges
-            top.endY = currRng.endY;
-            top.regenerate();
+            const newTopGeometry = LandingRange.buildBasicGeometry(currRng.endY-top.startY);
+            top.regenerate(top.startY, newTopGeometry);
             currRng.clear();
             //stack.pop(); stack.push(top);
           }
           else {
             // ... otherwise, shorten the current range and add it to the stack
-            currRng.startY = top.endY;
-            currRng.regenerate();
+            const newCurrRngGeometry = LandingRange.buildBasicGeometry(currRng.endY-top.endY);
+            currRng.regenerate(top.endY, newCurrRngGeometry);
             stack.push(currRng);
           }
         }
@@ -118,19 +118,13 @@ class TerrainColumn {
     );
   }
 
-  calcAABBs(epsilon=TerrainColumn.EPSILON) {
-    return this.landingRanges.map(landingRange => landingRange.calcAABB(epsilon));
+  computeBoundingBoxes(epsilon=TerrainColumn.EPSILON) {
+    return this.landingRanges.map(landingRange => landingRange.computeBoundingBox(epsilon));
   }
-  containsPoint(pt, aabbs=[]) {
-    const boundingBoxes = aabbs && aabbs.length > 0 ? aabbs : this.calcAABBs();
-    for (let i = 0; i < boundingBoxes.length; i++) {
-      if (boundingBoxes[i].containsPoint(pt)) { return true; }
-    }
-    return false;
-  }
+
   landingRangesContainingPoint(pt) {
     const result = [];
-    const boundingBoxes = this.calcAABBs();
+    const boundingBoxes = this.computeBoundingBoxes();
     for (let i = 0; i < boundingBoxes.length; i++) {
       if (boundingBoxes[i].containsPoint(pt)) {
         result.push(this.landingRanges[i])
@@ -172,14 +166,50 @@ class TerrainColumn {
       size: size,
       material: material.cannonMaterial,
     };
+    rangeToRemove.terrainColumn = null;
     rangeToRemove.physicsObj = this.battlefield.convertTerrainToDebris(detachedMesh, config);
   }
 
-  /*
   attachLandingRange(landingRange) {
-    // Figure out where the landing range needs to be inserted
+    // Figure out where the landing range needs to be attached/inserted
+    const {mesh} = landingRange;
+    const {geometry} = mesh;
+
+    // Find the upper and lower bounds of the y-coordinates in this column
+    geometry.computeBoundingBox();
+    const boundingBox = geometry.boundingBox.clone();
+    boundingBox.applyMatrix4(mesh.matrix);
+
+    // Find the closest existing landing range under the given one
+    const {min:bbMin, max:bbMax} = boundingBox;
+    let mergeLandingRange = null;
+    for (const range of this.landingRanges) {
+      const {startY, endY} = range;
+      if (endY >= (bbMin.y-TerrainColumn.EPSILON)) {
+        mergeLandingRange = range;
+        break;
+      }
+    }
+    const { rigidBodyLattice } = this.battlefield;
+    if (mergeLandingRange) {
+      geometry.applyMatrix4(mesh.matrix);
+      mergeLandingRange.mergeTerrain(geometry);
+      landingRange.clearGeometry(this);
+    }
+    else {
+      // Nothing to merge with, add to the column
+      landingRange.terrainColumn = this;
+      landingRange.startY = bbMin.y;
+      landingRange.endY = bbMax.y;
+      this.landingRanges.push(landingRange);
+      landingRange.buildPhysicsObj();
+      rigidBodyLattice.addLandingRangeNodes(landingRange);
+    }
+
+    rigidBodyLattice.debugDrawNodes(true);
+    //this.debugDrawAABBs(true);
   }
-  */
+  
 
   // NOTE: We assume that the subtractGeometry is in the same coord space as the terrain
   blowupTerrain(subtractGeometry) {
@@ -213,8 +243,9 @@ class TerrainColumn {
     this._clearDebugAABBGroup();
 
     if (show) {
+      this.debugAABBGroup = new THREE.Group();
       const {terrainGroup} = this.battlefield;
-      const aabbs = this.calcAABBs();
+      const aabbs = this.computeBoundingBoxes();
       const currCenter = new THREE.Vector3();
       aabbs.forEach(aabb => {
         const edges = new THREE.EdgesGeometry(new THREE.BoxBufferGeometry(aabb.max.x - aabb.min.x, aabb.max.y - aabb.min.y, aabb.max.z - aabb.min.z));

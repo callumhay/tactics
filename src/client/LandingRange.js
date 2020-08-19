@@ -6,6 +6,8 @@ import GameMaterials from './GameMaterials';
 import TerrainColumn from './TerrainColumn';
 import GameTypes from './GameTypes';
 
+const tempTargetVec3 = new THREE.Vector3();
+
 class LandingRange {
   static get defaultPhysicsConfig() {
     return {
@@ -14,6 +16,10 @@ class LandingRange {
       shape: "box",
       size: [1, 1, 1],
     };
+  }
+
+  static buildBasicGeometry(height) {
+    return new THREE.BoxBufferGeometry(TerrainColumn.SIZE, height * TerrainColumn.SIZE, TerrainColumn.SIZE);
   }
 
   constructor(terrainColumn, config) {
@@ -26,12 +32,12 @@ class LandingRange {
     this.mesh = null;
     this.physicsObj = null;
 
-    this.startY = startY;
-    this.endY = endY;
+    // Build the bounding box (aabb) for this
+    const height = (endY-startY);
 
     // Don't build anything if the landing range is degenerative - it will be cleaned up
-    if (this.startY < this.endY) {
-      this.regenerate();
+    if (height > 0) {
+      this.regenerate(startY, LandingRange.buildBasicGeometry(height));
     }
     else {
       console.warn(`Degenerative landing range found (${this.startY},${this.endY}). This will be cleaned up.`);
@@ -41,65 +47,95 @@ class LandingRange {
   get height() {
     return this.endY - this.startY;
   }
-
-  clear() {
-    if (this.mesh) {
-      const { terrainGroup } = this.terrainColumn.battlefield;
-      terrainGroup.remove(this.mesh);
-      this.mesh.geometry.dispose();
-      this.mesh = null;
-    }
-    if (this.physicsObj) {
-      const { physics } = this.terrainColumn.battlefield;
-      physics.removeObject(this.physicsObj);
-      this.physicsObj = null;
-    }
+  get startY() {
+    return this.boundingBox.min.y;
   }
-  regenerate(geometry = null) {
+  get endY() {
+    return this.boundingBox.max.y;
+  }
+
+  clearGeometry(terrainColumn = this.terrainColumn) {
+    if (this.mesh) {
+      const { terrainGroup } = terrainColumn.battlefield;
+      this.mesh.geometry.dispose();
+      terrainGroup.remove(this.mesh);
+    }
+    this.mesh = null;
+    this.boundingBox = null;
+  }
+
+  clear(terrainColumn=this.terrainColumn) {
+    this.clearGeometry(terrainColumn);
+    if (this.physicsObj) {
+      const { physics } = terrainColumn.battlefield;
+      physics.removeObject(this.physicsObj);
+    }
+    this.physicsObj = null;
+  }
+
+  regenerate(startY, geometry) {
+    if (this.mesh && geometry === this.mesh.geometry) {
+      console.error(`Attemting to regenerate LandingRange ${this} with same geometry.`);
+      return;
+    }
+
     // IMPORTANT: Order matters here, various regeneration routines depend on others finishing first!!
     this.clear();
-    this.mesh = this._buildTerrainMesh(geometry || new THREE.BoxBufferGeometry(TerrainColumn.SIZE, this.height * TerrainColumn.SIZE, TerrainColumn.SIZE));
+
+    this._createTerrainMesh(startY, geometry);
     const {terrainGroup, rigidBodyLattice} = this.terrainColumn.battlefield;
     terrainGroup.add(this.mesh);
-    this.physicsObj = this._buildPhysicsObj();
+    this.physicsObj = this.buildPhysicsObj();
 
-    // We need to remove all rigid body nodes that are no longer inside this geometry...
+    // We need to remove/add rigid body nodes based on the new geometry
     if (rigidBodyLattice) { rigidBodyLattice.updateNodesForLandingRange(this); }
   }
 
-  getTerrainSpaceTranslation() {
+  getTerrainSpaceTranslation(startY, height) {
     const translation = this.terrainColumn.getTerrainSpaceTranslation();
-    translation.y = this.startY + this.height / 2;
+    translation.y = startY + height / 2;
     return translation;
   }
 
   blowupTerrain(subtractGeometry) {
-    const collidingMesh = this.mesh;
-    const collidingGeometry = collidingMesh.geometry;
+    const {geometry, matrix} = this.mesh;
+    const invMatrix = new THREE.Matrix4();
+    invMatrix.getInverse(matrix);
 
-    // The geometry needs to be placed into the terrain space
-    const translation = this.getTerrainSpaceTranslation();
-    collidingGeometry.translate(translation.x, translation.y, translation.z);
+    const heightBefore = this.height;
 
-    const csgGeometry = CSG.subtract([collidingGeometry, subtractGeometry]);
+    geometry.applyMatrix4(matrix); // Geometry needs to be placed into the terrain space
+    const csgGeometry = CSG.subtract([geometry, subtractGeometry]);
     const newGeometry = CSG.BufferGeometry(csgGeometry);
-    newGeometry.translate(-translation.x, -translation.y, -translation.z);
+    newGeometry.applyMatrix4(invMatrix); // New geometry needs to be moved back into local space
 
-    this.regenerate(newGeometry);
+    // We have to maintain the proper local space translation so that that the geometry is centered
+    newGeometry.computeBoundingBox();
+
+    const heightAfter = newGeometry.boundingBox.getSize(tempTargetVec3).y;
+    newGeometry.translate(0, (heightBefore - heightAfter) / 2, 0);
+
+    this.regenerate(this.startY, newGeometry);
   }
 
-  calcAABB(epsilon) {
-    const { xIndex, zIndex } = this.terrainColumn;
-    const { startY, endY } = this;
-    const startXPos = xIndex * TerrainColumn.SIZE;
-    const startZPos = zIndex * TerrainColumn.SIZE;
-    const endXPos = startXPos + TerrainColumn.SIZE;
-    const endZPos = startZPos + TerrainColumn.SIZE;
+  mergeTerrain(mergeGeometry) {
+    const {geometry, matrix} = this.mesh;
+    const invMatrix = new THREE.Matrix4();
+    invMatrix.getInverse(matrix);
 
-    return new THREE.Box3(
-      new THREE.Vector3(startXPos - epsilon, startY - epsilon, startZPos - epsilon),
-      new THREE.Vector3(endXPos + epsilon, endY + epsilon, endZPos + epsilon)
-    );
+    const heightBefore = this.height;
+
+    geometry.applyMatrix4(matrix); // Geometry needs to be placed into the terrain space
+    const csgGeometry = CSG.union([geometry, mergeGeometry]);
+    const newGeometry = CSG.BufferGeometry(csgGeometry);
+    newGeometry.applyMatrix4(invMatrix); // New geometry needs to be moved back into local space
+
+    // We have to maintain the proper local space translation so that that the geometry is centered
+    newGeometry.computeBoundingBox();
+    const heightAfter = newGeometry.boundingBox.getSize(tempTargetVec3).y;
+    newGeometry.translate(0, (heightBefore-heightAfter)/2, 0);
+
+    this.regenerate(this.startY, newGeometry);
   }
 
   toString() {
@@ -117,18 +153,7 @@ class LandingRange {
     );
   }
 
-  _buildTerrainMesh(geometry) {
-    const translation = this.getTerrainSpaceTranslation();
-    const mesh = new THREE.Mesh(geometry, this.material.threeMaterial);
-    mesh.translateX(translation.x);
-    mesh.translateY(translation.y);
-    mesh.translateZ(translation.z);
-    mesh.updateMatrixWorld(); // IMPORTANT: We may use the matrix of this mesh sometime before rendering
-    mesh.terrainLandingRange = this;
-    return mesh;
-  }
-
-  _buildPhysicsObj() {
+  buildPhysicsObj() {
     const { physics } = this.terrainColumn.battlefield;
     const config = LandingRange.defaultPhysicsConfig;
     config.material = this.material;
@@ -136,6 +161,31 @@ class LandingRange {
     size[1] = this.height;
 
     return physics.addObject(this.mesh, config);
+  }
+
+  _createTerrainMesh(startY, geometry) {
+    // IMPORTANT: Order matters here!
+    this.mesh = new THREE.Mesh(geometry, this.material.threeMaterial);
+    geometry.computeBoundingBox();
+
+    const height = geometry.boundingBox.getSize(tempTargetVec3).y;
+    const translation = this.getTerrainSpaceTranslation(startY, height);
+
+    this.boundingBox = geometry.boundingBox.clone();
+    this.boundingBox.translate(translation);
+
+    this.mesh.translateX(translation.x);
+    this.mesh.translateY(translation.y);
+    this.mesh.translateZ(translation.z);
+    this.mesh.updateMatrixWorld(); // IMPORTANT: We may use the matrix of this mesh sometime before rendering
+    this.mesh.terrainLandingRange = this;
+  }
+
+  computeBoundingBox(epsilon = 0) {
+    const result = this.boundingBox.clone();
+    result.min.subScalar(epsilon);
+    result.max.addScalar(epsilon);
+    return result;
   }
 }
 

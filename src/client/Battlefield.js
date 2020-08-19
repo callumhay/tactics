@@ -134,8 +134,7 @@ export default class Battlefield {
       mesh.setRotationFromEuler(rotation);
       mesh.updateMatrixWorld();
 
-      // TODO
-      //closestTerrainCol.attachLandingRange(landingRange);
+      closestTerrainCol.attachLandingRange(landingRange);
     }
     else {
       // TODO: Deal with cases where the mesh is too big for just one terrain column, split it up, etc.
