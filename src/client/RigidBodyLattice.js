@@ -366,9 +366,7 @@ export default class RigidBodyLattice {
           const node = this.nodes[x][z][y];
           if (node) {
             node.grounded = false;
-            traversalInfo[node.id] = {
-              visitState: TRAVERSAL_UNVISITED_STATE,
-            };
+            traversalInfo[node.id] = { visitState: TRAVERSAL_UNVISITED_STATE };
             // Fill the queue with all the ground nodes
             if (y <= 0) { queue.push(node); }
           }
@@ -387,6 +385,43 @@ export default class RigidBodyLattice {
         }
       }
     }
+  }
+  traverseIslands() {
+    /*
+    const traversalInfo = {};
+    const islands = [];
+    
+    // Grab all ungrounded nodes...
+    const ungroundedNodes = [];
+    for (let x = 0; x < this.nodes.length; x++) {
+      for (let z = 0; z < this.nodes[x].length; z++) {
+        for (let y = 0; y < this.nodes[x][z].length; y++) {
+          const node = this.nodes[x][z][y];
+          if (node && !node.grounded) {
+            ungroundedNodes.push(node);
+            traversalInfo[node.id] = { islandNum: -1 };
+          }
+        }
+      }
+    }
+
+    let currIslandNum = 0;
+    while (ungroundedNodes.length > 0) {
+      const node = ungroundedNodes.shift();
+      if (node) {
+        const nodeTraversalInfo = traversalInfo[node.id];
+        if (nodeTraversalInfo.islandNum === -1) {
+          const neighbours = this.getNeighboursForNode(node);
+          for (const neighbour of neighbours) {
+
+          }
+
+
+        }
+      }
+    }
+    */
+
   }
 
   _clearDebugDraw() {
