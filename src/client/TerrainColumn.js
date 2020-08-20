@@ -1,34 +1,37 @@
 import * as THREE from 'three';
-import * as CANNON from 'cannon';
+import CSG from 'three-csg';
 
 import LandingRange from './LandingRange';
 import Debug from '../debug';
-import GameTypes from './GameTypes';
+import Battlefield from './Battlefield';
 
 class TerrainColumn {
   static get SIZE() { return 1; }
   static get HALF_SIZE() { return TerrainColumn.SIZE/2; }
-  static get EPSILON() { return 1e-8; }
+  static get EPSILON() { return 1e-6; }
   
   constructor(battlefield, u, v, materialGroups) {
     this.battlefield = battlefield;
     this.xIndex = u;
     this.zIndex = v;
     this.landingRanges = [];
-    materialGroups.forEach(matGrp => {
-      const {type, landingRanges} = matGrp;
-      landingRanges.forEach(landingRange => {
-        const [startY, endY] = landingRange;
-        this.landingRanges.push(new LandingRange(this, {type, startY, endY}));
-      });
-    });
 
-    // If there are any zero/negative sized ranges they must be removed
-    this.landingRanges = this.landingRanges.filter(range => range.height > 0);
-    // Sort the landing ranges by their starting ("startY") coordinate
-    this.landingRanges.sort((a,b) => a.startY-b.startY);
-    // Clean-up: Merge together any overlaps
-    this.landingRanges = TerrainColumn.mergeLandingRanges(this.landingRanges);
+    if (materialGroups && Object.keys(materialGroups).length > 0) { 
+      materialGroups.forEach(matGrp => {
+        const {type, landingRanges} = matGrp;
+        for (const landingRange of landingRanges) {
+          const [startY, endY] = landingRange;
+          this.landingRanges.push(new LandingRange(this, {type, startY, endY}));
+        }
+      });
+
+      // If there are any zero/negative sized ranges they must be removed
+      this.landingRanges = this.landingRanges.filter(range => range.height > 0);
+      // Sort the landing ranges by their starting ("startY") coordinate
+      this.landingRanges.sort((a, b) => a.startY - b.startY);
+      // Clean-up: Merge together any overlaps
+      this.landingRanges = TerrainColumn.mergeLandingRanges(this.landingRanges);
+    }
   }
 
   // NOTE: landingRanges must be sorted by the starting element of each range in ascending order,
@@ -133,84 +136,73 @@ class TerrainColumn {
     return result;
   }
 
-  detachLandingRange(rangeIdx) {
-    const rangeToRemove = this.landingRanges[rangeIdx];
+  detachLandingRange(rangeToRemove) {
+    const rangeIdx = this.landingRanges.indexOf(rangeToRemove);
+    if (rangeIdx < 0) { return; }
     console.log(`Removing landing range ${rangeToRemove} in TerrainColumn ${this}.`);
-
     // We'll need to convert the landing range into debris that is physics-based
-    const {height, material, mesh:detachedMesh, physicsObj:detachedPhysObj} = rangeToRemove;
+    const { height, material, mesh: detachedMesh, physicsObj: detachedPhysObj } = rangeToRemove;
     this.landingRanges.splice(rangeIdx, 1);
-
-    // We need to remove the old physical object for the terrain
-    const {physics} = this.battlefield;
-    physics.removeObject(detachedPhysObj);
-
-    // Make sure there are no longer any nodes associated with the detached range - it's possible that this
-    // is being called during initialization (in which case there isn't a lattice yet so we don't need to worry about it)
-    const {rigidBodyLattice} = this.battlefield;
-    if (rigidBodyLattice) { rigidBodyLattice.removeNodesInsideLandingRange(rangeToRemove); }
-
-    // TODO: Do we treat the debris as a box? a mesh? does it break apart? etc.
-
-    // IMPORTANT: Removing a small epsilon from the size avoids
-    // friction and collision anomolies with the rest of the terrain
-    const sideWidthEpsilon = TerrainColumn.SIZE - TerrainColumn.EPSILON;
-    const size = [sideWidthEpsilon, height - TerrainColumn.EPSILON, sideWidthEpsilon];
-    const mass = material.density * size[0] * size[1] * size[2];
-    const config = {
-      gameType: GameTypes.DETACHED_TERRAIN,
-      gameObject: rangeToRemove,
-      physicsBodyType: CANNON.Body.DYNAMIC,
-      mass: mass,
-      shape: "box",
-      size: size,
-      material: material.cannonMaterial,
-    };
     rangeToRemove.terrainColumn = null;
-    rangeToRemove.physicsObj = this.battlefield.convertTerrainToDebris(detachedMesh, config);
   }
 
-  attachLandingRange(landingRange) {
-    // Figure out where the landing range needs to be attached/inserted
-    const {mesh} = landingRange;
+  attachDebris(debris) {
+    const {mesh} = debris;
     const {geometry} = mesh;
 
     // Find the upper and lower bounds of the y-coordinates in this column
-    geometry.computeBoundingBox();
     const boundingBox = geometry.boundingBox.clone();
-    boundingBox.applyMatrix4(mesh.matrix);
 
     // Find the closest existing landing range under the given one
-    const {min:bbMin, max:bbMax} = boundingBox;
+    const { min: bbMin, max: bbMax } = boundingBox;
     let mergeLandingRange = null;
     for (const range of this.landingRanges) {
-      const {startY, endY} = range;
-      if (endY >= (bbMin.y-TerrainColumn.EPSILON)) {
+      const {endY} = range;
+      if (endY >= (bbMin.y - TerrainColumn.EPSILON)) {
         mergeLandingRange = range;
         break;
       }
     }
-    const { rigidBodyLattice } = this.battlefield;
+
+    // We need to only take the part of the debris that's in this column:
+    // Use an CSG intersection with a tall bounding box representing this column
+    const columnBoxHeight = Battlefield.MAX_HEIGHT + TerrainColumn.SIZE;
+    const columnBox = new THREE.BoxBufferGeometry(TerrainColumn.SIZE, columnBoxHeight, TerrainColumn.SIZE);
+    const translation = this.getTerrainSpaceTranslation();
+    translation.y = columnBoxHeight / 2 - TerrainColumn.HALF_SIZE;
+    columnBox.translate(translation.x, translation.y, translation.z);
+    // Debugging for visualizing the columnBox
+    //const {terrainGroup} = this.battlefield;
+    //const temp = new THREE.Mesh(columnBox, new MeshBasicMaterial({color:0x0000CC, transparent: true, opacity: 0.25}));
+    //terrainGroup.add(temp);
+
+    const csgGeometry = CSG.intersect([columnBox, geometry]);
+    const newGeometry = CSG.BufferGeometry(csgGeometry);
+    // Debugging for visualizing the resulting CSG geometry
+    //const testNewGeom = new THREE.Mesh(newGeometry, new THREE.MeshBasicMaterial({color:0x0000CC, transparent: true, opacity: 0.25, depthFunc:THREE.AlwaysDepth}));
+    //const testBB = new THREE.Box3Helper(boundingBox);
+    //terrainGroup.add(testNewGeom);
+    //terrainGroup.add(testBB);
+
+    // Take the chunk that becomes part of this column out of the debris 
+    debris.subtractGeometry(columnBox);
+
+    // Merge the new geometry into a landing range or create a new one
+    const {rigidBodyLattice} = this.battlefield;
     if (mergeLandingRange) {
-      geometry.applyMatrix4(mesh.matrix);
-      mergeLandingRange.mergeTerrain(geometry);
-      landingRange.clearGeometry(this);
+
     }
     else {
-      // Nothing to merge with, add to the column
-      landingRange.terrainColumn = this;
-      landingRange.startY = bbMin.y;
-      landingRange.endY = bbMax.y;
-      this.landingRanges.push(landingRange);
-      landingRange.buildPhysicsObj();
-      rigidBodyLattice.addLandingRangeNodes(landingRange);
+      const newLandingRange = LandingRange.buildFromGeometry(newGeometry, this, debris.material);
+      this.landingRanges.push(newLandingRange);
+      rigidBodyLattice.addLandingRangeNodes(newLandingRange, true);
     }
 
     // Re-traverse the rigid body node lattice, find out if anything is no longer attached to the ground
     rigidBodyLattice.traverseGroundedNodes();
     rigidBodyLattice.debugDrawNodes(true);
   }
-  
+
   // NOTE: We assume that the subtractGeometry is in the same coord space as the terrain
   blowupTerrain(subtractGeometry) {
     const {boundingBox} = subtractGeometry;
@@ -225,11 +217,12 @@ class TerrainColumn {
     const {rigidBodyLattice} = this.battlefield;
     rigidBodyLattice.traverseGroundedNodes();
     
+    const islands = rigidBodyLattice.traverseIslands(this.landingRanges);
+    console.log(islands);
     /*
     // Figure out what's no longer attached and detach it as a separated landing range
-    for (const landingRange of collidingRanges) {
-      const nodes = rigidBodyLattice.getNodesInLandingRange(landingRange);
-      // TODO
+    for (const islandNodeSet of islands) {
+      
     }
     */
 

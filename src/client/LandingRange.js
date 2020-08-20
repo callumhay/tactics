@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-import * as CANNON from 'cannon';
 import CSG from 'three-csg';
 
 import GameMaterials from './GameMaterials';
@@ -9,38 +8,39 @@ import GameTypes from './GameTypes';
 const tempTargetVec3 = new THREE.Vector3();
 
 class LandingRange {
-  static get defaultPhysicsConfig() {
-    return {
-      physicsBodyType: CANNON.Body.KINEMATIC,
-      gameType: GameTypes.ATTACHED_TERRAIN,
-      shape: "box",
-      size: [1, 1, 1],
-    };
-  }
-
   static buildBasicGeometry(height) {
     return new THREE.BoxBufferGeometry(TerrainColumn.SIZE, height * TerrainColumn.SIZE, TerrainColumn.SIZE);
   }
+  static buildFromGeometry(geometry, terrainColumn, material) {
+    const landingRange = new LandingRange(terrainColumn, {material, startY:0, endY:0});
+    // The geometry will need to be translated into the local space of the landing range
+    geometry.computeBoundingBox();
+    const {boundingBox} = geometry;
+    const startY = boundingBox.min.y;
+    const height = boundingBox.max.y - startY;
+    const translation = terrainColumn.getTerrainSpaceTranslation();
+    translation.y = boundingBox.min.y + height / 2;
+    translation.multiplyScalar(-1);
+    geometry.translate(translation.x, translation.y, translation.z);
+    landingRange.regenerate(startY, geometry);
+    return landingRange;
+  } 
 
   constructor(terrainColumn, config) {
     this.terrainColumn = terrainColumn;
 
-    const { type, startY, endY } = config;
+    const { type, startY, endY, material } = config;
     this.materialType = type;
 
-    this.material = GameMaterials.materials[this.materialType];
+    this.material = material || GameMaterials.materials[this.materialType];
     this.mesh = null;
     this.physicsObj = null;
 
     // Build the bounding box (aabb) for this
-    const height = (endY-startY);
-
-    // Don't build anything if the landing range is degenerative - it will be cleaned up
+    const height = (endY-startY) || 0;
+    // Don't build anything if the landing range is degenerative
     if (height > 0) {
       this.regenerate(startY, LandingRange.buildBasicGeometry(height));
-    }
-    else {
-      console.warn(`Degenerative landing range found (${this.startY},${this.endY}). This will be cleaned up.`);
     }
   }
 
@@ -125,7 +125,7 @@ class LandingRange {
 
     const heightBefore = this.height;
 
-    geometry.applyMatrix4(matrix); // Geometry needs to be placed into the terrain space
+    geometry.applyMatrix4(matrix); // Geometry needs to be placed into local space
     const csgGeometry = CSG.union([geometry, mergeGeometry]);
     const newGeometry = CSG.BufferGeometry(csgGeometry);
     newGeometry.applyMatrix4(invMatrix); // New geometry needs to be moved back into local space
@@ -155,17 +155,19 @@ class LandingRange {
 
   buildPhysicsObj() {
     const { physics } = this.terrainColumn.battlefield;
-    const config = LandingRange.defaultPhysicsConfig;
-    config.material = this.material;
-    const { size } = config;
-    size[1] = this.height;
-
-    return physics.addObject(this.mesh, config);
+    const config = {
+      gameType: GameTypes.TERRAIN,
+      material: this.material,
+      mesh: this.mesh,
+    };
+    return physics.addTerrain(config);
   }
 
   _createTerrainMesh(startY, geometry) {
     // IMPORTANT: Order matters here!
     this.mesh = new THREE.Mesh(geometry, this.material.threeMaterial);
+    this.mesh.castShadow = true;
+    this.mesh.receiveShadow = false;
     geometry.computeBoundingBox();
 
     const height = geometry.boundingBox.getSize(tempTargetVec3).y;

@@ -7,29 +7,30 @@ class BattlefieldLoader {
       const terrain = [];
       const {terrain:terrainJsonObj} = battlefieldJsonObj;
       if (!terrain) { throw `Invalid terrain entry found could not find 'terrain'.`; }
-      terrainJsonObj.forEach(terrainLineJsonObj => {
+      for (const terrainLineJsonObj of terrainJsonObj) {
         const terrainCols = [];
-        terrainLineJsonObj.forEach(terrainColJsonObj => {
-
+        for (const terrainColJsonObj of terrainLineJsonObj) {
           // The terrain column may have multiple material groupings
-          const {matGroups} = terrainColJsonObj;
+          const {matgroups} = terrainColJsonObj;
           const materialGroups = [];
-          if (matGroups) {
-            matGroups.forEach(matGroup => {
-              materialGroups.push(BattlefieldLoader.verifyMaterialGroup(matGroup));
-            });
+
+ 
+          if (matgroups) {
+            for (const matgroup of matgroups) {
+              materialGroups.push(BattlefieldLoader.verifyMaterialGroup(matgroup));
+            }
           }
           else {
             materialGroups.push(BattlefieldLoader.verifyMaterialGroup(terrainColJsonObj));
           }
 
           const terrainColumn = new TerrainColumn(
-            battlefield, terrain.length, terrainCols.length, materialGroups
+            battlefield, terrain.length, terrainCols.length, materialGroups.filter(m => m !== null)
           );
           terrainCols.push(terrainColumn);
-        });
+        }
         terrain.push(terrainCols);
-      });
+      }
       battlefield.setTerrain(terrain);
     }
     catch (err) {
@@ -39,6 +40,10 @@ class BattlefieldLoader {
   }
 
   static verifyMaterialGroup(materialGroup) {
+    if (Object.keys(materialGroup).length === 0) {
+      // Empty object just means no landing ranges are present
+      return null;
+    }
     const { type, landingRanges } = materialGroup;
     if (!type) { throw `Invalid terrain column entry found: ${materialGroup} could not find 'type'.`; }
     if (!landingRanges) { throw `Invalid terrain column entry found: ${materialGroup} could not find 'landingRanges'.`; }

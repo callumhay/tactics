@@ -8,6 +8,10 @@ import GameClient from './GameClient';
 const renderer = new THREE.WebGLRenderer();
 renderer.autoClear = false;
 renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+renderer.setClearColor(new THREE.Color(0xB1E1FF));
 document.body.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
@@ -43,6 +47,9 @@ function onWindowResize(event) {
 
 // Setup game objects
 const gameModel = new GameModel(scene);
+// Setup the client, connect to the game server
+const client = new GameClient();
+client.start(gameModel);
 
 const raycaster = new THREE.Raycaster();
 window.addEventListener('click', onMouseClick, false);
@@ -78,10 +85,6 @@ function onMouseClick(event) {
     blastGeometry.dispose();
   }
 }
-
-// Setup the client, connect to the game server
-const client = new GameClient();
-client.start(gameModel);
 
 // Setup and execute the game loop
 const clock = new THREE.Clock(true);

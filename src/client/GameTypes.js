@@ -1,7 +1,8 @@
 
 class GameTypes {
-  static get ATTACHED_TERRAIN() { return "attached_terrain"; }
-  static get DETACHED_TERRAIN() { return "detached_terrain"; }
+  static get BEDROCK() { return "bedrock"; }
+  static get DEBRIS() { return "debris"; }
+  static get TERRAIN() { return "terrain"; }
 }
 
 export default GameTypes;

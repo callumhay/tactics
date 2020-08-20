@@ -2,6 +2,7 @@ import * as THREE from 'three';
 
 import TerrainColumn from './TerrainColumn';
 import Debug from '../debug';
+import { Vector3 } from 'three';
 
 class LatticeNode {
   constructor(id, xIdx, zIdx, yIdx, pos, columnsAndLandingRanges) {
@@ -13,6 +14,7 @@ class LatticeNode {
     this.columnsAndLandingRanges = columnsAndLandingRanges;
     this.grounded = false;
   }
+
   hasLandingRange(landingRange) {
     const {terrainColumn} = landingRange;
     const landingRanges = this.columnsAndLandingRanges[terrainColumn];
@@ -22,6 +24,15 @@ class LatticeNode {
       }
     }
     return false;
+  }
+
+  // Get a set of all landing ranges associated with this node
+  getLandingRanges() {
+    const result = new Set();
+    for (const landingRanges of Object.values(this.columnsAndLandingRanges)) {
+      landingRanges.forEach(lr => result.add(lr));
+    }
+    return result;
   }
 
   addLandingRange(landingRange) {
@@ -57,9 +68,6 @@ class LatticeNode {
   
     for (const landingRanges of columnsLandingRanges) {
       for (const landingRange of landingRanges) {
-        if (!landingRange) {
-          console.log("HERE");
-        }
         colour.add(landingRange.debugColour());
         count++;
       }
@@ -70,8 +78,8 @@ class LatticeNode {
 }
 
 const DEFAULT_NODES_PER_TERRAIN_SQUARE_UNIT = 5;
-const TRAVERSAL_UNVISITED_STATE     = 0;
-const TRAVERSAL_FINISHED_STATE      = 1;
+const TRAVERSAL_UNVISITED_STATE     = 1;
+const TRAVERSAL_FINISHED_STATE      = 2;
 
 export default class RigidBodyLattice {
   constructor(terrainGroup) {
@@ -151,7 +159,7 @@ export default class RigidBodyLattice {
         let maxHeight = 0;
         for (let i = 0; i < columns.length; i++) {
           const {landingRanges} = columns[i];
-          maxHeight = Math.max(landingRanges[landingRanges.length-1].endY, maxHeight);
+          maxHeight = landingRanges.length === 0 ? maxHeight : Math.max(landingRanges[landingRanges.length-1].endY, maxHeight);
         }
         const numNodesY = maxHeight * numNodesPerUnit;
         const nodesY = nodesZ[z] = new Array(numNodesY).fill(null);
@@ -282,8 +290,8 @@ export default class RigidBodyLattice {
     const {mesh} = landingRange;
     const nodes = this.addLandingRangeNodes(landingRange);
     const raycaster = new THREE.Raycaster();
-    raycaster.near = 0;
-    raycaster.far = landingRange.height;
+    //raycaster.near = 0;
+    //raycaster.far = landingRange.height;
     const rayPos = new THREE.Vector3();
     const rayDir = new THREE.Vector3(0,1,0);
     
@@ -298,11 +306,20 @@ export default class RigidBodyLattice {
       }
     };
 
+    let rayPosTransform = null;
+    if (mesh.parent) {
+      rayPosTransform = mesh.parent.matrixWorld;
+    }
+    else {
+      rayPosTransform = new THREE.Matrix4();
+    }
+
     for (let i = 0; i < nodes.length; i++) {
       const node = nodes[i];
       let intersections = [];
       const {pos} = node;
       rayPos.set(pos.x, pos.y, pos.z);
+      rayPos.applyMatrix4(rayPosTransform);
       raycaster.set(rayPos, rayDir);
       mesh.raycast(raycaster, intersections);
       if (intersections.length === 0) {
@@ -386,42 +403,72 @@ export default class RigidBodyLattice {
       }
     }
   }
-  traverseIslands() {
-    /*
+  // Find islands in this lattice (i.e., isolated node regions that are not grounded),
+  // optional landingRanges parameter will limit the serach to only nodes in those ranges.
+  traverseIslands(landingRanges=null) {
     const traversalInfo = {};
     const islands = [];
+
+    const depthFirstSearch = (node, islandNum, islandNodes) => {
+      const nodeTraversalInfo = traversalInfo[node.id];
+      nodeTraversalInfo.islandNum = islandNum;
+      nodeTraversalInfo.visitState = TRAVERSAL_FINISHED_STATE;
+      islandNodes.add(node);
+
+      const neighbours = this.getNeighboursForNode(node);
+      for (const neighbour of neighbours) {
+        if (neighbour && traversalInfo[neighbour.id] && traversalInfo[neighbour.id].visitState === TRAVERSAL_UNVISITED_STATE) {
+          depthFirstSearch(neighbour, islandNodes, islandNodes);
+        }
+      }
+    }
     
-    // Grab all ungrounded nodes...
-    const ungroundedNodes = [];
+    // Find the ungrounded nodes...
+    const ungroundedNodes = new Set();
+    if (landingRanges && landingRanges.length > 0) {
+      for (const landingRange of landingRanges) {
+        const nodes = this.getNodesInLandingRange(landingRange);
+        nodes.filter(n => !n.grounded).forEach(n => ungroundedNodes.add(n));
+      }
+    }
+    else {
+      for (let x = 0; x < this.nodes.length; x++) {
+        for (let z = 0; z < this.nodes[x].length; z++) {
+          for (let y = 0; y < this.nodes[x][z].length; y++) {
+            const node = this.nodes[x][z][y];
+            if (node && !node.grounded) {
+              ungroundedNodes.add(node);
+            }
+          }
+        }
+      }
+    }
+
+    // Initialize the traversal info for all ungrounded nodes
     for (let x = 0; x < this.nodes.length; x++) {
       for (let z = 0; z < this.nodes[x].length; z++) {
         for (let y = 0; y < this.nodes[x][z].length; y++) {
           const node = this.nodes[x][z][y];
           if (node && !node.grounded) {
-            ungroundedNodes.push(node);
-            traversalInfo[node.id] = { islandNum: -1 };
+            ungroundedNodes.add(node);
+            traversalInfo[node.id] = { islandNum: -1, visitState: TRAVERSAL_UNVISITED_STATE };
           }
         }
       }
     }
-
-    let currIslandNum = 0;
-    while (ungroundedNodes.length > 0) {
-      const node = ungroundedNodes.shift();
+    
+    for (const node of ungroundedNodes) {
       if (node) {
         const nodeTraversalInfo = traversalInfo[node.id];
-        if (nodeTraversalInfo.islandNum === -1) {
-          const neighbours = this.getNeighboursForNode(node);
-          for (const neighbour of neighbours) {
-
-          }
-
-
+        if (nodeTraversalInfo.visitState === TRAVERSAL_UNVISITED_STATE) {
+          const islandNodes = new Set();
+          depthFirstSearch(node, islands.length, islandNodes);
+          islands.push(islandNodes);
         }
       }
     }
-    */
 
+    return islands;
   }
 
   _clearDebugDraw() {

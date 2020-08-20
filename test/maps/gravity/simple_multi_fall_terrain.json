@@ -1,0 +1,11 @@
+{
+  "terrain": [
+    [{
+      "matgroups": [
+        {"type":"rock", "landingRanges":[[0,4]]},
+        {"type":"rock", "landingRanges":[[6,7]]},
+        {"type":"rock", "landingRanges":[[8,10]]}
+      ]
+    }]
+  ]
+}

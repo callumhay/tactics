@@ -1,11 +1,17 @@
 import * as THREE from 'three';
-import * as CANNON from 'cannon';
+import * as CANNON from 'cannon-es';
 
-const MATERIAL_TYPE_ROCK = "rock";
-const MATERIAL_TYPE_DIRT = "dirt";
+const MATERIAL_TYPE_BEDROCK = "bedrock";
+const MATERIAL_TYPE_ROCK    = "rock";
+const MATERIAL_TYPE_DIRT    = "dirt";
 
 // NOTE: Material density is measured in kg/m^3
 const materials = {
+  [MATERIAL_TYPE_BEDROCK]: {
+    density: 2000,
+    threeMaterial: new THREE.MeshLambertMaterial({color: 0x666666}),
+    cannonMaterial: new CANNON.Material(MATERIAL_TYPE_BEDROCK)
+  },
   [MATERIAL_TYPE_ROCK]: { 
     density: 1600, 
     threeMaterial: new THREE.MeshLambertMaterial({ color: 0xcccccc}),
@@ -30,7 +36,10 @@ const contactMaterials = [
 ];
 
 class GameMaterials {
+  
   static get MATERIAL_TYPE_ROCK() { return MATERIAL_TYPE_ROCK; }
+  static get MATERIAL_TYPE_BEDROCK() { return MATERIAL_TYPE_BEDROCK; }
+
   static get materials() { return materials; }
   static get contactMaterials() { return contactMaterials; }
 }

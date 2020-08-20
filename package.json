@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "dependencies": {
-    "cannon": "^0.6.2",
+    "cannon-es": "^0.15.1",
     "express": "^4.17.1",
     "reload": "^3.1.0",
     "three": "^0.119.1",
