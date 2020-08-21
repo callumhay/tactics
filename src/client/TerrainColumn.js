@@ -115,9 +115,7 @@ class TerrainColumn {
   getTerrainSpaceTranslation() {
     const { xIndex, zIndex } = this;
     return new THREE.Vector3(
-      xIndex * TerrainColumn.SIZE + TerrainColumn.HALF_SIZE,
-      0,
-      zIndex * TerrainColumn.SIZE + TerrainColumn.HALF_SIZE
+      xIndex * TerrainColumn.SIZE + TerrainColumn.HALF_SIZE, 0, zIndex * TerrainColumn.SIZE + TerrainColumn.HALF_SIZE
     );
   }
 
@@ -167,7 +165,7 @@ class TerrainColumn {
     // We need to only take the part of the debris that's in this column:
     // Use an CSG intersection with a tall bounding box representing this column
     const columnBoxHeight = Battlefield.MAX_HEIGHT + TerrainColumn.SIZE;
-    const columnBox = new THREE.BoxBufferGeometry(TerrainColumn.SIZE, columnBoxHeight, TerrainColumn.SIZE);
+    const columnBox = new THREE.BoxBufferGeometry(TerrainColumn.SIZE + TerrainColumn.EPSILON, columnBoxHeight, TerrainColumn.SIZE + TerrainColumn.EPSILON);
     const translation = this.getTerrainSpaceTranslation();
     translation.y = columnBoxHeight / 2 - TerrainColumn.HALF_SIZE;
     columnBox.translate(translation.x, translation.y, translation.z);
@@ -193,6 +191,8 @@ class TerrainColumn {
 
     }
     else {
+      // TODO: WHAT IF THERE ARE MULTIPLE LEVELS IN THE GEOMETRY?
+
       const newLandingRange = LandingRange.buildFromGeometry(newGeometry, this, debris.material);
       this.landingRanges.push(newLandingRange);
       rigidBodyLattice.addLandingRangeNodes(newLandingRange, true);
@@ -207,10 +207,19 @@ class TerrainColumn {
   blowupTerrain(subtractGeometry) {
     const {boundingBox} = subtractGeometry;
     // Figure out what terrain geometry will be affected in this column
-    const collidingRanges = this.landingRanges.filter(range => range.startY <= boundingBox.max.y && range.endY >= boundingBox.min.y);
+    const collidingRanges = this.landingRanges.map((range,idx) => [idx, range]).filter(idxRangePair => idxRangePair[1].startY <= boundingBox.max.y && idxRangePair[1].endY >= boundingBox.min.y);
+    
     // BLOW IT UP!
-    for (const landingRange of collidingRanges) {
+    const lrIndicesToRemove = [];
+    for (const idxRangePair of collidingRanges) {
+      const [idx, landingRange] = idxRangePair;
       landingRange.blowupTerrain(subtractGeometry);
+      if (landingRange.isEmpty()) {
+        lrIndicesToRemove.push(idx);
+      }
+    }
+    for (const lrIdx of lrIndicesToRemove) {
+      this.landingRanges.splice(lrIdx, 1);
     }
 
     // Re-traverse the rigid body node lattice, find out if anything is no longer attached to the ground
@@ -245,10 +254,7 @@ class TerrainColumn {
     }
   }
   debugDrawAABBs(show=true) {
-    if (show && this.debugAABBGroup || !show && !this.debugAABBGroup) { return; }
-
     this._clearDebugAABBGroup();
-
     if (show) {
       this.debugAABBGroup = new THREE.Group();
       const {terrainGroup} = this.battlefield;

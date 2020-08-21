@@ -235,7 +235,7 @@ export default class RigidBodyLattice {
   removeNodesInsideLandingRange(landingRange) {
     const {terrainColumn} = landingRange;
     const nodes = this.getNodesInLandingRange(landingRange);
-    nodes.forEach(node => {
+    for (const node of nodes) {
       // If the node ONLY contains the given landing range then we remove it
       const {columnsAndLandingRanges} = node;
       if (node && columnsAndLandingRanges[terrainColumn].length === 1 && 
@@ -243,7 +243,7 @@ export default class RigidBodyLattice {
         const {xIdx, zIdx, yIdx} = node;
         this.nodes[xIdx][zIdx][yIdx] = null;
       }
-    });
+    }
   }
 
   addLandingRangeNodes(landingRange, attachSides=false) {
@@ -286,15 +286,15 @@ export default class RigidBodyLattice {
     return allLandingRangeNodes;
   }
 
-  updateNodesForLandingRange(landingRange, epsilon=TerrainColumn.EPSILON) {
+  updateNodesForLandingRange(landingRange) {
     const {mesh} = landingRange;
     const nodes = this.addLandingRangeNodes(landingRange);
+
     const raycaster = new THREE.Raycaster();
-    //raycaster.near = 0;
-    //raycaster.far = landingRange.height;
-    const rayPos = new THREE.Vector3();
-    const rayDir = new THREE.Vector3(0,1,0);
-    
+    raycaster.near = 0;
+    raycaster.far = landingRange.height;
+    raycaster.ray.direction.set(0,1,0);
+
     const temp = mesh.material.side;
     mesh.material.side = THREE.DoubleSide;
 
@@ -318,9 +318,7 @@ export default class RigidBodyLattice {
       const node = nodes[i];
       let intersections = [];
       const {pos} = node;
-      rayPos.set(pos.x, pos.y, pos.z);
-      rayPos.applyMatrix4(rayPosTransform);
-      raycaster.set(rayPos, rayDir);
+      raycaster.ray.origin.set(pos.x,pos.y,pos.z).applyMatrix4(rayPosTransform);
       mesh.raycast(raycaster, intersections);
       if (intersections.length === 0) {
         // If there are zero intersections then we should remove the node
@@ -334,7 +332,7 @@ export default class RigidBodyLattice {
           const {face} = intersections[0];
           // If the closest intersection is the backface of a triangle then we're still inside the
           // landing range's mesh and we should keep the node. 
-          if (rayDir.dot(face.normal) < 0) {
+          if (raycaster.ray.direction.dot(face.normal) < 0) {
             // Not inside the mesh - remove the current landing range from the node,
             // if there are no more landing ranges left then the node is no longer
             // attached to anything and should be removed

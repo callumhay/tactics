@@ -2,7 +2,8 @@
 
 class MathUtils {
   static roundToDecimal(value, decimals) {
-    return Number(Math.round(value + 'e' + decimals) + 'e-' + decimals);
+    const multiple = Math.pow(10, decimals);
+    return Math.round(value * multiple) / multiple;
   }   
 
 }

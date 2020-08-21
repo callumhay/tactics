@@ -42,6 +42,7 @@ export default class Battlefield {
     );
 
     this.terrainGroup = new THREE.Group();
+    this.rigidBodyLattice = new RigidBodyLattice(this.terrainGroup);
 
     const bedrockMat = GameMaterials.materials[GameMaterials.MATERIAL_TYPE_BEDROCK];
     const bedrockGeom = new THREE.BoxBufferGeometry(Battlefield.MAX_SIZE, Battlefield.MAX_SIZE, TerrainColumn.SIZE);
@@ -57,12 +58,11 @@ export default class Battlefield {
     this.terrainGroup.add(this.bedrockMesh);
 
     // TODO: Debug routine?
-    const grid = new THREE.GridHelper(Battlefield.MAX_SIZE, Battlefield.MAX_SIZE, 0x00FF00);
-    grid.renderOrder = Debug.GRID_RENDER_ORDER;
-    grid.material.depthFunc = THREE.AlwaysDepth;
-    this.terrainGroup.add(grid);
+    //const grid = new THREE.GridHelper(Battlefield.MAX_SIZE, Battlefield.MAX_SIZE, 0x00FF00);
+    //grid.renderOrder = Debug.GRID_RENDER_ORDER;
+    //grid.material.depthFunc = THREE.AlwaysDepth;
+    //this.terrainGroup.add(grid);
 
-    
     this._scene.add(this.terrainGroup);
   }
 
@@ -76,8 +76,7 @@ export default class Battlefield {
   }
 
   _buildRigidbodyLattice() {
-    if (this.rigidBodyLattice) { this.rigidBodyLattice.clear(); }
-    this.rigidBodyLattice = new RigidBodyLattice(this.terrainGroup);
+    this.rigidBodyLattice.clear();
     this.rigidBodyLattice.buildFromTerrain(this._terrain);
   }
 
@@ -96,7 +95,7 @@ export default class Battlefield {
 
   // NOTE: We assume that the subtractGeometry is in the same coord space as the terrain
   blowupTerrain(subtractGeometry) {
-    if (!subtractGeometry.boundingBox) subtractGeometry.computeBoundingBox();
+    subtractGeometry.computeBoundingBox();
     const {boundingBox} = subtractGeometry;
     const {clamp} = THREE.MathUtils;
 
@@ -118,9 +117,9 @@ export default class Battlefield {
       }
     }
 
-    terrainCols.forEach(terrainCol => {
+    for (const terrainCol of terrainCols) {
       terrainCol.blowupTerrain(subtractGeometry);
-    });
+    }
   }
 
   convertDebrisToTerrain(debrisPhysObj) {

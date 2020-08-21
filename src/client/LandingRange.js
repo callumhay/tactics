@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import CSG from 'three-csg';
 
+import MathUtils from '../MathUtils';
+
 import GameMaterials from './GameMaterials';
 import TerrainColumn from './TerrainColumn';
 import GameTypes from './GameTypes';
@@ -16,8 +18,8 @@ class LandingRange {
     // The geometry will need to be translated into the local space of the landing range
     geometry.computeBoundingBox();
     const {boundingBox} = geometry;
-    const startY = boundingBox.min.y;
-    const height = boundingBox.max.y - startY;
+    const startY = MathUtils.roundToDecimal(boundingBox.min.y, 2);
+    const height = MathUtils.roundToDecimal(boundingBox.max.y - startY, 2);
     const translation = terrainColumn.getTerrainSpaceTranslation();
     translation.y = boundingBox.min.y + height / 2;
     translation.multiplyScalar(-1);
@@ -54,6 +56,10 @@ class LandingRange {
     return this.boundingBox.max.y;
   }
 
+  isEmpty() {
+    return (this.mesh === null);
+  }
+
   clearGeometry(terrainColumn = this.terrainColumn) {
     if (this.mesh) {
       const { terrainGroup } = terrainColumn.battlefield;
@@ -79,16 +85,27 @@ class LandingRange {
       return;
     }
 
-    // IMPORTANT: Order matters here, various regeneration routines depend on others finishing first!!
+    const {terrainGroup, rigidBodyLattice} = this.terrainColumn.battlefield;
+
+    // Check for tiny/negligable geometry
+    const bbSize = new THREE.Vector3();
+    geometry.computeBoundingBox();
+    geometry.boundingBox.getSize(bbSize);
+    // If the resulting height/width/depth is smaller than the inter-node distance then we need to destroy this asap
+    if (bbSize.x < rigidBodyLattice.unitsBetweenNodes || bbSize.y < rigidBodyLattice.unitsBetweenNodes || bbSize.z < rigidBodyLattice.unitsBetweenNodes) {
+      rigidBodyLattice.removeNodesInsideLandingRange(this);
+      this.clear();
+      return;
+    }
+
     this.clear();
 
     this._createTerrainMesh(startY, geometry);
-    const {terrainGroup, rigidBodyLattice} = this.terrainColumn.battlefield;
     terrainGroup.add(this.mesh);
     this.physicsObj = this.buildPhysicsObj();
 
     // We need to remove/add rigid body nodes based on the new geometry
-    if (rigidBodyLattice) { rigidBodyLattice.updateNodesForLandingRange(this); }
+    rigidBodyLattice.updateNodesForLandingRange(this); // TODO: THIS IS BUGGY, IF THE LANDING RANGE GEOMETRY HAS CHANGED THEN THIS WILL LEAVE NODES BEHIND DUE TO CHANGED STARTY/ENDY VALUES... MAYBE DO IT FOR THE ENTIRE TERRAINCOLUMN?
   }
 
   getTerrainSpaceTranslation(startY, height) {
@@ -102,40 +119,18 @@ class LandingRange {
     const invMatrix = new THREE.Matrix4();
     invMatrix.getInverse(matrix);
 
-    const heightBefore = this.height;
-
     geometry.applyMatrix4(matrix); // Geometry needs to be placed into the terrain space
     const csgGeometry = CSG.subtract([geometry, subtractGeometry]);
     const newGeometry = CSG.BufferGeometry(csgGeometry);
-    newGeometry.applyMatrix4(invMatrix); // New geometry needs to be moved back into local space
-
-    // We have to maintain the proper local space translation so that that the geometry is centered
     newGeometry.computeBoundingBox();
 
-    const heightAfter = newGeometry.boundingBox.getSize(tempTargetVec3).y;
-    newGeometry.translate(0, (heightBefore - heightAfter) / 2, 0);
+    const bbSize = new THREE.Vector3();
+    newGeometry.boundingBox.getSize(bbSize);
 
-    this.regenerate(this.startY, newGeometry);
-  }
-
-  mergeTerrain(mergeGeometry) {
-    const {geometry, matrix} = this.mesh;
-    const invMatrix = new THREE.Matrix4();
-    invMatrix.getInverse(matrix);
-
-    const heightBefore = this.height;
-
-    geometry.applyMatrix4(matrix); // Geometry needs to be placed into local space
-    const csgGeometry = CSG.union([geometry, mergeGeometry]);
-    const newGeometry = CSG.BufferGeometry(csgGeometry);
+    const newStartY = newGeometry.boundingBox.min.y;
     newGeometry.applyMatrix4(invMatrix); // New geometry needs to be moved back into local space
-
-    // We have to maintain the proper local space translation so that that the geometry is centered
-    newGeometry.computeBoundingBox();
-    const heightAfter = newGeometry.boundingBox.getSize(tempTargetVec3).y;
-    newGeometry.translate(0, (heightBefore-heightAfter)/2, 0);
-
-    this.regenerate(this.startY, newGeometry);
+    newGeometry.center();
+    this.regenerate(newStartY, newGeometry);
   }
 
   toString() {
@@ -173,14 +168,14 @@ class LandingRange {
     const height = geometry.boundingBox.getSize(tempTargetVec3).y;
     const translation = this.getTerrainSpaceTranslation(startY, height);
 
-    this.boundingBox = geometry.boundingBox.clone();
-    this.boundingBox.translate(translation);
-
     this.mesh.translateX(translation.x);
     this.mesh.translateY(translation.y);
     this.mesh.translateZ(translation.z);
     this.mesh.updateMatrixWorld(); // IMPORTANT: We may use the matrix of this mesh sometime before rendering
     this.mesh.terrainLandingRange = this;
+
+    this.boundingBox = geometry.boundingBox.clone();
+    this.boundingBox.applyMatrix4(this.mesh.matrixWorld);
   }
 
   computeBoundingBox(epsilon = 0) {
