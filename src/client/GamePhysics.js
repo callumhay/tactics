@@ -80,14 +80,9 @@ class GamePhysics {
       type: CANNON.Body.STATIC,
       mass: 0,
       shape: shape,
-      //position: ,
-      //quaternion: mesh.quaternion,
-      material: material
+      material: material,
     });
-
     body.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), -Math.PI / 2);
-    
-
     this.world.addBody(body);
     
     const id = body.id

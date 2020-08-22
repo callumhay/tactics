@@ -2,10 +2,12 @@ import * as THREE from 'three';
 import CSG from 'three-csg';
 
 import MathUtils from '../MathUtils';
+import GeometryUtils from '../GeometryUtils';
 
 import GameMaterials from './GameMaterials';
 import TerrainColumn from './TerrainColumn';
 import GameTypes from './GameTypes';
+import { Box3 } from 'three';
 
 const tempTargetVec3 = new THREE.Vector3();
 
@@ -15,26 +17,18 @@ class LandingRange {
   }
   static buildFromGeometry(geometry, terrainColumn, material) {
     const landingRange = new LandingRange(terrainColumn, {material, startY:0, endY:0});
-    // The geometry will need to be translated into the local space of the landing range
     geometry.computeBoundingBox();
     const {boundingBox} = geometry;
     const startY = MathUtils.roundToDecimal(boundingBox.min.y, 2);
-    const height = MathUtils.roundToDecimal(boundingBox.max.y - startY, 2);
-    const translation = terrainColumn.getTerrainSpaceTranslation();
-    translation.y = boundingBox.min.y + height / 2;
-    translation.multiplyScalar(-1);
-    geometry.translate(translation.x, translation.y, translation.z);
+    geometry.center();
     landingRange.regenerate(startY, geometry);
     return landingRange;
   } 
 
   constructor(terrainColumn, config) {
     this.terrainColumn = terrainColumn;
-
     const { type, startY, endY, material } = config;
-    this.materialType = type;
-
-    this.material = material || GameMaterials.materials[this.materialType];
+    this.material = material || GameMaterials.materials[type];
     this.mesh = null;
     this.physicsObj = null;
 
@@ -93,19 +87,26 @@ class LandingRange {
     geometry.boundingBox.getSize(bbSize);
     // If the resulting height/width/depth is smaller than the inter-node distance then we need to destroy this asap
     if (bbSize.x < rigidBodyLattice.unitsBetweenNodes || bbSize.y < rigidBodyLattice.unitsBetweenNodes || bbSize.z < rigidBodyLattice.unitsBetweenNodes) {
-      rigidBodyLattice.removeNodesInsideLandingRange(this);
+      rigidBodyLattice.removeNodesWithLandingRange(this);
       this.clear();
       return;
     }
 
-    this.clear();
+    // We need to existing bounding box for proper node updating
+    let previousBoundingBox = null;
+    if (this.mesh) {
+      previousBoundingBox = this.mesh.geometry.boundingBox.clone();
+      previousBoundingBox.min.subScalar(TerrainColumn.EPSILON);
+      previousBoundingBox.max.addScalar(TerrainColumn.EPSILON);
+    }
 
+    this.clear();
     this._createTerrainMesh(startY, geometry);
     terrainGroup.add(this.mesh);
     this.physicsObj = this.buildPhysicsObj();
 
     // We need to remove/add rigid body nodes based on the new geometry
-    rigidBodyLattice.updateNodesForLandingRange(this); // TODO: THIS IS BUGGY, IF THE LANDING RANGE GEOMETRY HAS CHANGED THEN THIS WILL LEAVE NODES BEHIND DUE TO CHANGED STARTY/ENDY VALUES... MAYBE DO IT FOR THE ENTIRE TERRAINCOLUMN?
+    rigidBodyLattice.updateNodesForLandingRange(this, previousBoundingBox);
   }
 
   getTerrainSpaceTranslation(startY, height) {
@@ -119,13 +120,36 @@ class LandingRange {
     const invMatrix = new THREE.Matrix4();
     invMatrix.getInverse(matrix);
 
+    const prevStartY = this.startY;
+    const prevEndY = this.endY;
+
     geometry.applyMatrix4(matrix); // Geometry needs to be placed into the terrain space
     const csgGeometry = CSG.subtract([geometry, subtractGeometry]);
+    geometry.applyMatrix4(invMatrix); // ... move it back for proper bounding box calcs in regenerate
+
     const newGeometry = CSG.BufferGeometry(csgGeometry);
+    GeometryUtils.roundVertices(newGeometry);
+    
+    // TODO: BIG TIME GEOMETRY CLEAN UP IS NEEDED HERE.
+    //console.log(GeometryUtils.findGeometryIslands(newGeometry));
+    
+    
     newGeometry.computeBoundingBox();
 
     const bbSize = new THREE.Vector3();
     newGeometry.boundingBox.getSize(bbSize);
+
+    // If the size on x or z is greater than TerrainColumn.SIZE then we
+    // likely have broken geometry that we need to clean up so that it fits inside the column
+    if (bbSize.x > TerrainColumn.SIZE || bbSize.z > TerrainColumn.SIZE) {
+      const {xIndex, zIndex} = this.terrainColumn;
+      const confinedBB = new THREE.Box3(
+        new THREE.Vector3(xIndex, prevStartY, zIndex),
+        new THREE.Vector3(xIndex+TerrainColumn.SIZE, prevEndY, zIndex+TerrainColumn.SIZE)
+      );
+      GeometryUtils.clampGeometryToBoundingBox(newGeometry, confinedBB);
+      newGeometry.computeBoundingBox();
+    }
 
     const newStartY = newGeometry.boundingBox.min.y;
     newGeometry.applyMatrix4(invMatrix); // New geometry needs to be moved back into local space

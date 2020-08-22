@@ -4,6 +4,7 @@ import CSG from 'three-csg';
 import LandingRange from './LandingRange';
 import Debug from '../debug';
 import Battlefield from './Battlefield';
+import GeometryUtils from '../GeometryUtils';
 
 class TerrainColumn {
   static get SIZE() { return 1; }
@@ -164,10 +165,10 @@ class TerrainColumn {
 
     // We need to only take the part of the debris that's in this column:
     // Use an CSG intersection with a tall bounding box representing this column
-    const columnBoxHeight = Battlefield.MAX_HEIGHT + TerrainColumn.SIZE;
+    const columnBoxHeight = Battlefield.MAX_HEIGHT + 2*TerrainColumn.EPSILON;
     const columnBox = new THREE.BoxBufferGeometry(TerrainColumn.SIZE + TerrainColumn.EPSILON, columnBoxHeight, TerrainColumn.SIZE + TerrainColumn.EPSILON);
     const translation = this.getTerrainSpaceTranslation();
-    translation.y = columnBoxHeight / 2 - TerrainColumn.HALF_SIZE;
+    translation.y = columnBoxHeight / 2 - TerrainColumn.EPSILON;
     columnBox.translate(translation.x, translation.y, translation.z);
     // Debugging for visualizing the columnBox
     //const {terrainGroup} = this.battlefield;
@@ -176,6 +177,8 @@ class TerrainColumn {
 
     const csgGeometry = CSG.intersect([columnBox, geometry]);
     const newGeometry = CSG.BufferGeometry(csgGeometry);
+    GeometryUtils.roundVertices(newGeometry);
+
     // Debugging for visualizing the resulting CSG geometry
     //const testNewGeom = new THREE.Mesh(newGeometry, new THREE.MeshBasicMaterial({color:0x0000CC, transparent: true, opacity: 0.25, depthFunc:THREE.AlwaysDepth}));
     //const testBB = new THREE.Box3Helper(boundingBox);
@@ -185,27 +188,33 @@ class TerrainColumn {
     // Take the chunk that becomes part of this column out of the debris 
     debris.subtractGeometry(columnBox);
 
+    // TODO: WHAT IF THERE ARE MULTIPLE LEVELS IN THE GEOMETRY?
+    // DO THIS!!!!
+
     // Merge the new geometry into a landing range or create a new one
     const {rigidBodyLattice} = this.battlefield;
     if (mergeLandingRange) {
 
     }
     else {
-      // TODO: WHAT IF THERE ARE MULTIPLE LEVELS IN THE GEOMETRY?
+      
 
       const newLandingRange = LandingRange.buildFromGeometry(newGeometry, this, debris.material);
       this.landingRanges.push(newLandingRange);
-      rigidBodyLattice.addLandingRangeNodes(newLandingRange, true);
+      //rigidBodyLattice.addLandingRangeNodes(newLandingRange, null, true);
     }
 
     // Re-traverse the rigid body node lattice, find out if anything is no longer attached to the ground
     rigidBodyLattice.traverseGroundedNodes();
     rigidBodyLattice.debugDrawNodes(true);
+    this.debugDrawAABBs(true);
   }
 
   // NOTE: We assume that the subtractGeometry is in the same coord space as the terrain
   blowupTerrain(subtractGeometry) {
     const {boundingBox} = subtractGeometry;
+    const { rigidBodyLattice } = this.battlefield;
+
     // Figure out what terrain geometry will be affected in this column
     const collidingRanges = this.landingRanges.map((range,idx) => [idx, range]).filter(idxRangePair => idxRangePair[1].startY <= boundingBox.max.y && idxRangePair[1].endY >= boundingBox.min.y);
     
@@ -223,11 +232,11 @@ class TerrainColumn {
     }
 
     // Re-traverse the rigid body node lattice, find out if anything is no longer attached to the ground
-    const {rigidBodyLattice} = this.battlefield;
+    
     rigidBodyLattice.traverseGroundedNodes();
     
-    const islands = rigidBodyLattice.traverseIslands(this.landingRanges);
-    console.log(islands);
+    const islands = rigidBodyLattice.traverseIslands();
+    //console.log(islands);
     /*
     // Figure out what's no longer attached and detach it as a separated landing range
     for (const islandNodeSet of islands) {
@@ -236,6 +245,7 @@ class TerrainColumn {
     */
 
     rigidBodyLattice.debugDrawNodes(true);
+    this.debugDrawAABBs(true);
   }
 
   toString() {

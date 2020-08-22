@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import { Vector3 } from 'three';
+
+import GeometryUtils from '../GeometryUtils';
 
 class Debris {
   constructor(terrainGroup, landingRanges) {
@@ -24,6 +25,7 @@ class Debris {
 
     const csgGeometry = CSG.union(geometries);
     const geometry = CSG.BufferGeometry(csgGeometry);
+    GeometryUtils.roundVertices(geometry);
     geometry.computeBoundingBox();
 
     const {boundingBox} = geometry;
@@ -38,6 +40,7 @@ class Debris {
     const {geometry} = this.mesh;
     const csgGeometry = CSG.subtract([geometry, subtractGeom]);
     const newGeometry = CSG.BufferGeometry(csgGeometry);
+    GeometryUtils.roundVertices(newGeometry);
     geometry.dispose();
     this.mesh.geometry = newGeometry;
     newGeometry.computeBoundingBox();

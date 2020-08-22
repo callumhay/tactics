@@ -24,15 +24,20 @@ const materials = {
   }
 };
 
+const BEDROCK_FRICTION = 0.5;
+const BEDROCK_RESTITUTION = 0.3;
 const ROCK_FRICTION = 0.4;
 const ROCK_RESTITUTION = 0.315;
 const DIRT_FRICTION = 0.562;
 const DIRT_RESTITUTION = 0.3;
 
+
 const contactMaterials = [
   new CANNON.ContactMaterial(materials[MATERIAL_TYPE_ROCK], materials[MATERIAL_TYPE_ROCK], { friction: ROCK_FRICTION, restitution: ROCK_RESTITUTION}),
   new CANNON.ContactMaterial(materials[MATERIAL_TYPE_DIRT], materials[MATERIAL_TYPE_DIRT], { friction: DIRT_FRICTION, restitution: DIRT_RESTITUTION}),
-  new CANNON.ContactMaterial(materials[MATERIAL_TYPE_ROCK], materials[MATERIAL_TYPE_DIRT], { friction: (ROCK_FRICTION+DIRT_FRICTION)/2, restitution: (ROCK_RESTITUTION+DIRT_RESTITUTION)/2})
+  new CANNON.ContactMaterial(materials[MATERIAL_TYPE_ROCK], materials[MATERIAL_TYPE_DIRT], { friction: (ROCK_FRICTION+DIRT_FRICTION)/2, restitution: (ROCK_RESTITUTION+DIRT_RESTITUTION)/2}),
+  new CANNON.ContactMaterial(materials[MATERIAL_TYPE_BEDROCK], materials[MATERIAL_TYPE_DIRT], { friction: (BEDROCK_FRICTION + DIRT_FRICTION) / 2, restitution: (BEDROCK_RESTITUTION + DIRT_RESTITUTION) / 2 }),
+  new CANNON.ContactMaterial(materials[MATERIAL_TYPE_BEDROCK], materials[MATERIAL_TYPE_ROCK], { friction: (ROCK_FRICTION + BEDROCK_FRICTION) / 2, restitution: (ROCK_RESTITUTION + BEDROCK_RESTITUTION) / 2 })
 ];
 
 class GameMaterials {

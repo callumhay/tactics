@@ -27,7 +27,7 @@ class GameServer {
         self.webClientSockets.splice(self.webClientSockets.indexOf(socket), 1);
       });
 
-      const bfFilepath = 'test/maps/gravity/complex_multi_fall_terrain.json'; //connected_terrain_1.json';
+      const bfFilepath = 'test/maps/gravity/complex_multi_fall_terrain.json';
       fs.readFile(bfFilepath, (err, data) => {
         if (err) {
           console.error(`Failed to read file '${bfFilepath}': ${err}`);

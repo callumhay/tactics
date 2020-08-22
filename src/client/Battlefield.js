@@ -58,10 +58,12 @@ export default class Battlefield {
     this.terrainGroup.add(this.bedrockMesh);
 
     // TODO: Debug routine?
-    //const grid = new THREE.GridHelper(Battlefield.MAX_SIZE, Battlefield.MAX_SIZE, 0x00FF00);
-    //grid.renderOrder = Debug.GRID_RENDER_ORDER;
-    //grid.material.depthFunc = THREE.AlwaysDepth;
-    //this.terrainGroup.add(grid);
+    const grid = new THREE.GridHelper(Battlefield.MAX_SIZE, Battlefield.MAX_SIZE, 0x00FF00);
+    grid.renderOrder = Debug.GRID_RENDER_ORDER;
+    grid.material.depthFunc = THREE.AlwaysDepth;
+    grid.material.opacity = 0.25;
+    grid.material.transparent = true;
+    this.terrainGroup.add(grid);
 
     this._scene.add(this.terrainGroup);
   }
@@ -135,7 +137,7 @@ export default class Battlefield {
 
     mesh.updateMatrixWorld();
 
-    const { geometry, rotation, position } = mesh;
+    const { geometry, rotation } = mesh;
     // We need to clean up the rotation so that the box lies cleanly in the terrain grid
     for (const coord of ['x', 'y', 'z']) {
       // Snap the rotation to the nearest 90 degree angle
@@ -217,6 +219,11 @@ export default class Battlefield {
     mesh.translateX(-mesh.position.x);
     mesh.translateY(-mesh.position.y);
     mesh.translateZ(-mesh.position.z);
+    mesh.position.set(
+      MathUtils.roundToDecimal(mesh.position.x, 2), 
+      MathUtils.roundToDecimal(mesh.position.y, 2),
+      MathUtils.roundToDecimal(mesh.position.z, 2),
+    );
     mesh.updateMatrix();
 
     // We need to reattach the debris to the terrain in all the 
@@ -230,11 +237,6 @@ export default class Battlefield {
         }
       }
     }
-    
-    // TODO
-
-    
-
     // Clean-up
     this.debris.splice(this.debris.indexOf(debrisObj), 1);
   }
@@ -260,7 +262,7 @@ export default class Battlefield {
     for (const landingRangeSet of islandLandingRanges) {
       for (const landingRange of landingRangeSet) {
         // Make sure there are no longer any nodes associated with the detached range
-        rigidBodyLattice.removeNodesInsideLandingRange(landingRange);
+        rigidBodyLattice.removeNodesWithLandingRange(landingRange);
       }
 
       // We'll need to convert the landingRanges into debris

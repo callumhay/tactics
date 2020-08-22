@@ -1,11 +1,15 @@
 import * as THREE from 'three';
+import {assert} from 'chai'
 
 import TerrainColumn from './TerrainColumn';
 import Debug from '../debug';
-import { Vector3 } from 'three';
 
 class LatticeNode {
   constructor(id, xIdx, zIdx, yIdx, pos, columnsAndLandingRanges) {
+    assert(xIdx >= 0, "xIdx of a LatticeNode must be at least zero.");
+    assert(yIdx >= 0, "yIdx of a LatticeNode must be at least zero.");
+    assert(zIdx >= 0, "zIdx of a LatticeNode must be at least zero.");
+
     this.id = id;
     this.xIdx = xIdx;
     this.zIdx = zIdx;
@@ -13,6 +17,10 @@ class LatticeNode {
     this.pos = pos;
     this.columnsAndLandingRanges = columnsAndLandingRanges;
     this.grounded = false;
+  }
+
+  hasNoColumnsAndLandingRanges() {
+    return Object.keys(this.columnsAndLandingRanges).length === 0;
   }
 
   hasLandingRange(landingRange) {
@@ -194,9 +202,12 @@ export default class RigidBodyLattice {
     this.debugDrawNodes(true);
   }
 
-  _getNodeIndicesForLandingRange(landingRange) {
-    const { terrainColumn, startY, endY } = landingRange;
+  _getNodeIndicesForLandingRange(landingRange, searchBoundingBox=null) {
+    const { terrainColumn } = landingRange;
     const { xIndex, zIndex } = terrainColumn;
+    const startY = searchBoundingBox ? Math.max(0,searchBoundingBox.min.y) : landingRange.startY;
+    const endY = searchBoundingBox ? Math.max(0,searchBoundingBox.max.y) : landingRange.endY;
+
     const numNodesPerUnitMinusOne = (this.numNodesPerUnit - 1);
     const nodeXIdxStart = xIndex * numNodesPerUnitMinusOne;
     const nodeZIdxStart = zIndex * numNodesPerUnitMinusOne;
@@ -205,8 +216,8 @@ export default class RigidBodyLattice {
       nodeXIdxEnd: nodeXIdxStart + numNodesPerUnitMinusOne,
       nodeZIdxStart,
       nodeZIdxEnd: nodeZIdxStart + numNodesPerUnitMinusOne,
-      nodeYIdxStart: Math.floor(startY * numNodesPerUnitMinusOne),
-      nodeYIdxEnd: Math.floor(endY * numNodesPerUnitMinusOne)
+      nodeYIdxStart: Math.trunc(startY * numNodesPerUnitMinusOne),
+      nodeYIdxEnd: Math.trunc(endY * numNodesPerUnitMinusOne)
     };
   }
 
@@ -217,7 +228,8 @@ export default class RigidBodyLattice {
       nodeYIdxStart, nodeYIdxEnd
     } = this._getNodeIndicesForLandingRange(landingRange);
 
-    // Find all of the nodes that would be within the landing range (but might be tied to other landing ranges as well)
+    // Find all of the nodes that would be within the landing range 
+    // (but might be tied to other landing ranges as well)
     const result = [];
     for (let x = nodeXIdxStart; x <= nodeXIdxEnd; x++) {
       for (let z = nodeZIdxStart; z <= nodeZIdxEnd; z++) {
@@ -229,45 +241,65 @@ export default class RigidBodyLattice {
         }
       }
     }
+
     return result;
   }
 
-  removeNodesInsideLandingRange(landingRange) {
+  removeNodesWithLandingRange(landingRange) {
     const {terrainColumn} = landingRange;
-    const nodes = this.getNodesInLandingRange(landingRange);
-    for (const node of nodes) {
-      // If the node ONLY contains the given landing range then we remove it
-      const {columnsAndLandingRanges} = node;
-      if (node && columnsAndLandingRanges[terrainColumn].length === 1 && 
-        columnsAndLandingRanges[terrainColumn][0] === landingRange) {
-        const {xIdx, zIdx, yIdx} = node;
-        this.nodes[xIdx][zIdx][yIdx] = null;
+    // Exaustive search all nodes for the given landing range and remove that landing range
+    // if the node no longer has any landing ranges, remove that node
+    // Initialize the node traversal info
+    for (let x = 0; x < this.nodes.length; x++) {
+      for (let z = 0; z < this.nodes[x].length; z++) {
+        for (let y = 0; y < this.nodes[x][z].length; y++) {
+          const node = this.nodes[x][z][y];
+          if (node) {
+            node.removeLandingRange(landingRange);
+            if (node.hasNoColumnsAndLandingRanges()) {
+              this.nodes[x][z][y] = null;
+            }
+          }
+        }
       }
     }
+    // The below code wasn't getting all the nodes??
+    // TODO: Optimize later?
+    // const nodes = this.getNodesInLandingRange(landingRange);
+    // for (const node of nodes) {
+    //   const {columnsAndLandingRanges} = node;
+    //   if (node) {
+    //     if (columnsAndLandingRanges[terrainColumn].length === 1 && 
+    //         columnsAndLandingRanges[terrainColumn][0] === landingRange) {
+    //       const { xIdx, zIdx, yIdx } = node;
+    //       this.nodes[xIdx][zIdx][yIdx] = null;
+    //     }
+    //     else { node.removeLandingRange(landingRange); }
+    //   }
+    // }
   }
 
-  addLandingRangeNodes(landingRange, attachSides=false) {
+  addLandingRangeNodes(landingRange, searchBoundingBox=null, attachSides=false) {
     const {
       nodeXIdxStart, nodeXIdxEnd,
       nodeZIdxStart, nodeZIdxEnd,
       nodeYIdxStart, nodeYIdxEnd
-    } = this._getNodeIndicesForLandingRange(landingRange);
-    const {terrainColumn} = landingRange;
+    } = this._getNodeIndicesForLandingRange(landingRange, searchBoundingBox);
 
+    const {terrainColumn} = landingRange;
     const allLandingRangeNodes = [];
     for (let x = nodeXIdxStart; x <= nodeXIdxEnd; x++) {
       for (let z = nodeZIdxStart; z <= nodeZIdxEnd; z++) {
         const nodesY = this.nodes[x][z];
-        // Make sure the nodes exist, if they don't then add them
+        // Make sure the slots exist for the potential nodes
         while (nodesY.length <= nodeYIdxEnd) { nodesY.push(null); }
 
         for (let y = nodeYIdxStart; y <= nodeYIdxEnd; y++) {
           let node = nodesY[y];
           if (node) {
-            const { columnsAndLandingRanges } = node;
             // If the node is not the bottom most node or it is and has no pre-attached
             // columns/landing ranges then we add the landing range to it
-            if (attachSides || y === nodeYIdxStart || Object.keys(columnsAndLandingRanges).length === 0) {
+            if (attachSides || y === nodeYIdxStart || node.hasNoColumnsAndLandingRanges()) {
               node.addLandingRange(landingRange);
             }
           }
@@ -286,13 +318,14 @@ export default class RigidBodyLattice {
     return allLandingRangeNodes;
   }
 
-  updateNodesForLandingRange(landingRange) {
-    const {mesh} = landingRange;
-    const nodes = this.addLandingRangeNodes(landingRange);
+  // Updates (adds and removes) nodes for the given landing range,
+  // if the searchBoundingBox is provided, then this will search for and update
+  // all nodes within that bounding box.
+  updateNodesForLandingRange(landingRange, searchBoundingBox=null) {
+    const {mesh, terrainColumn} = landingRange;
+    const nodes = this.addLandingRangeNodes(landingRange, searchBoundingBox);
 
     const raycaster = new THREE.Raycaster();
-    raycaster.near = 0;
-    raycaster.far = landingRange.height;
     raycaster.ray.direction.set(0,1,0);
 
     const temp = mesh.material.side;
@@ -301,7 +334,7 @@ export default class RigidBodyLattice {
     const remove = (node, landingRange) => {
       const {xIdx,zIdx,yIdx} = node;
       node.removeLandingRange(landingRange);
-      if (Object.keys(node.columnsAndLandingRanges).length === 0) {
+      if (node.hasNoColumnsAndLandingRanges()) {
         this.nodes[xIdx][zIdx][yIdx] = null;
       }
     };
@@ -316,9 +349,17 @@ export default class RigidBodyLattice {
 
     for (let i = 0; i < nodes.length; i++) {
       const node = nodes[i];
+      assert(node !== null, "LatticeNode should not be null");
+
       let intersections = [];
       const {pos} = node;
       raycaster.ray.origin.set(pos.x,pos.y,pos.z).applyMatrix4(rayPosTransform);
+
+      const temp = new THREE.ArrowHelper(raycaster.ray.direction, raycaster.ray.origin, 0.1);
+      temp.line.material.depthFunc=THREE.AlwaysDepth;
+      temp.cone.material.depthFunc = THREE.AlwaysDepth;
+      terrainColumn.battlefield._scene.add(temp);
+
       mesh.raycast(raycaster, intersections);
       if (intersections.length === 0) {
         // If there are zero intersections then we should remove the node
@@ -333,9 +374,6 @@ export default class RigidBodyLattice {
           // If the closest intersection is the backface of a triangle then we're still inside the
           // landing range's mesh and we should keep the node. 
           if (raycaster.ray.direction.dot(face.normal) < 0) {
-            // Not inside the mesh - remove the current landing range from the node,
-            // if there are no more landing ranges left then the node is no longer
-            // attached to anything and should be removed
             remove(node, landingRange);
           }
         }
@@ -403,7 +441,7 @@ export default class RigidBodyLattice {
   }
   // Find islands in this lattice (i.e., isolated node regions that are not grounded),
   // optional landingRanges parameter will limit the serach to only nodes in those ranges.
-  traverseIslands(landingRanges=null) {
+  traverseIslands() {
     const traversalInfo = {};
     const islands = [];
 
@@ -423,24 +461,17 @@ export default class RigidBodyLattice {
     
     // Find the ungrounded nodes...
     const ungroundedNodes = new Set();
-    if (landingRanges && landingRanges.length > 0) {
-      for (const landingRange of landingRanges) {
-        const nodes = this.getNodesInLandingRange(landingRange);
-        nodes.filter(n => !n.grounded).forEach(n => ungroundedNodes.add(n));
-      }
-    }
-    else {
-      for (let x = 0; x < this.nodes.length; x++) {
-        for (let z = 0; z < this.nodes[x].length; z++) {
-          for (let y = 0; y < this.nodes[x][z].length; y++) {
-            const node = this.nodes[x][z][y];
-            if (node && !node.grounded) {
-              ungroundedNodes.add(node);
-            }
+    for (let x = 0; x < this.nodes.length; x++) {
+      for (let z = 0; z < this.nodes[x].length; z++) {
+        for (let y = 0; y < this.nodes[x][z].length; y++) {
+          const node = this.nodes[x][z][y];
+          if (node && !node.grounded) {
+            ungroundedNodes.add(node);
           }
         }
       }
     }
+
 
     // Initialize the traversal info for all ungrounded nodes
     for (let x = 0; x < this.nodes.length; x++) {
