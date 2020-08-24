@@ -62,25 +62,28 @@ function onMouseClick(event) {
   raycaster.setFromCamera(mousePos, camera);
 
   const intersects = raycaster.intersectObjects(gameModel.battlefield.terrainGroup.children, true);
-  intersects.sort((a,b) => a.distance-b.distance);
   if (intersects.length > 0) {
     let intersectingTerrain = null;
-    for (const intersection of intersects) {
-      if (intersection.face) { intersectingTerrain = intersection; break; }
+    for (let i = 0; i < intersects.length; i++) {
+      if (intersects[i].object && intersects[i].object.terrainLandingRange) { intersectingTerrain = intersects[i]; break; }
     }
     if (!intersectingTerrain) {
       return;
     }
 
-    const {point} = intersectingTerrain;
+    const {object, point} = intersectingTerrain;
 
+    const group = object.parent;
     const groupInvTransform = new THREE.Matrix4();
-    groupInvTransform.getInverse(gameModel.battlefield.terrainGroup.matrixWorld);
+    groupInvTransform.getInverse(group.matrixWorld);
 
-    const BLAST_RADIUS = 0.5;
-    const explosionShape = new THREE.Sphere(new THREE.Vector3(point.x, point.y, point.z), BLAST_RADIUS);
-    explosionShape.applyMatrix4(groupInvTransform);
-    gameModel.battlefield.blowupTerrain(explosionShape);
+    const BLAST_RADIUS = 1;
+    const blastGeometry = new THREE.DodecahedronBufferGeometry(BLAST_RADIUS, 0);
+    blastGeometry.translate(point.x, point.y, point.z);
+    blastGeometry.applyMatrix4(groupInvTransform);
+    //scene.add(new THREE.Mesh(blastGeometry));
+    gameModel.battlefield.blowupTerrain(blastGeometry);
+    blastGeometry.dispose();
   }
 }
 

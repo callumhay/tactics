@@ -1,14 +1,14 @@
 {
   "terrain": [
     [
-      {"type":"rock", "landingRanges":[[0,4],[6,7]]},
-      {"type":"rock", "landingRanges":[[0,7]]}
+      {"material":"rock", "geometry":[{"type":"box", "range":[0,4]}, {"type":"box", "range":[6,7]}]},
+      {"material":"rock", "geometry":[{"type":"box", "range":[0,7]}]}
     ],
     [
-      {"type":"rock", "landingRanges":[[0,1],[4,5]]}
+      {"material":"rock", "geometry":[{"type":"box", "range":[0,1]}, {"type":"box", "range":[4,5]}]}
     ],
     [
-      {"type":"rock", "landingRanges":[[0,4],[6,7]]}
+      {"material":"rock", "geometry":[{"type":"box", "range":[0,4]}, {"type":"box", "range":[6,7]}]}
     ]
   ]
 }

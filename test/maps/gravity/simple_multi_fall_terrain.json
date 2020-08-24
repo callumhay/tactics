@@ -2,9 +2,9 @@
   "terrain": [
     [{
       "matgroups": [
-        {"type":"rock", "landingRanges":[[0,4]]},
-        {"type":"rock", "landingRanges":[[6,7]]},
-        {"type":"rock", "landingRanges":[[8,10]]}
+        {"material":"rock", "geometry":[{"type":"box", "range":[0,4]}]},
+        {"material":"rock", "geometry":[{"type":"box", "range":[6,7]}]},
+        {"material":"rock", "geometry":[{"type":"box", "range":[8,10]}]}
       ]
     }]
   ]

@@ -1,13 +1,22 @@
 import * as THREE from 'three';
 
 import GeometryUtils from '../GeometryUtils';
+import MarchingCubes from './MarchingCubes';
+
+
+const tempVec3 = new THREE.Vector3();
 
 class Debris {
-  constructor(terrainGroup, landingRanges) {
-    const geometries = [];
+  constructor(terrainGroup, rigidBodyLattice, nodes) {
+    this.mesh = null;
+    this.physicsObj = null;
     this.density = 0;
     this.terrainGroup = terrainGroup;
+    
+    // Convert the nodes into geometry
+    this._regenerate(rigidBodyLattice, nodes);
 
+    /*
     for (const landingRange of landingRanges) {
       const {mesh, material} = landingRange;
       const {geometry, matrixWorld} = mesh;
@@ -32,18 +41,9 @@ class Debris {
     const bbCenter = new THREE.Vector3();
     boundingBox.getCenter(bbCenter);
     geometry.translate(-bbCenter.x, -bbCenter.y, -bbCenter.z);
+    */
 
-    this._regenerate(geometry, bbCenter);
-  }
-
-  subtractGeometry(subtractGeom) {
-    const {geometry} = this.mesh;
-    const csgGeometry = CSG.subtract([geometry, subtractGeom]);
-    const newGeometry = CSG.BufferGeometry(csgGeometry);
-    GeometryUtils.roundVertices(newGeometry);
-    geometry.dispose();
-    this.mesh.geometry = newGeometry;
-    newGeometry.computeBoundingBox();
+    
   }
 
   clearGeometry() {
@@ -54,25 +54,57 @@ class Debris {
   }
 
   addPhysics(physics) {
+    if (this.physicsObj) {
+      console.warn("A physics object has already been added for this debris!");
+      return;
+    }
+
     const physicsConfig = {
       gameObject: this,
       mesh: this.mesh,
       material: this.material.cannonMaterial,
       density: this.density,
     };
-    physics.addDebris(physicsConfig);
+    this.physicsObj = physics.addDebris(physicsConfig);
   }
 
-  _regenerate(geometry, translation = new THREE.Vector3(0, 0, 0)) {
+  _regenerate(rigidBodyLattice, nodes) {
     this.clearGeometry();
-    this.mesh = new THREE.Mesh(geometry, this.material.threeMaterial);
+
+    // Calculate the density based on node materials
+    this.density = 0;
+    for (const node of nodes) {
+      this.density += node.density;
+      this.material = node.materials[0];
+    }
+    this.density /= nodes.size;
+    
+    // TODO: 
+    // 1. Group the geometry by material
+    // 2. Create separate rigid bodies with different materials??
+    const nodeCubeCells = rigidBodyLattice.getNodeCubeCells(nodes);
+    const triangles = [];
+    for (const nodeCubeCell of nodeCubeCells) {
+      MarchingCubes.polygonizeNodeCubeCell(nodeCubeCell, triangles);
+    }
+
+    // Create the debris geometry, center it (so that we can do physics stuff cleanly) and move the translation over to the mesh
+    const geometry = GeometryUtils.buildBufferGeometryFromTris(triangles);
+    geometry.computeBoundingBox();
+    const {boundingBox} = geometry;
+    boundingBox.getCenter(tempVec3);
+    geometry.translate(-tempVec3.x, -tempVec3.y, -tempVec3.z);
+
+    this.mesh = new THREE.Mesh(geometry, new THREE.MeshLambertMaterial({color:0xcccccc}));
+    this.mesh.translateX(tempVec3.x);
+    this.mesh.translateY(tempVec3.y);
+    this.mesh.translateZ(tempVec3.z);
+    this.mesh.updateMatrixWorld();
+
+
     this.mesh.castShadow = true;
     this.mesh.receiveShadow = false;
-    this.mesh.translateX(translation.x);
-    this.mesh.translateY(translation.y);
-    this.mesh.translateZ(translation.z);
     this.terrainGroup.add(this.mesh);
-    this.mesh.updateMatrixWorld();
   }
 }
 

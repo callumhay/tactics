@@ -2,8 +2,8 @@
   "terrain": [
     [{
       "matgroups": [
-        {"type":"rock", "landingRanges":[[0,4]]},
-        {"type":"dirt", "landingRanges":[[6,7]]}
+        {"material":"rock", "geometry":[{"type":"box", "range":[0,4]}]},
+        {"material":"dirt", "geometry":[{"type":"box", "range":[6,7]}]}
       ]
     }]
   ]

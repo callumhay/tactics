@@ -1,5 +1,4 @@
 import * as CANNON from 'cannon-es';
-import {assert} from 'chai';
 
 import { threeToCannon } from './threetocannon';
 
@@ -49,8 +48,7 @@ class GamePhysics {
   addObject(type, gameType, config) {
     const { gameObject, mesh, density, material } = config;
     const shape = threeToCannon(mesh);
-    assert(shape !== null, "Cannon.js shape is null, this shouldn't happen.");
-    const mass = (density || material.density) * shape.volume();
+    const mass = density * shape.volume();
     const body = new CANNON.Body({
       type: type,
       shape: shape,

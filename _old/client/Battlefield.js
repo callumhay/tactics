@@ -8,7 +8,6 @@ import RigidBodyLattice from './RigidBodyLattice';
 import Debris from './Debris';
 import GameTypes from './GameTypes';
 import GameMaterials from './GameMaterials';
-import { Box3 } from 'three';
 
 export default class Battlefield {
   static get MAX_SIZE() { return TerrainColumn.SIZE * 200; }
@@ -18,7 +17,6 @@ export default class Battlefield {
     this._scene = scene;
     this.physics = physics;
 
-    this._terrain = [];
     this.debris = [];
 
     this.sunLight = new THREE.DirectionalLight(0xffffff, 0.2);
@@ -71,29 +69,24 @@ export default class Battlefield {
   }
 
   setTerrain(terrain) {
-    // Order matters here!!!
-    this.clear();
+    this._clearTerrain();
     this._terrain = terrain;
-
-    // Regenerate the terrain
-    for (let x = 0; x < this._terrain.length; x++) {
-      for (let z = 0; z < this._terrain[x].length; z++) {
-        this._terrain[x][z].regenerate();
-      }
-    }
-
     const terrainSize = terrain.length * TerrainColumn.SIZE;
     this.terrainGroup.position.set(-terrainSize / 2, 0, -terrainSize / 2);
-
+    this._buildRigidbodyLattice();
     this.terrainPhysicsCleanup();
+  }
 
-    // Traverse the lattice, find anything that might not be connected to the ground, 
-    // remove it from the terrain and turn it into a physical object
-    
-    this.rigidBodyLattice.debugDrawNodes(true);
+  _buildRigidbodyLattice() {
+    this.rigidBodyLattice.clear();
+    this.rigidBodyLattice.buildFromTerrain(this._terrain);
   }
 
   clear() {
+    this._clearTerrain();
+  }
+  _clearTerrain() {
+    if (!this._terrain) { return; }
     for (let x = 0; x < this._terrain.length; x++) {
       for (let z = 0; z < this._terrain[x].length; z++) {
         this._terrain[x][z].clear();
@@ -102,11 +95,11 @@ export default class Battlefield {
     this._terrain = [];
   }
 
-  // NOTE: We assume that the explosionShape is in the same coordinate space as the terrain
-  blowupTerrain(explosionShape) {
+  // NOTE: We assume that the subtractGeometry is in the same coord space as the terrain
+  blowupTerrain(subtractGeometry) {
+    subtractGeometry.computeBoundingBox();
+    const {boundingBox} = subtractGeometry;
     const {clamp} = THREE.MathUtils;
-    const boundingBox = new Box3();
-    explosionShape.getBoundingBox(boundingBox);
 
     // Get all the terrain columns that might be modified
     const minX = clamp(Math.floor(boundingBox.min.x), 0, this._terrain.length-1);
@@ -126,27 +119,12 @@ export default class Battlefield {
       }
     }
 
-    // Blow up the nodes
-    // Test all the nodes in this column against explosionShape and remove all nodes inside it
-    this.rigidBodyLattice.removeNodesInsideShape(explosionShape);
-    
-    // Re-traverse the rigid body node lattice, find out if anything is no longer attached to the ground
-    this.rigidBodyLattice.traverseGroundedNodes();
-    const islands = this.rigidBodyLattice.traverseIslands();
-    
-    // Figure out what's no longer attached and detach it and build the geometry for it as debris
-    //for (const islandNodeSet of islands) {
-    //}
-    this.rigidBodyLattice.debugDrawNodes(true);
-
-    // Rebuild the geometry for all the affected TerrainColumns
     for (const terrainCol of terrainCols) {
-      terrainCol.regenerate();
+      terrainCol.blowupTerrain(subtractGeometry);
     }
   }
 
   convertDebrisToTerrain(debrisPhysObj) {
-    /*
     const { gameType, gameObject: debrisObj, mesh } = debrisPhysObj;
     if (gameType !== GameTypes.DEBRIS) {
       console.error("Attempting to convert invalid game type back into terrain, ignoring.");
@@ -261,39 +239,46 @@ export default class Battlefield {
     }
     // Clean-up
     this.debris.splice(this.debris.indexOf(debrisObj), 1);
-    */
   }
 
   // Do a check for floating "islands" (i.e., terrain blobs that aren't connected to the ground), 
   // remove them from the terrain and turn them into physics objects
   terrainPhysicsCleanup() {
-    const { rigidBodyLattice, terrainGroup, physics, debris} = this;
-
-    rigidBodyLattice.traverseGroundedNodes();
+    const { rigidBodyLattice, physics, debris} = this;
     const islands = rigidBodyLattice.traverseIslands();
 
-    // Build debris for each island and find all the terrain columns associated with each island
-    let terrainColumnSet = new Set();
+    // Find all the landing ranges associated with each island
+    const islandLandingRanges = [];
     for (const islandNodeSet of islands) {
-      const debrisObj = new Debris(terrainGroup, rigidBodyLattice, islandNodeSet);
+      let landingRangeSet = new Set();
+      for (const node of islandNodeSet) {
+        landingRangeSet = new Set([...landingRangeSet, ...node.getLandingRanges()]);
+      }
+      islandLandingRanges.push(landingRangeSet);
+    }
+
+    // Merge together all the landing ranges in each island and turn them into detached
+    // geometry that become dynamic physics objects
+    for (const landingRangeSet of islandLandingRanges) {
+      for (const landingRange of landingRangeSet) {
+        // Make sure there are no longer any nodes associated with the detached range
+        rigidBodyLattice.removeNodesWithLandingRange(landingRange);
+      }
+
+      // We'll need to convert the landingRanges into debris
+      const debrisObj = new Debris(this.terrainGroup, landingRangeSet);
       debris.push(debrisObj);
       debrisObj.addPhysics(physics);
 
-      for (const node of islandNodeSet) {
-        terrainColumnSet = new Set([...terrainColumnSet, ...node.terrainColumns]);
+      // Clean-up the landing ranges, they are now debris and will no longer exist
+      for (const landingRange of landingRangeSet) {
+        const {terrainColumn} = landingRange;
+        landingRange.terrainColumn.detachLandingRange(landingRange);
+        landingRange.clear(terrainColumn);
       }
     }
 
-    // The nodes are longer is associated with any terrain columns so remove the association in the lattice
-    for (const terrainColumn of terrainColumnSet) {
-      for (const nodeSet of islands) {
-        rigidBodyLattice.removeTerrainColumnFromNodes(terrainColumn, nodeSet);
-      }
-    }
-    // Regenerate the geometry for the terrain columns
-    for (const terrainColumn of terrainColumnSet) {
-      terrainColumn.regenerate();
-    }
+    rigidBodyLattice.debugDrawNodes(true);
   }
 
 }

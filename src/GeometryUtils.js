@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { assert } from 'chai';
-import MathUtils from './MathUtils';
 
+import MathUtils from './MathUtils';
 
 class GeometryUtils {
   static roundVertices(geometry, decimals=4) {
@@ -14,146 +14,110 @@ class GeometryUtils {
     }
   }
 
-  static findGeometryIslands(geometry, tolerance=1e-6) {
-    const {index} = geometry;
-    assert(index.count % 3 === 0, "Geometry must be composed of triangles!");
-    const positions = geometry.getAttribute('position');
-    
+  static buildBufferGeometryFromTris(triangles, smoothingAngle=40*Math.PI/180, tolerance=1e-4) {
     tolerance = Math.max(tolerance, Number.EPSILON);
-    const decimalShift = Math.log10(1 / tolerance);
+    const decimalShift = Math.log10(1/tolerance);
     const shiftMultiplier = Math.pow(10, decimalShift);
     const makeValueHash = (value) => {
-      return `${~ ~(value * shiftMultiplier)}`;
-    };
-    const makeVertexHash = (x, y, z) => {
-      return `${makeValueHash(x)},${makeValueHash(y)},${makeValueHash(z)}`
+      return `${~ ~(value * shiftMultiplier)}`; // ~ ~ truncates the value
+    }
+    const makeVertexHash = (vertex) => {
+      const {x,y,z} = vertex;
+      return `${makeValueHash(x)},${makeValueHash(y)},${makeValueHash(z)}`;
     }
 
-    const UNVISTED_STATE = 0;
-    const VISTING_STATE  = 1;
-    const FINISHED_STATE = 2;
+    const tempVec3 = new THREE.Vector3();
 
-    const numTris = index.count/3;
-    const triangles = new Array(numTris).fill(null);
-    const indexToTris = {};
-    let triCount = 0;
-    for (let i = 0; i < index.count; i+=3) {
-      const idx0 = index.getX(i), idx1 = index.getX(i + 1), idx2 = index.getX(i + 2);
-      const currTT = triangles[triCount] = { 
-        triIndex: triCount,
-        indices: [idx0, idx1, idx2],
-      };
-
-      for (const idx of currTT.indices) {
-        if (!indexToTris[idx]) {
-          indexToTris[idx] = [];
+    const faces = [];
+    const vertexMap = {};
+    for (const triangle of triangles) {
+      const {a,b,c} = triangle
+      const normal = triangle.getNormal(tempVec3).clone();
+      const face = [0,0,0];
+      faces.push(face);
+      [a,b,c].forEach((vertex,idx) => {
+        const hash = makeVertexHash(vertex);
+        let vertexLookup = vertexMap[hash];
+        if (!vertexLookup) {
+          vertexLookup = vertexMap[hash] = {vertex: vertex, normals:[], faces:[]};
         }
-        indexToTris[idx].push(currTT);
-      }
-
-      triCount++;
+        vertexLookup.normals.push(normal);
+        vertexLookup.faces.push([face,idx])
+      });
     }
 
-    // Create a mapping of all unique vertices to their respective indices
-    const vertexToIndices = {};
-    const traversalInfo = {};
-    for (let i = 0; i < index.count; i++) {
-      const idx = index.getX(i);
-      traversalInfo[idx] = {
-        idx,
-        state: UNVISTED_STATE,
-        islandIdx: -1,
-      };
-      const hash = makeVertexHash(positions.getX(idx), positions.getY(idx), positions.getZ(idx));
-      if (!vertexToIndices[hash]) {
-        vertexToIndices[hash] = [];
-      }
-      vertexToIndices[hash].push(idx);
-    }
+    const vertices = [];
+    const normalVecs = [];
 
-    for (let i = 0; i < index.count; i++) {
-      const posX = positions.getX(i);
-      const posY = positions.getY(i);
-      const posZ = positions.getZ(i);
-      const hash = makeVertexHash(posX, posY, posZ);
-      traversalInfo[hash] = { 
-        posIdx: i, 
-        state: UNVISTED_STATE,
-        islandIdx: -1,
-        vertexHash: hash,
-      };
-    }
-
-    const depthFirstSearch = (islandIdx, tInfo, islandSet) => {
-      tInfo.state = VISTING_STATE;
-
-      const { idx } = tInfo;
-      const posX = positions.getX(idx);
-      const posY = positions.getY(idx);
-      const posZ = positions.getZ(idx);
-      const hash = makeVertexHash(posX, posY, posZ);
-
-      // Find all the indices that have approx the same vertex position 
-      // as the current index being traversed
-      const indicesWithSameVertex = vertexToIndices[hash];
-      for (const index of indicesWithSameVertex) {
-        // For each index we find the triangles that index is a part of
-        const tris = indexToTris[index];
-        for (const tri of tris) {
-          // We then traverse all the indices that make up each triangle
-          for (const triVertexIdx of tri.indices) {
-            const nextTInfo = traversalInfo[triVertexIdx];
-            if (nextTInfo.state === UNVISTED_STATE) {
-              depthFirstSearch(islandIdx, nextTInfo, islandSet);
+    // Go over the vertex map and clean up any duplicate vertices based on normal angle
+    for (const vertexObj of Object.values(vertexMap)) {
+      const {vertex, normals, faces} = vertexObj;
+      const ungroupedNormals = normals.map(() => true);
+      const groupedNormals = [];
+      
+      for (let i = 0; i < normals.length; i++) {
+        if (ungroupedNormals[i]) {
+          const currGroup = [i];
+          ungroupedNormals[i] = false;
+          
+          for (let j = i; j < normals.length; j++) {
+            if (ungroupedNormals[j]) {
+              const iNorm = normals[i];
+              const jNorm = normals[j];
+              if (iNorm.angleTo(jNorm) <= smoothingAngle) {
+                currGroup.push(j);
+                ungroupedNormals[j] = false;
+              }
             }
           }
+          
+          groupedNormals.push(currGroup);
         }
       }
 
-      tInfo.islandIdx = islandIdx;
-      islandSet.add(tInfo);
-      tInfo.state = FINISHED_STATE;
-    };
+      // Go through each of the grouped normals, average each group and insert them as duplicates of the vertices
+      for (let i = 0; i < groupedNormals.length; i++) {
+        const currNormalIndices = groupedNormals[i];
 
-    const islands = [];
-    for (let i = 0; i < index.count; i++) {
-      const tInfo = traversalInfo[index.getX(i)];
-      if (tInfo.state === UNVISTED_STATE) {
-        const islandSet = new Set();
-        depthFirstSearch(islands.length, tInfo, islandSet);
-        islands.push(islandSet);
+        const avgNormal = new THREE.Vector3();
+        for (let j = 0; j < currNormalIndices.length; j++) {
+          const currNormal = normals[currNormalIndices[j]];
+          avgNormal.add(currNormal);
+        }
+        avgNormal.normalize();
+
+        for (let j = 0; j < currNormalIndices.length; j++) {
+          const currIndex = currNormalIndices[j];
+          const [face, idx] = faces[currIndex];
+
+          face[idx] = Math.floor(vertices.length/3);
+
+          ['x', 'y', 'z'].forEach((axis) => {
+            vertices.push(vertex[axis]);
+            normalVecs.push(avgNormal[axis]);
+          });
+        }
       }
+
     }
 
-    return islands;
+    const indices = new Array(faces.length*3);
+    let indexCount = 0;
+    faces.forEach(face => {
+      indices[indexCount++] = face[0];
+      indices[indexCount++] = face[1];
+      indices[indexCount++] = face[2];
+    });
+  
+    let threeGeometry = new THREE.BufferGeometry();
+    threeGeometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(vertices), 3));
+    threeGeometry.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(normalVecs), 3, true));
+    threeGeometry.setIndex(indices);
+    return threeGeometry;
+    //const simplifier = new SimplifyModifier();
+    //return simplifier.modify(threeGeometry, Math.floor(threeGeometry.getAttribute('position').count*0.25));
   }
 
-  static clampGeometryToBoundingBox(geometry, boundingBox) {
-    const {clamp} = THREE.MathUtils;
-    const {min, max} = boundingBox;
-    const { index } = geometry;
-    const positions = geometry.getAttribute('position');
-    for (let i = 0; i < index.count; i++) {
-      const idx = index.getX(i);
-      positions.setX(idx, clamp(positions.getX(idx), min.x, max.x));
-      positions.setY(idx, clamp(positions.getY(idx), min.y, max.y));
-      positions.setZ(idx, clamp(positions.getZ(idx), min.z, max.z));
-    }
-    geometry.computeVertexNormals();
-  }
-
-
-  // TODO...
-  cleanUpStrayFaces(mesh) {
-    const raycaster = new THREE.Raycaster();
-    const {geometry} = mesh;
-
-    // Go through each face and check to see if the -normal of the face hits the back of another face
-    // only keep faces that pass that check
-
-
-
-  }
 
 
 }
