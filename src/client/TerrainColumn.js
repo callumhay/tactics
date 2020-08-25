@@ -5,6 +5,7 @@ import GeometryUtils from '../GeometryUtils';
 
 import GameMaterials from './GameMaterials';
 import MarchingCubes from './MarchingCubes';
+import { MeshLambertMaterial } from 'three';
 
 const tempVec3 = new THREE.Vector3();
 
@@ -17,10 +18,10 @@ class TerrainColumn {
     this.battlefield = battlefield;
     this.xIndex = u;
     this.zIndex = v;
-    this.maxY = 0;
 
     this.mesh = null;
     this.physObject = null;
+    this.material = null;
 
     const {rigidBodyLattice} = this.battlefield;
 
@@ -30,14 +31,13 @@ class TerrainColumn {
         const gameMaterial = GameMaterials.materials[material];
 
         // TODO: Materials??
-        this.material = gameMaterial;
+        if (gameMaterial) { this.material = gameMaterial; }
 
         for (const geomPiece of geometry) {
           const {type} = geomPiece;
           switch (type) {
             case "box":
               const [startY, endY] = geomPiece.range;
-              this.maxY = Math.max(this.maxY, endY);
               rigidBodyLattice.addTerrainColumnBox(this, {startY, endY, material:gameMaterial});
               break;
             default:
@@ -66,6 +66,7 @@ class TerrainColumn {
 
   regenerate() {
     this.clear();
+    if (!this.material) { return; }
 
     const { rigidBodyLattice, terrainGroup } = this.battlefield;
     const nodeCubeCells = rigidBodyLattice.getTerrainColumnCubeCells(this);
@@ -81,7 +82,7 @@ class TerrainColumn {
     boundingBox.getCenter(tempVec3);
     geometry.translate(-tempVec3.x, -tempVec3.y, -tempVec3.z);
 
-    this.mesh = new THREE.Mesh(geometry, new THREE.MeshLambertMaterial({color:0xcccccc}));
+    this.mesh = new THREE.Mesh(geometry, new MeshLambertMaterial()); //this.material.three);
     this.mesh.castShadow = true;
     this.mesh.receiveShadow = false;
 
@@ -95,7 +96,7 @@ class TerrainColumn {
     const { physics } = this.battlefield;
     const config = {
       gameObject: this,
-      material: this.material,
+      material: this.material.cannon,
       mesh: this.mesh,
     };
     this.physObject = physics.addTerrain(config);

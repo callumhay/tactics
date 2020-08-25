@@ -16,7 +16,7 @@ class LatticeNode {
     this.zIdx = zIdx;
     this.yIdx = yIdx;
     this.pos = pos;
-    this.terrainColumns = terrainColumns; // The size of this array should never be 
+    this.attachedTerrainCols = terrainColumns; // The size of this array should never be 
     this.materials = materials;
     this.grounded = false;
     //this.isEmpty = isEmpty; 
@@ -31,31 +31,31 @@ class LatticeNode {
   }
 
   hasTerrainColumn(terrainCol) {
-    return this.terrainColumns.indexOf(terrainCol) !== -1;
+    return this.attachedTerrainCols.indexOf(terrainCol) !== -1;
   }
 
   addTerrainColumn(terrainCol) {
     if (this.hasTerrainColumn(terrainCol)) { return; }
-    this.terrainColumns.push(terrainCol);
-    assert(this.terrainColumns.length <= 4, "There should never be more than 4 TerrainColumns tied to a node.");
+    this.attachedTerrainCols.push(terrainCol);
+    assert(this.attachedTerrainCols.length <= 4, "There should never be more than 4 TerrainColumns tied to a node.");
   }
 
   removeTerrainColumn(terrainCol) {
-    const index = this.terrainColumns.indexOf(terrainCol);
-    this.terrainColumns.splice(index, 1);
+    const index = this.attachedTerrainCols.indexOf(terrainCol);
+    this.attachedTerrainCols.splice(index, 1);
     //this.materials.splice(index, 1);
   }
   clearTerrainColumns() {
-    this.terrainColumns = [];
+    this.attachedTerrainCols = [];
   }
 
   debugColour() {
     const colour = new THREE.Color(0,0,0);
-    for (const terrainCol of this.terrainColumns) {
+    for (const terrainCol of this.attachedTerrainCols) {
       colour.add(terrainCol.debugColour());
     }
-    assert(this.terrainColumns.length > 0, "There shouldn't be a node in existance that has no associated TerrainColumns.");
-    colour.multiplyScalar(1/Math.max(1, this.terrainColumns.length));
+    assert(this.attachedTerrainCols.length > 0, "There shouldn't be a node in existance that has no associated TerrainColumns.");
+    colour.multiplyScalar(1/Math.max(1, this.attachedTerrainCols.length));
     return colour;
   }
 }
@@ -157,7 +157,7 @@ export default class RigidBodyLattice {
   removeTerrainColumnFromNodes(terrainColumn, nodeSet) {
     for (const node of nodeSet) {
       node.removeTerrainColumn(terrainColumn);
-      if (node.terrainColumns.length === 0) {
+      if (node.attachedTerrainCols.length === 0) {
         const {xIdx, zIdx, yIdx} = node;
         this._removeNode(xIdx, zIdx, yIdx);
       }
@@ -228,19 +228,23 @@ export default class RigidBodyLattice {
   }
 
   getTerrainColumnCubeCells(terrainColumn) {
-    const nodeYIdxEnd = this._unitsToNodeIndex(terrainColumn.maxY);
-    if (nodeYIdxEnd === 0) { return []; } // Early out for empty columns
-
     const {nodeXIdxStart, nodeXIdxEnd, nodeZIdxStart, nodeZIdxEnd} = this._getXZIndexRangeForTerrainColumn(terrainColumn);
     const cubeCells = [];
 
-    // We form cube cells for everything inside the terrain column, but we also need to form cube cells 
-    // for all of the surrounding regions of the terrain column, one node outwards in each direction. 
-    // NOTE: if a node doesn't exist then we just say it's null... unless it's y < 0, in which case we use dummy nodes
+    let maxYIdx = -2;
     for (let x = nodeXIdxStart-1; x <= nodeXIdxEnd; x++) {
       for (let z = nodeZIdxStart-1; z <= nodeZIdxEnd; z++) {
-        for (let y = -1; y <= nodeYIdxEnd; y++) {
-         cubeCells.push(this._makeNodeCubeCell(x,y,z));
+        if (this.nodes[x] && this.nodes[x][z]) {
+          maxYIdx = Math.max(maxYIdx, this.nodes[x][z].length-1);
+        }
+      }
+    }
+
+    // We form cube cells for everything inside the terrain column
+    for (let x = nodeXIdxStart-1; x <= nodeXIdxEnd; x++) {
+      for (let z = nodeZIdxStart-1; z <= nodeZIdxEnd; z++) {
+        for (let y = -1; y <= maxYIdx; y++) {
+          cubeCells.push(this._makeNodeCubeCell(x,y,z));
         }
       }
     }
@@ -289,7 +293,12 @@ export default class RigidBodyLattice {
         }
       }
     }
-
+  }
+  removeNodes(nodes) {
+    for (const node of nodes) {
+      const {xIdx, zIdx, yIdx} = node;
+      this._removeNode(xIdx, zIdx, yIdx);
+    }
   }
 
   getNeighboursForNode(node) {

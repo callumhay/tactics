@@ -3,7 +3,6 @@ import * as THREE from 'three';
 import GeometryUtils from '../GeometryUtils';
 import MarchingCubes from './MarchingCubes';
 
-
 const tempVec3 = new THREE.Vector3();
 
 class Debris {
@@ -15,35 +14,6 @@ class Debris {
     
     // Convert the nodes into geometry
     this._regenerate(rigidBodyLattice, nodes);
-
-    /*
-    for (const landingRange of landingRanges) {
-      const {mesh, material} = landingRange;
-      const {geometry, matrixWorld} = mesh;
-
-      geometry.applyMatrix4(matrixWorld); // Geometry needs to be placed into the terrain space
-      geometries.push(geometry);
-
-      this.density += material.density;
-
-      // Right now we just assign the material to a landing range materal
-      // Cannon doesn't support multiple materials in a body
-      this.material = material;
-    }
-    this.density /= (landingRanges.size ? landingRanges.size : landingRanges.length);
-
-    const csgGeometry = CSG.union(geometries);
-    const geometry = CSG.BufferGeometry(csgGeometry);
-    GeometryUtils.roundVertices(geometry);
-    geometry.computeBoundingBox();
-
-    const {boundingBox} = geometry;
-    const bbCenter = new THREE.Vector3();
-    boundingBox.getCenter(bbCenter);
-    geometry.translate(-bbCenter.x, -bbCenter.y, -bbCenter.z);
-    */
-
-    
   }
 
   clearGeometry() {
@@ -62,7 +32,7 @@ class Debris {
     const physicsConfig = {
       gameObject: this,
       mesh: this.mesh,
-      material: this.material.cannonMaterial,
+      material: this.material.cannon,
       density: this.density,
     };
     this.physicsObj = physics.addDebris(physicsConfig);

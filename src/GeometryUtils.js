@@ -33,6 +33,11 @@ class GeometryUtils {
     for (const triangle of triangles) {
       const {a,b,c} = triangle
       const normal = triangle.getNormal(tempVec3).clone();
+      // If the normal is zero then we get rid of the triangle
+      if (normal.lengthSq() < tolerance*tolerance) {
+        continue;
+      }
+
       const face = [0,0,0];
       faces.push(face);
       [a,b,c].forEach((vertex,idx) => {

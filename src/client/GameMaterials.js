@@ -9,18 +9,18 @@ const MATERIAL_TYPE_DIRT    = "dirt";
 const materials = {
   [MATERIAL_TYPE_BEDROCK]: {
     density: 2000,
-    threeMaterial: new THREE.MeshLambertMaterial({color: 0x666666}),
-    cannonMaterial: new CANNON.Material(MATERIAL_TYPE_BEDROCK)
+    three: new THREE.MeshLambertMaterial({color: 0x666666}),
+    cannon: new CANNON.Material(MATERIAL_TYPE_BEDROCK)
   },
   [MATERIAL_TYPE_ROCK]: { 
     density: 1600, 
-    threeMaterial: new THREE.MeshLambertMaterial({ color: 0xcccccc}),
-    cannonMaterial: new CANNON.Material(MATERIAL_TYPE_ROCK)
+    three: new THREE.MeshLambertMaterial({ color: 0xcccccc}),
+    cannon: new CANNON.Material(MATERIAL_TYPE_ROCK)
   },
   [MATERIAL_TYPE_DIRT]: {
     density: 1225,
-    threeMaterial: new THREE.MeshLambertMaterial({ color: 0xa0522d }),
-    cannonMaterial: new CANNON.Material(MATERIAL_TYPE_DIRT)
+    three: new THREE.MeshLambertMaterial({ color: 0xa0522d }),
+    cannon: new CANNON.Material(MATERIAL_TYPE_DIRT)
   }
 };
 

@@ -41,7 +41,10 @@ class MarchingCubes {
     for (let i = 0; triLookup[i] !== -1; i += 3) {
       const a = vertexList[triLookup[i]], b = vertexList[triLookup[i+1]], c = vertexList[triLookup[i+2]];
       //if (a.y < 0 || b.y < 0 || c.y < 0) { continue; } // Don't allow triangles below the bedrock of the terrain
-      trianglesTarget.push(new THREE.Triangle(a,b,c));
+      const tri = new THREE.Triangle(a,b,c);
+      //tri.getNormal(tempVec3);
+      //if (tempVec3.lengthSq())
+      trianglesTarget.push(tri);
       triCount++;
     }
 
@@ -69,7 +72,7 @@ const interpolateVertex = (nodeObj1, nodeObj2) => {
     n2 = nodeObj1;
   }
 
-  const isoVal = 0.1;//0.5;
+  const isoVal = 0.1;
   const n1Val = n1.node ? 0 : 1;
   const n2Val = n2.node ? 0 : 1;
   const point = new THREE.Vector3(n1.pos.x, n1.pos.y, n1.pos.z);
