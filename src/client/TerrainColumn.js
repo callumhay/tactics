@@ -5,7 +5,8 @@ import GeometryUtils from '../GeometryUtils';
 
 import GameMaterials from './GameMaterials';
 import MarchingCubes from './MarchingCubes';
-import { MeshLambertMaterial } from 'three';
+import { MeshLambertMaterial, Geometry } from 'three';
+import Battlefield from './Battlefield';
 
 const tempVec3 = new THREE.Vector3();
 
@@ -64,25 +65,34 @@ class TerrainColumn {
     }
   }
 
+  getBoundingBox() {
+    return new THREE.Box3(
+      new THREE.Vector3(this.xIndex, 0, this.zIndex), 
+      new THREE.Vector3(this.xIndex+TerrainColumn.SIZE, Battlefield.MAX_HEIGHT, this.zIndex+TerrainColumn.SIZE)
+    );
+  }
+
   regenerate() {
     this.clear();
     if (!this.material) { return; }
 
     const { rigidBodyLattice, terrainGroup } = this.battlefield;
     const nodeCubeCells = rigidBodyLattice.getTerrainColumnCubeCells(this);
-    const triangles = [];
-    for (const nodeCubeCell of nodeCubeCells) {
-      MarchingCubes.polygonizeNodeCubeCell(nodeCubeCell, triangles);
-    }
-    if (triangles.length === 0) { return; } // This is an empty terrain column, nothing else to do here.
-
+    const triangles = MarchingCubes.convertTerrainColumnToTriangles(this, nodeCubeCells)
+    if (triangles.length === 0) { return; }
     const geometry = GeometryUtils.buildBufferGeometryFromTris(triangles);
+    if (geometry.getAttribute('position').count === 0) { return; } // Empty terrain column
+
     geometry.computeBoundingBox();
     const {boundingBox} = geometry;
     boundingBox.getCenter(tempVec3);
     geometry.translate(-tempVec3.x, -tempVec3.y, -tempVec3.z);
 
-    this.mesh = new THREE.Mesh(geometry, new MeshLambertMaterial()); //this.material.three);
+    const debugColour = this.debugColour();
+    debugColour.setRGB(debugColour.b, debugColour.g, debugColour.r).multiplyScalar(0.25);
+    const material = new MeshLambertMaterial({emissive:debugColour});
+
+    this.mesh = new THREE.Mesh(geometry, material); //this.material.three);
     this.mesh.castShadow = true;
     this.mesh.receiveShadow = false;
 

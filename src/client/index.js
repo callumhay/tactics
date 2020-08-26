@@ -4,6 +4,8 @@ import {OrbitControls} from 'three/examples/jsm/controls/OrbitControls';
 import GameModel from './GameModel';
 import GameClient from './GameClient';
 
+import CannonDebugRenderer from './CannonDebugRenderer';
+
 // Setup THREE library boilerplate for getting a scene + camera + basic controls up and running
 const renderer = new THREE.WebGLRenderer();
 renderer.autoClear = false;
@@ -66,7 +68,7 @@ function onMouseClick(event) {
   if (intersects.length > 0) {
     let intersectingTerrain = null;
     for (const intersection of intersects) {
-      if (intersection.face) { intersectingTerrain = intersection; break; }
+      if (intersection.face && !(intersection.object && intersection.object.material.wireframe)) { intersectingTerrain = intersection; break; }
     }
     if (!intersectingTerrain) {
       return;
@@ -84,6 +86,10 @@ function onMouseClick(event) {
   }
 }
 
+const {physics} = gameModel;
+const {terrainGroup} = gameModel.battlefield;
+const cannonDebugRenderer = new CannonDebugRenderer(terrainGroup, physics.world);
+
 // Setup and execute the game loop
 const clock = new THREE.Clock(true);
 const render = function () {
@@ -94,6 +100,9 @@ const render = function () {
   // Updates for physics/controls/sound/etc.
   gameModel.update(dt);
   controls.update();
+
+
+  cannonDebugRenderer.update();
 
   // Render the scene
   renderer.clear();

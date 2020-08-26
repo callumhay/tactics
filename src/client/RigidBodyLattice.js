@@ -205,7 +205,7 @@ export default class RigidBodyLattice {
     const zOutside = (zIdx < 0);
     const yOutside = (yIdx < 0);
 
-    const yOutsideNode = null;  // yIdx < 0 ? {} : null;
+    const yOutsideNode =  yIdx < 0 ? {} : null;
 
     const n0 = (xOutside || zOutside || zIdx >= this.nodes[xIdx].length || yOutside) ?
     {node: yOutsideNode, pos: xyzPt} : {node: this.nodes[xIdx][zIdx][yIdx], pos: xyzPt};
@@ -242,8 +242,11 @@ export default class RigidBodyLattice {
 
     // We form cube cells for everything inside the terrain column
     for (let x = nodeXIdxStart-1; x <= nodeXIdxEnd; x++) {
+      let isXBoundary = (x === nodeXIdxStart || x === nodeXIdxEnd);
       for (let z = nodeZIdxStart-1; z <= nodeZIdxEnd; z++) {
+        const isBoundary = (z === nodeZIdxStart || z === nodeZIdxEnd) || isXBoundary;
         for (let y = -1; y <= maxYIdx; y++) {
+
           cubeCells.push(this._makeNodeCubeCell(x,y,z));
         }
       }

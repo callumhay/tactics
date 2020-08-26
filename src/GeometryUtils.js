@@ -14,6 +14,14 @@ class GeometryUtils {
     }
   }
 
+  // static removeTrianglesOutsideBoundingBox(boundingBox, triangles) {
+  //   const {min, max} = boundingBox;
+  //   return trianglesTarget.filter(triangle => {
+  //     const {a,b,c} = triangle;
+  //     return 
+  //   });
+  // }
+
   static buildBufferGeometryFromTris(triangles, smoothingAngle=40*Math.PI/180, tolerance=1e-4) {
     tolerance = Math.max(tolerance, Number.EPSILON);
     const decimalShift = Math.log10(1/tolerance);
@@ -119,11 +127,7 @@ class GeometryUtils {
     threeGeometry.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(normalVecs), 3, true));
     threeGeometry.setIndex(indices);
     return threeGeometry;
-    //const simplifier = new SimplifyModifier();
-    //return simplifier.modify(threeGeometry, Math.floor(threeGeometry.getAttribute('position').count*0.25));
   }
-
-
 
 }
 

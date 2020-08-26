@@ -1,14 +1,11 @@
 import * as THREE from 'three';
 
 import Debug from '../debug';
-import MathUtils from '../MathUtils';
-
 import TerrainColumn from './TerrainColumn';
 import RigidBodyLattice from './RigidBodyLattice';
 import Debris from './Debris';
 import GameTypes from './GameTypes';
 import GameMaterials from './GameMaterials';
-import { Box3 } from 'three';
 
 export default class Battlefield {
   static get MAX_SIZE() { return TerrainColumn.SIZE * 200; }
@@ -105,7 +102,7 @@ export default class Battlefield {
   // NOTE: We assume that the explosionShape is in the same coordinate space as the terrain
   blowupTerrain(explosionShape) {
     const {clamp} = THREE.MathUtils;
-    const boundingBox = new Box3();
+    const boundingBox = new THREE.Box3();
     explosionShape.getBoundingBox(boundingBox);
 
     // Get all the terrain columns that might be modified

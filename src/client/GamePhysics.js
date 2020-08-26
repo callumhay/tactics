@@ -6,6 +6,8 @@ import { threeToCannon } from './threetocannon';
 import GameMaterials from './GameMaterials';
 import GameTypes from './GameTypes';
 
+
+
 class GamePhysics {
   constructor(scene, gameModel) {
     this.scene = scene; // THREE.js scene
@@ -25,6 +27,9 @@ class GamePhysics {
 
     this.onBodyCollision = this.onBodyCollision.bind(this);
     this.onBodySleep = this.onBodySleep.bind(this);
+
+    // TODO: Remove this...
+
   }
 
   update(dt) {
@@ -48,7 +53,7 @@ class GamePhysics {
 
   addObject(type, gameType, config) {
     const { gameObject, mesh, density, material } = config;
-    const shape = threeToCannon(mesh, threeToCannon.Type.MESH);
+    const shape = threeToCannon(mesh);//, {type: threeToCannon.Type.MESH});
     assert(shape !== null, "Cannon.js shape is null, this shouldn't happen.");
     const mass = (density || material.density) * shape.volume();
     const body = new CANNON.Body({
@@ -73,7 +78,7 @@ class GamePhysics {
   }
 
   addDebris(config) { return this.addObject(CANNON.Body.DYNAMIC, GameTypes.DEBRIS, config); }
-  addTerrain(config) { return this.addObject(CANNON.Body.KINEMATIC, GameTypes.TERRAIN, config); }
+  addTerrain(config) { return this.addObject(CANNON.Body.STATIC, GameTypes.TERRAIN, config); }
 
   addBedrock(config) {
     const { gameType, gameObject, mesh, material } = config;
@@ -122,8 +127,8 @@ class GamePhysics {
       
       case GameTypes.DEBRIS:
         // When a dynamic chunk of terrain falls asleep we need to merge it back into the environment
-        this.gameModel.reattachTerrain(gameObj);
-        gameObj.remove = true;
+        //this.gameModel.reattachTerrain(gameObj);
+        //gameObj.remove = true;
         break;
 
       default:
