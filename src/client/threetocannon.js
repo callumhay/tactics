@@ -124,23 +124,46 @@ function createBoundingBoxShape (object) {
  */
 function createConvexPolyhedron (object) {
   // Compute the 3D convex hull.
-  var hull = new ConvexHull().setFromObject(object);
-  var faces = hull.faces;
-  var vertices = [];
-  var normals = [];
+  const hull = new ConvexHull().setFromObject(new Mesh(object.geometry));
+  const vertices = [];
+  const normals = [];
+  const faces = [];
 
-  for ( var i = 0; i < faces.length; i ++ ) {
-    var face = faces[ i ];
-    var edge = face.edge;
-    do {
-      var point = edge.head().point;
-      vertices.push( new Vec3(point.x, point.y, point.z) );
-      normals.push( new Vec3(face.normal.x, face.normal.y, face.normal.z) );
-      edge = edge.next;
-    } while ( edge !== face.edge );
+  const decimalShift = Math.log10(1 / 1e-4);
+  const shiftMultiplier = Math.pow(10, decimalShift);
+  const makeValueHash = (value) => {
+    return `${~ ~(value * shiftMultiplier)}`; // ~ ~ truncates the value
+  }
+  const makeVertexHash = (vertex) => {
+    const { x, y, z } = vertex;
+    return `${makeValueHash(x)},${makeValueHash(y)},${makeValueHash(z)}`;
   }
 
-  return new ConvexPolyhedron(vertices);
+  const vertexMap = {};
+
+  for (const face of hull.faces) {
+    let edge = face.edge;
+    normals.push(new Vec3(face.normal.x, face.normal.y, face.normal.z));
+    const faceIndices = [];
+    do {
+      const point = edge.head().point;
+      const hash = makeVertexHash(point);
+      let vertexIdx = -1;
+      if (hash in vertexMap) {
+        vertexIdx = vertexMap[hash];
+      }
+      else {
+        vertexMap[hash] = vertexIdx = vertices.length;
+        vertices.push(new Vec3(point.x, point.y, point.z));
+      }
+      faceIndices.push(vertexIdx);
+      
+      edge = edge.next;
+    } while ( edge !== face.edge );
+    faces.push(faceIndices);
+  }
+
+  return new ConvexPolyhedron({vertices, faces, normals});
 }
 
 /**
@@ -255,12 +278,8 @@ function createBoundingSphereShape (object, options) {
  */
 function createTrimeshShape (geometry) {
   var vertices = getVertices(geometry);
-
-  if (!vertices.length) return null;
-
-  var indices = geometry.index.array || Object.keys(vertices).map(Number);
-
-  return new Trimesh(vertices, indices);
+  if (!vertices.length) { return null; }
+  return new Trimesh(vertices, geometry.index.array);
 }
 
 /******************************************************************************
@@ -282,8 +301,5 @@ function getGeometry (object) {
  * @return {Array<number>}
  */
 function getVertices (geometry) {
-  if (!geometry.attributes) {
-    geometry = new BufferGeometry().fromGeometry(geometry);
-  }
-  return (geometry.getAttribute('position') || {}).array || [];
+  return geometry.getAttribute('position').array;
 }

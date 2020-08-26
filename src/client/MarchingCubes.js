@@ -9,7 +9,6 @@ import { assert } from 'chai';
 class MarchingCubes {
 
   static convertTerrainColumnToTriangles(terrainColumn, nodeCubeCells) {
-    const {xIndex, zIndex, battlefield} = terrainColumn;
     const triangles = [];
     const tcBoundingBox = terrainColumn.getBoundingBox();
     for (const nodeCubeCell of nodeCubeCells) {
@@ -37,25 +36,29 @@ class MarchingCubes {
 
         if (isBoundary) {
           // Super-special cases... the triangle is on the +/-x or +/-z boundary, we need a tie-breaker:
+          // Don't include the triangle if the normal is facing inwards towards the center of the terrainColumn!
           // If the current terrain column is the first one in the list on the same axis associated with the boundary then draw it
-          const {attachedTerrainCols} = boundaryCells[0].node;
-          const xAxisTieBreaker = attachedTerrainCols.filter(tc => tc.zIndex === terrainColumn.zIndex)[0] === terrainColumn;
-          const zAxisTieBreaker = attachedTerrainCols.filter(tc => tc.xIndex === terrainColumn.xIndex)[0] === terrainColumn;
-
+          tcBoundingBox.getCenter(tempVec3);
+          // Get the vector from the triangle to the bounding box center
+          tri.getMidpoint(tempVec3a);
+          tempVec3.subVectors(tempVec3, tempVec3a);
+          tri.getNormal(tempVec3a);
+          // If the dot product is positive then the triangle is facing inward and we shouldn't draw it
+          const tieBreaker = tempVec3.dot(tempVec3a) < 0;
           if (MathUtils.approxEquals(a.x, min.x) && MathUtils.approxEquals(b.x, min.x) && MathUtils.approxEquals(c.x, min.x)) {
-            if (xAxisTieBreaker || !battlefield.getTerrainColumn(xIndex-1,zIndex)) { finalTris.push(tri); }
+            if (tieBreaker) { finalTris.push(tri); }
             else { continue; }
           }
           else if (MathUtils.approxEquals(a.x, max.x) && MathUtils.approxEquals(b.x, max.x) && MathUtils.approxEquals(c.x, max.x)) {
-            if (xAxisTieBreaker || !battlefield.getTerrainColumn(xIndex+1,zIndex)) { finalTris.push(tri); } 
+            if (tieBreaker) { finalTris.push(tri); } 
             else { continue; }
           }
           else if (MathUtils.approxEquals(a.z, min.z) && MathUtils.approxEquals(b.z, min.z) && MathUtils.approxEquals(c.z, min.z)) {
-            if (zAxisTieBreaker || !battlefield.getTerrainColumn(xIndex,zIndex-1)) { finalTris.push(tri); } 
+            if (tieBreaker) { finalTris.push(tri); } 
             else { continue; }
           } 
           else if (MathUtils.approxEquals(a.z, max.z) && MathUtils.approxEquals(b.z, max.z) && MathUtils.approxEquals(c.z, max.z)) {
-            if (zAxisTieBreaker || !battlefield.getTerrainColumn(xIndex,zIndex+1)) { finalTris.push(tri); } 
+            if (tieBreaker) { finalTris.push(tri); } 
             else {  continue; }
           }
         }
@@ -96,6 +99,7 @@ class MarchingCubes {
 export default MarchingCubes;
 
 const tempVec3 = new THREE.Vector3();
+const tempVec3a = new THREE.Vector3();
 
 const positionLessThan = (left, right) => {
   if (left.x < right.x) { return true; }

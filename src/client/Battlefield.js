@@ -10,6 +10,7 @@ import GameMaterials from './GameMaterials';
 export default class Battlefield {
   static get MAX_SIZE() { return TerrainColumn.SIZE * 200; }
   static get MAX_HEIGHT() { return TerrainColumn.SIZE * 25; }
+  static get HALF_MAX_HEIGHT() { return Battlefield.MAX_HEIGHT/2; }
 
   constructor(scene, physics) {
     this._scene = scene;

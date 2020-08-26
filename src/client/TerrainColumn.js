@@ -71,6 +71,13 @@ class TerrainColumn {
       new THREE.Vector3(this.xIndex+TerrainColumn.SIZE, Battlefield.MAX_HEIGHT, this.zIndex+TerrainColumn.SIZE)
     );
   }
+  getCenter(target) {
+    target.set(
+      this.xIndex + TerrainColumn.HALF_SIZE, 
+      Battlefield.HALF_MAX_HEIGHT, 
+      this.zIndex + TerrainColumn.HALF_SIZE
+    );
+  }
 
   regenerate() {
     this.clear();
