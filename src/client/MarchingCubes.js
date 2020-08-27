@@ -26,18 +26,16 @@ class MarchingCubes {
         const {a,b,c} = tri;
         const {min,max} = tcBoundingBox;
 
-        if (!tcBoundingBox.containsPoint(a) || !tcBoundingBox.containsPoint(b) || !tcBoundingBox.containsPoint(c)) {
-          continue;
-        }
-        if (MathUtils.approxEquals(a.y, min.y) && MathUtils.approxEquals(b.y, min.y) && MathUtils.approxEquals(c.y, min.y)) {
-          // If all the points are on the y=0 plane then get rid of the triangle
+        // If the Terrain column doesn't have one of the points in the triangle in it or all the points form
+        // a triangle on the ground plane then don't keep the triangle
+        if (!tcBoundingBox.containsPoint(a) || !tcBoundingBox.containsPoint(b) || !tcBoundingBox.containsPoint(c) ||
+            (MathUtils.approxEquals(a.y, min.y) && MathUtils.approxEquals(b.y, min.y) && MathUtils.approxEquals(c.y, min.y))) {
           continue;
         }
 
         if (isBoundary) {
           // Super-special cases... the triangle is on the +/-x or +/-z boundary, we need a tie-breaker:
           // Don't include the triangle if the normal is facing inwards towards the center of the terrainColumn!
-          // If the current terrain column is the first one in the list on the same axis associated with the boundary then draw it
           tcBoundingBox.getCenter(tempVec3);
           // Get the vector from the triangle to the bounding box center
           tri.getMidpoint(tempVec3a);
@@ -45,6 +43,7 @@ class MarchingCubes {
           tri.getNormal(tempVec3a);
           // If the dot product is positive then the triangle is facing inward and we shouldn't draw it
           const tieBreaker = tempVec3.dot(tempVec3a) < 0;
+
           if (MathUtils.approxEquals(a.x, min.x) && MathUtils.approxEquals(b.x, min.x) && MathUtils.approxEquals(c.x, min.x)) {
             if (tieBreaker) { finalTris.push(tri); }
             else { continue; }
@@ -62,6 +61,7 @@ class MarchingCubes {
             else {  continue; }
           }
         }
+
         finalTris.push(tri);
       }
       triangles.push.apply(triangles, finalTris);

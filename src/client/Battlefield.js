@@ -73,7 +73,20 @@ export default class Battlefield {
     this.clear();
     this._terrain = terrain;
 
+    // The map must be square... make sure of this
+    let maxZLength = 0;
+    for (let x = 0; x < this._terrain.length; x++) {
+      maxZLength = Math.max(maxZLength, this._terrain[x].length);
+    }
+
+
+
     // Regenerate the terrain
+    for (let x = 0; x < this._terrain.length; x++) {
+      while (this._terrain[x].length !== maxZLength) {
+        this._terrain[x].push(new TerrainColumn(this, x,this._terrain[x].length, null));
+      }
+    }
     for (let x = 0; x < this._terrain.length; x++) {
       for (let z = 0; z < this._terrain[x].length; z++) {
         this._terrain[x][z].regenerate();
@@ -130,6 +143,10 @@ export default class Battlefield {
     const regenTerrainCols = this.terrainPhysicsCleanup(false);
     for (const terrainCol of terrainCols) {
       regenTerrainCols.add(terrainCol);
+      const adjTerrainCols = this.getAdjacentTerrainColumns(terrainCol);
+      for (const adjTerrainCol of adjTerrainCols) {
+        regenTerrainCols.add(adjTerrainCol);
+      }
     }
 
     // Rebuild the geometry for all the affected TerrainColumns

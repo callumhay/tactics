@@ -81,7 +81,6 @@ class TerrainColumn {
 
   regenerate() {
     this.clear();
-    if (!this.material) { return; }
 
     const { rigidBodyLattice, terrainGroup } = this.battlefield;
     const nodeCubeCells = rigidBodyLattice.getTerrainColumnCubeCells(this);
@@ -113,7 +112,7 @@ class TerrainColumn {
     const { physics } = this.battlefield;
     const config = {
       gameObject: this,
-      material: this.material.cannon,
+      material: GameMaterials.materials[GameMaterials.MATERIAL_TYPE_ROCK].cannon, // TODO FIX THIS
       mesh: this.mesh,
     };
     this.physObject = physics.addTerrain(config);

@@ -16,18 +16,21 @@ class BattlefieldLoader {
         for (const terrainColJsonObj of terrainLineJsonObj) {
           // The terrain column may have multiple material groupings
           const {matgroups} = terrainColJsonObj;
+          let terrainColumn = null;
           if (matgroups) {
             for (const matgroup of matgroups) {
               BattlefieldLoader.verifyMaterialGroup(matgroup);
             }
+            terrainColumn = new TerrainColumn(
+              battlefield, terrain.length, terrainCols.length, (matgroups ? matgroups.filter(m => !isEmpty(m)) : [])
+            );
           }
           else {
             BattlefieldLoader.verifyMaterialGroup(terrainColJsonObj);
+            terrainColumn = new TerrainColumn(battlefield, terrain.length, terrainCols.length, [terrainColJsonObj]);
           }
 
-          const terrainColumn = new TerrainColumn(
-            battlefield, terrain.length, terrainCols.length, (matgroups ? matgroups.filter(m => !isEmpty(m)) : [])
-          );
+
           terrainCols.push(terrainColumn);
         }
         terrain.push(terrainCols);

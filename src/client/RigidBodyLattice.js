@@ -207,8 +207,8 @@ export default class RigidBodyLattice {
 
     const yOutsideNode =  yIdx < 0 ? {} : null;
 
-    const n0 = (xOutside || zOutside || zIdx >= this.nodes[xIdx].length || yOutside) ?
-    {node: yOutsideNode, pos: xyzPt} : {node: this.nodes[xIdx][zIdx][yIdx], pos: xyzPt};
+    const n0 = (xOutside || zOutside || zIdx >= this.nodes[xIdx].length || yOutside || yIdx >= this.nodes[xIdx][zIdx].length) ?
+      {node: yOutsideNode, pos: xyzPt} : {node: this.nodes[xIdx][zIdx][yIdx], pos: xyzPt};
     const n1 = (xPlus1Outside || zOutside || zIdx >= this.nodes[xPlus1].length || yOutside || yIdx >= this.nodes[xPlus1][zIdx].length) ? 
       {node: yOutsideNode, pos: x1yzPt} : {node: this.nodes[xPlus1][zIdx][yIdx], pos: x1yzPt};
     const n2 = (xPlus1Outside || zPlus1 >= this.nodes[xPlus1].length || yOutside || yIdx >= this.nodes[xPlus1][zPlus1].length) ? 
@@ -355,11 +355,16 @@ export default class RigidBodyLattice {
         if (nodeTraversalInfo.visitState === TRAVERSAL_UNVISITED_STATE) {
           node.grounded = true;
           nodeTraversalInfo.visitState = TRAVERSAL_FINISHED_STATE;
-          queue.push(...this.getNeighboursForNode(node));
+          const neighbours = this.getNeighboursForNode(node);
+          
+          // TODO: If there are no neighbours, check the corners and if the node is completely stranded then remove it.
+
+          queue.push(...neighbours);
         }
       }
     }
   }
+
   // Find islands in this lattice (i.e., isolated node regions that are not grounded),
   // optional landingRanges parameter will limit the serach to only nodes in those ranges.
   traverseIslands() {
@@ -395,14 +400,12 @@ export default class RigidBodyLattice {
     }
     
     for (const node of ungroundedNodes) {
-      if (node) {
-        const nodeTraversalInfo = traversalInfo[node.id];
-        if (nodeTraversalInfo.visitState === TRAVERSAL_UNVISITED_STATE) {
-          const islandNodes = new Set();
-          depthFirstSearch(node, islands.length, islandNodes);
-          if (islandNodes.size > 0 && !islandNodes.values().next().value.grounded) {
-            islands.push(islandNodes);
-          }
+      const nodeTraversalInfo = traversalInfo[node.id];
+      if (nodeTraversalInfo.visitState === TRAVERSAL_UNVISITED_STATE) {
+        const islandNodes = new Set();
+        depthFirstSearch(node, islands.length, islandNodes);
+        if (islandNodes.size > 0 && !islandNodes.values().next().value.grounded) {
+          islands.push(islandNodes);
         }
       }
     }
