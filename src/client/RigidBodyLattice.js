@@ -4,6 +4,8 @@ import {assert} from 'chai'
 import TerrainColumn from './TerrainColumn';
 import Debug from '../debug';
 
+const tempVec3 = new THREE.Vector3();
+
 class LatticeNode {
   constructor(id, xIdx, zIdx, yIdx, pos, terrainColumns, materials) {
     assert(xIdx >= 0, "xIdx of a LatticeNode must be at least zero.");
@@ -130,6 +132,12 @@ export default class RigidBodyLattice {
     nodePos.addScalar(this.halfUnitsBetweenNodes);
     return nodePos;
   }
+  _getNode(xIdx, zIdx, yIdx) {
+    if (this.nodes[xIdx] && this.nodes[xIdx][zIdx]) {
+      return this.nodes[xIdx][zIdx][yIdx] || null;
+    }
+    return null;
+  }
   _removeNode(xIdx, zIdx, yIdx) {
     this.nodes[xIdx][zIdx][yIdx] = null;
   }
@@ -172,26 +180,6 @@ export default class RigidBodyLattice {
     }
   }
 
-  /*
-  getNodesInTerrainColumn(terrainColumn) {
-    const {nodeXIdxStart, nodeXIdxEnd, nodeZIdxStart, nodeZIdxEnd} = this._getXZIndexRangeForTerrainColumn(terrainColumn);
-    const result = [];
-    for (let x = nodeXIdxStart; x <= nodeXIdxEnd; x++) {
-      for (let z = nodeZIdxStart; z <= nodeZIdxEnd; z++) {
-        const nodesXZ = this.nodes[x][z];
-        for (let y = 0; y < nodesXZ.length; y++) {
-          const node = nodesXZ[y];
-          if (node) { 
-            assert(node.hasTerrainColumn(terrainColumn));
-            result.push(node);
-          }
-        }
-      }
-    }
-    return result;
-  }
-  */
-
   _getNodeCubePositions(xIdx, yIdx, zIdx) {
     return {
       xyzPt    : this._nodeIndexToPosition(xIdx,yIdx,zIdx),
@@ -204,35 +192,38 @@ export default class RigidBodyLattice {
       xy1z1Pt  : this._nodeIndexToPosition(xIdx,yIdx+1,zIdx+1),
     };
   }
-  _makeNodeCubeCell(xIdx, yIdx, zIdx) {
-    const {xyzPt, x1yzPt, x1yz1Pt, xyz1Pt, xy1zPt, x1y1zPt, x1y1z1Pt, xy1z1Pt} = this._getNodeCubePositions(xIdx,yIdx,zIdx);
-    const xPlus1 = xIdx+1, yPlus1 = yIdx+1, zPlus1 = zIdx+1;
 
-    const xOutside = (xIdx < 0 || xIdx >= this.nodes.length);
-    const xPlus1Outside = (xPlus1 >= this.nodes.length);
+  static _makeNodeCubeCellFromNodeArray(xIdx, yIdx, zIdx, nodeArray, positionFunc) {
+    const {xyzPt, x1yzPt, x1yz1Pt, xyz1Pt, xy1zPt, x1y1zPt, x1y1z1Pt, xy1z1Pt} = positionFunc(xIdx,yIdx,zIdx);
+    const xPlus1 = xIdx+1, yPlus1 = yIdx+1, zPlus1 = zIdx+1;
+    const xOutside = (xIdx < 0 || xIdx >= nodeArray.length);
+    const xPlus1Outside = (xPlus1 >= nodeArray.length);
     const zOutside = (zIdx < 0);
     const yOutside = (yIdx < 0);
 
-    
-    const n4 = (xOutside || zOutside || zIdx >= this.nodes[xIdx].length || yPlus1 >= this.nodes[xIdx][zIdx].length) ? 
-      {node: null, pos: xy1zPt} : {node: this.nodes[xIdx][zIdx][yPlus1], pos: xy1zPt};
-    const n5 = (xPlus1Outside || zOutside || zIdx >= this.nodes[xPlus1].length || yPlus1 >= this.nodes[xPlus1][zIdx].length) ? 
-      {node: null, pos: x1y1zPt} : {node: this.nodes[xPlus1][zIdx][yPlus1], pos: x1y1zPt};
-    const n6 = (xPlus1Outside || zPlus1 >= this.nodes[xPlus1].length || yPlus1 >= this.nodes[xPlus1][zPlus1].length) ? 
-      {node: null, pos: x1y1z1Pt} : {node: this.nodes[xPlus1][zPlus1][yPlus1], pos: x1y1z1Pt};
-    const n7 = (xOutside || zPlus1 >= this.nodes[xIdx].length || yPlus1 >= this.nodes[xIdx][zPlus1].length) ? 
-      {node: null, pos: xy1z1Pt} : {node: this.nodes[xIdx][zPlus1][yPlus1], pos: xy1z1Pt};
+    const n4 = (xOutside || zOutside || zIdx >= nodeArray[xIdx].length || yPlus1 >= nodeArray[xIdx][zIdx].length) ? 
+      {node: null, pos: xy1zPt} : {node: nodeArray[xIdx][zIdx][yPlus1], pos: xy1zPt};
+    const n5 = (xPlus1Outside || zOutside || zIdx >= nodeArray[xPlus1].length || yPlus1 >= nodeArray[xPlus1][zIdx].length) ? 
+      {node: null, pos: x1y1zPt} : {node: nodeArray[xPlus1][zIdx][yPlus1], pos: x1y1zPt};
+    const n6 = (xPlus1Outside || zPlus1 >= nodeArray[xPlus1].length || yPlus1 >= nodeArray[xPlus1][zPlus1].length) ? 
+      {node: null, pos: x1y1z1Pt} : {node: nodeArray[xPlus1][zPlus1][yPlus1], pos: x1y1z1Pt};
+    const n7 = (xOutside || zPlus1 >= nodeArray[xIdx].length || yPlus1 >= nodeArray[xIdx][zPlus1].length) ? 
+      {node: null, pos: xy1z1Pt} : {node: nodeArray[xIdx][zPlus1][yPlus1], pos: xy1z1Pt};
 
-    const n0 = yOutside ? {...n4, pos: xyzPt} : (xOutside || zOutside || zIdx >= this.nodes[xIdx].length || yOutside || yIdx >= this.nodes[xIdx][zIdx].length) ?
-      { node: null, pos: xyzPt } : { node: this.nodes[xIdx][zIdx][yIdx], pos: xyzPt };
-    const n1 = yOutside ? {...n5, pos: x1yzPt} : (xPlus1Outside || zOutside || zIdx >= this.nodes[xPlus1].length || yOutside || yIdx >= this.nodes[xPlus1][zIdx].length) ?
-      { node: null, pos: x1yzPt } : { node: this.nodes[xPlus1][zIdx][yIdx], pos: x1yzPt };
-    const n2 = yOutside ? {...n6, pos: x1yz1Pt} : (xPlus1Outside || zPlus1 >= this.nodes[xPlus1].length || yOutside || yIdx >= this.nodes[xPlus1][zPlus1].length) ?
-      { node: null, pos: x1yz1Pt } : { node: this.nodes[xPlus1][zPlus1][yIdx], pos: x1yz1Pt };
-    const n3 = yOutside ? {...n7, pos: xyz1Pt} : (xOutside || zPlus1 >= this.nodes[xIdx].length || yOutside || yIdx >= this.nodes[xIdx][zPlus1].length) ?
-      { node: null, pos: xyz1Pt } : { node: this.nodes[xIdx][zPlus1][yIdx], pos: xyz1Pt };
+    const n0 = yOutside ? {...n4, pos: xyzPt} : (xOutside || zOutside || zIdx >= nodeArray[xIdx].length || yOutside || yIdx >= nodeArray[xIdx][zIdx].length) ?
+      { node: null, pos: xyzPt } : { node: nodeArray[xIdx][zIdx][yIdx], pos: xyzPt };
+    const n1 = yOutside ? {...n5, pos: x1yzPt} : (xPlus1Outside || zOutside || zIdx >= nodeArray[xPlus1].length || yOutside || yIdx >= nodeArray[xPlus1][zIdx].length) ?
+      { node: null, pos: x1yzPt } : { node: nodeArray[xPlus1][zIdx][yIdx], pos: x1yzPt };
+    const n2 = yOutside ? {...n6, pos: x1yz1Pt} : (xPlus1Outside || zPlus1 >= nodeArray[xPlus1].length || yOutside || yIdx >= nodeArray[xPlus1][zPlus1].length) ?
+      { node: null, pos: x1yz1Pt } : { node: nodeArray[xPlus1][zPlus1][yIdx], pos: x1yz1Pt };
+    const n3 = yOutside ? {...n7, pos: xyz1Pt} : (xOutside || zPlus1 >= nodeArray[xIdx].length || yOutside || yIdx >= nodeArray[xIdx][zPlus1].length) ?
+      { node: null, pos: xyz1Pt } : { node: nodeArray[xIdx][zPlus1][yIdx], pos: xyz1Pt };
 
     return [n0,n1,n2,n3,n4,n5,n6,n7];
+  }
+
+  _makeNodeCubeCell(xIdx, yIdx, zIdx) {
+    return RigidBodyLattice._makeNodeCubeCellFromNodeArray(xIdx, yIdx, zIdx, this.nodes, this._getNodeCubePositions.bind(this));
   }
 
   getTerrainColumnCubeCells(terrainColumn) {
@@ -250,11 +241,8 @@ export default class RigidBodyLattice {
 
     // We form cube cells for everything inside the terrain column
     for (let x = nodeXIdxStart-1; x <= nodeXIdxEnd; x++) {
-      let isXBoundary = (x === nodeXIdxStart || x === nodeXIdxEnd);
       for (let z = nodeZIdxStart-1; z <= nodeZIdxEnd; z++) {
-        const isBoundary = (z === nodeZIdxStart || z === nodeZIdxEnd) || isXBoundary;
         for (let y = -1; y <= maxYIdx; y++) {
-
           cubeCells.push(this._makeNodeCubeCell(x,y,z));
         }
       }
@@ -262,30 +250,59 @@ export default class RigidBodyLattice {
     return cubeCells;
   }
 
-  getNodeCubeCells(nodes) {
+  getNodeIslandCubeCells(nodes) {
     const cubeCells = [];
-    const positionsWithCubeCells = {};
 
-    const positionHash = (x,y,z) => { return `${x},${y},${z}`; };
-    // There are a total of 27 points to consider for each node: all the surrounding nodes and the center node
-    const sampleIndices = [
-      [-1, -1, -1], [-1, -1, 0], [-1, -1, 1], [-1, 0, -1], [-1, 0, 0 ], [-1, 0, 1 ], [-1, 1, -1 ], [-1, 1, 0 ], [-1, 1, 1 ],
-      [0, -1, -1],  [ 0, -1, 0 ], [ 0, -1, 1 ], [ 0, 0, -1 ], [ 0, 0, 0 ], [ 0, 0, 1 ], [ 0, 1, -1 ], [ 0, 1, 0 ], [ 0, 1, 1 ], 
-      [ 1, -1, -1 ], [ 1, -1, 0 ], [ 1, -1, 1 ], [ 1, 0, -1 ], [ 1, 0, 0 ], [ 1, 0, 1 ], [ 1, 1, -1 ], [ 1, 1, 0 ], [ 1, 1, 1 ]
-    ];
-
+    // Find the index bounding box that includes all the given nodes
+    const bbMin = new THREE.Vector3(Infinity, Infinity, Infinity);
+    const bbMax = new THREE.Vector3(-Infinity, -Infinity, -Infinity);
     for (const node of nodes) {
-      assert(node !== null, "Nodes given to getNodeCubeCells should not be null.");
+      const {xIdx, yIdx, zIdx} = node;
+      tempVec3.set(xIdx,yIdx,zIdx);
+      bbMin.min(tempVec3);
+      bbMax.max(tempVec3);
+    }
+    
+    // Make the box wider on each side by 1 (so that we capture the cubes making up the outer surface)
+    tempVec3.set(1,1,1);
+    bbMin.sub(tempVec3);
+    bbMax.add(tempVec3);
+
+    // Create a new, isolated array of nodes with its own local index space at the origin
+    // and a mapping of -bbMin to get from this.nodes space to it
+    const nodeBoundingBox = new THREE.Box3(bbMin, bbMax);
+    nodeBoundingBox.getSize(tempVec3);
+
+    const isolatedNodes = new Array(tempVec3.x).fill(null);
+    for (let x = 0; x < isolatedNodes.length; x++) {
+      const zNodes = new Array(tempVec3.z).fill(null);
+      isolatedNodes[x] = zNodes;
+      for (let z = 0; z < zNodes.length; z++) {
+        const yNodes = new Array(tempVec3.y).fill(null);
+        isolatedNodes[x][z] = yNodes;
+      }
+    }
+    // Map each of the nodes into the isolatedNodes array
+    for (const node of nodes) {
       const {xIdx, zIdx, yIdx} = node;
-      for (const indexInc of sampleIndices) {
-        const currXIdx = xIdx + indexInc[0], currYIdx = yIdx + indexInc[1], currZIdx = zIdx + indexInc[2];
-        const hash = positionHash(currXIdx, currYIdx, currZIdx);
-        if (!positionsWithCubeCells[hash]) {
-          cubeCells.push(this._makeNodeCubeCell(currXIdx, currYIdx, currZIdx));
-          positionsWithCubeCells[hash] = true;
+      isolatedNodes[xIdx-bbMin.x][zIdx-bbMin.z][yIdx-bbMin.y] = node;
+    }
+
+    const isolatedNodePositionFunc = ((xIdx, yIdx, zIdx) => {
+      return this._getNodeCubePositions(xIdx+bbMin.x, yIdx+bbMin.y, zIdx+bbMin.z);
+    }).bind(this);
+
+    // We can now use the isolated nodes array to generate all our cube cells
+    for (let x = 0; x < isolatedNodes.length; x++) {
+      const zNodes = isolatedNodes[x];
+      for (let z = 0; z < zNodes.length; z++) {
+        const yNodes = zNodes[z];
+        for (let y = 0; y < yNodes.length; y++) {
+          cubeCells.push(RigidBodyLattice._makeNodeCubeCellFromNodeArray(x, y, z, isolatedNodes, isolatedNodePositionFunc));
         }
       }
     }
+
     return cubeCells;
   }
 
@@ -393,7 +410,6 @@ export default class RigidBodyLattice {
         const {xIdx, zIdx, yIdx} = node;
         delete traversalInfo[node.id];
         this._removeNode(xIdx, zIdx, yIdx);
-        return;
       }
       else {
         const nodeTraversalInfo = traversalInfo[node.id];

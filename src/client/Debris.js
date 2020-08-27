@@ -57,7 +57,7 @@ class Debris {
     // TODO: 
     // 1. Group the geometry by material
     // 2. Create separate rigid bodies with different materials??
-    const nodeCubeCells = rigidBodyLattice.getNodeCubeCells(nodes);
+    const nodeCubeCells = rigidBodyLattice.getNodeIslandCubeCells(nodes);
     const triangles = [];
     for (const nodeCubeCell of nodeCubeCells) {
       MarchingCubes.polygonizeNodeCubeCell(nodeCubeCell, triangles);
