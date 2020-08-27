@@ -27,7 +27,7 @@ export default class Battlefield {
 
     const skyColor = 0xB1E1FF;  // light blue
     const groundColor = 0xB97A20;  // brownish orange
-    this.skyLight = new THREE.HemisphereLight(skyColor, groundColor, 0.5);
+    this.skyLight = new THREE.HemisphereLight(skyColor, groundColor, 0.3);
     this._scene.add(this.skyLight);
 
     this.fillLight = new THREE.PointLight(0xffffff, 0.5);

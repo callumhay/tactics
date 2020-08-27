@@ -96,7 +96,7 @@ class TerrainColumn {
 
     const debugColour = this.debugColour();
     debugColour.setRGB(debugColour.b, debugColour.g, debugColour.r).multiplyScalar(0.25);
-    const material = new MeshLambertMaterial({emissive:debugColour});
+    const material = new MeshLambertMaterial({color:0xcccccc});//{emissive:debugColour});
 
     this.mesh = new THREE.Mesh(geometry, material); //this.material.three);
     this.mesh.castShadow = true;

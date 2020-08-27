@@ -357,7 +357,7 @@ export default class RigidBodyLattice {
           nodeTraversalInfo.visitState = TRAVERSAL_FINISHED_STATE;
           const neighbours = this.getNeighboursForNode(node);
           
-          // TODO: If there are no neighbours, check the corners and if the node is completely stranded then remove it.
+          // TODO: If there are no neighbours, then the node is stranded and it should be removed.
 
           queue.push(...neighbours);
         }
@@ -372,12 +372,14 @@ export default class RigidBodyLattice {
     const islands = [];
 
     const depthFirstSearch = (node, islandNum, islandNodes) => {
+      const neighbours = this.getNeighboursForNode(node);
+      // TODO: If there are no neighbours, then the node is stranded and it should be removed.
+
       const nodeTraversalInfo = traversalInfo[node.id];
       nodeTraversalInfo.islandNum = islandNum;
       nodeTraversalInfo.visitState = TRAVERSAL_FINISHED_STATE;
       islandNodes.add(node);
 
-      const neighbours = this.getNeighboursForNode(node);
       for (const neighbour of neighbours) {
         if (neighbour && traversalInfo[neighbour.id] && traversalInfo[neighbour.id].visitState === TRAVERSAL_UNVISITED_STATE) {
           depthFirstSearch(neighbour, islandNodes, islandNodes);
