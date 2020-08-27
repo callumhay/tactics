@@ -64,9 +64,11 @@ const TRAVERSAL_UNVISITED_STATE     = 1;
 const TRAVERSAL_FINISHED_STATE      = 2;
 
 export default class RigidBodyLattice {
+  static get DEFAULT_UNITS_BETWEEN_NODES() { return 5; }
+  
   constructor(terrainGroup) {
     this.terrainGroup = terrainGroup;
-    this.numNodesPerUnit = 5;
+    this.numNodesPerUnit = RigidBodyLattice.DEFAULT_UNITS_BETWEEN_NODES;
     this.clear();
   }
 
@@ -352,14 +354,20 @@ export default class RigidBodyLattice {
       const node = queue.shift();
       if (node) {
         const nodeTraversalInfo = traversalInfo[node.id];
-        if (nodeTraversalInfo.visitState === TRAVERSAL_UNVISITED_STATE) {
+        if (nodeTraversalInfo && nodeTraversalInfo.visitState === TRAVERSAL_UNVISITED_STATE) {
           node.grounded = true;
           nodeTraversalInfo.visitState = TRAVERSAL_FINISHED_STATE;
-          const neighbours = this.getNeighboursForNode(node);
+          const neighbours = this.getNeighboursForNode(node).filter(n => n !== null);
           
-          // TODO: If there are no neighbours, then the node is stranded and it should be removed.
-
-          queue.push(...neighbours);
+          // If there are almost no neighbours, then the node is stranded and it should be removed.
+          if (neighbours.length <= 2) {
+            const {xIdx, zIdx, yIdx} = node;
+            delete traversalInfo[node.id];
+            this._removeNode(xIdx, zIdx, yIdx);
+          }
+          else {
+            queue.push(...neighbours);
+          }
         }
       }
     }
@@ -372,8 +380,15 @@ export default class RigidBodyLattice {
     const islands = [];
 
     const depthFirstSearch = (node, islandNum, islandNodes) => {
-      const neighbours = this.getNeighboursForNode(node);
-      // TODO: If there are no neighbours, then the node is stranded and it should be removed.
+      const neighbours = this.getNeighboursForNode(node).filter(n => n !== null);
+      
+      // If there are too few neighbours, then the node is stranded and it should be removed.
+      if (neighbours.length <= 2) {
+        const {xIdx, zIdx, yIdx} = node;
+        delete traversalInfo[node.id];
+        this._removeNode(xIdx, zIdx, yIdx);
+        return;
+      }
 
       const nodeTraversalInfo = traversalInfo[node.id];
       nodeTraversalInfo.islandNum = islandNum;
@@ -381,7 +396,7 @@ export default class RigidBodyLattice {
       islandNodes.add(node);
 
       for (const neighbour of neighbours) {
-        if (neighbour && traversalInfo[neighbour.id] && traversalInfo[neighbour.id].visitState === TRAVERSAL_UNVISITED_STATE) {
+        if (traversalInfo[neighbour.id] && traversalInfo[neighbour.id].visitState === TRAVERSAL_UNVISITED_STATE) {
           depthFirstSearch(neighbour, islandNodes, islandNodes);
         }
       }
@@ -403,7 +418,7 @@ export default class RigidBodyLattice {
     
     for (const node of ungroundedNodes) {
       const nodeTraversalInfo = traversalInfo[node.id];
-      if (nodeTraversalInfo.visitState === TRAVERSAL_UNVISITED_STATE) {
+      if (nodeTraversalInfo && nodeTraversalInfo.visitState === TRAVERSAL_UNVISITED_STATE) {
         const islandNodes = new Set();
         depthFirstSearch(node, islands.length, islandNodes);
         if (islandNodes.size > 0 && !islandNodes.values().next().value.grounded) {

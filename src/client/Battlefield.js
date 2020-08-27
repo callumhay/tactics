@@ -189,7 +189,7 @@ export default class Battlefield {
   terrainPhysicsCleanup(regenerateColumns=true) {
     const { rigidBodyLattice, terrainGroup, physics, debris} = this;
     rigidBodyLattice.traverseGroundedNodes();
-    const islands = rigidBodyLattice.traverseIslands();
+    let islands = rigidBodyLattice.traverseIslands();
 
     // Build debris for each island and find all the terrain columns associated with each island
     let terrainColumnSet = new Set();
@@ -207,6 +207,10 @@ export default class Battlefield {
     for (const nodeSet of islands) {
       rigidBodyLattice.removeNodes(nodeSet);
     }
+
+    // If the node set is less than 4 points then we ignore it - you can't compute
+    // a proper convex hull from it... also the geometry would be insignificant, regardless
+    islands = islands.filter(nodeSet => nodeSet.count >= 4);
 
     // The terrain columns that we need to regenerate need to include all 
     // adjacent terrain columns to the ones effected

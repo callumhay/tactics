@@ -28,6 +28,50 @@ class MarchingCubes {
 
         // If the Terrain column doesn't have one of the points in the triangle in it or all the points form
         // a triangle on the ground plane then don't keep the triangle
+        /*
+        // Cut the triangle at the boundaries and keep the portion that's inside the TerrainColumns bounds
+        const containsA = tcBoundingBox.containsPoint(a),
+          containsB = tcBoundingBox.containsPoint(b),
+          containsC = tcBoundingBox.containsPoint(c);
+
+        if (!containsA || !containsB || !containsC) {
+          if (containsA) {
+            if (containsB) {
+              // a and b are inside the bounding box, c is outside
+              const ac = new THREE.Line3(a,c);
+              const bc = new THREE.Line3(b,c);
+            }
+            else {
+              if (containsC) {
+                // a and c are inside the box, b is outside
+                const ab = new THREE.Line3(a,b);
+                const cb = new THREE.Line3(c,b);
+
+              }
+              else {
+                // a is inside the box, b and c are outside
+                const ac = new THREE.Line3(a,c);
+                const ab = new THREE.Line3(a,b);
+              }
+            }
+          }
+          else if (containsB) {
+            if (containsC) {
+              // b and c are inside the box, a is outside
+            }
+            else {
+              // b is inside the box, a and c are outside 
+            }
+          }
+          else if (containsC) {
+            // c is inside the box, a and b are outside
+          }
+          else {
+            // All the points are outside the box
+            continue;
+          }
+        }
+        */
         if (!tcBoundingBox.containsPoint(a) || !tcBoundingBox.containsPoint(b) || !tcBoundingBox.containsPoint(c) ||
             (MathUtils.approxEquals(a.y, min.y) && MathUtils.approxEquals(b.y, min.y) && MathUtils.approxEquals(c.y, min.y))) {
           continue;
@@ -116,7 +160,7 @@ const interpolateVertex = (nodeObj1, nodeObj2) => {
     n2 = nodeObj1;
   }
 
-  const isoVal = 0;
+  const isoVal = 0; //0.5;
   const n1Val = n1.node ? 0 : 1;
   const n2Val = n2.node ? 0 : 1;
   const point = new THREE.Vector3(n1.pos.x, n1.pos.y, n1.pos.z);
