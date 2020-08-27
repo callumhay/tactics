@@ -102,7 +102,7 @@ const render = function () {
   controls.update();
 
 
-  cannonDebugRenderer.update();
+  //cannonDebugRenderer.update();
 
   // Render the scene
   renderer.clear();

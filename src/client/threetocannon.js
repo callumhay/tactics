@@ -124,7 +124,17 @@ function createBoundingBoxShape (object) {
  */
 function createConvexPolyhedron (object) {
   // Compute the 3D convex hull.
-  const hull = new ConvexHull().setFromObject(new Mesh(object.geometry));
+  let hull = null;
+  try {
+    hull = new ConvexHull().setFromObject(new Mesh(object.geometry));
+  }
+  catch (err) {
+    console.log("Invalid convex hull geometry, discarding.");
+  }
+  if (hull === null || hull.vertices.length === 0 || hull.faces.length === 0) {
+    return null;
+  }
+
   const vertices = [];
   const normals = [];
   const faces = [];

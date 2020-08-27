@@ -3,109 +3,22 @@ import * as THREE from 'three';
 import MathUtils from '../MathUtils';
 import { assert } from 'chai';
 
-
-
-
 class MarchingCubes {
 
   static convertTerrainColumnToTriangles(terrainColumn, nodeCubeCells) {
     const triangles = [];
     const tcBoundingBox = terrainColumn.getBoundingBox();
     for (const nodeCubeCell of nodeCubeCells) {
-      // Is the current cell at a boundary (is there a node within the cell that has an attached terrain column that's not the current one?)
-      const boundaryCells = nodeCubeCell.filter(cell => {
-        return cell.node !== null && cell.node.attachedTerrainCols && 
-          cell.node.attachedTerrainCols.filter(tc => tc !== terrainColumn).length > 0;
-      });
-      const isBoundary = boundaryCells.length > 0;
       const currTris = [];
       MarchingCubes.polygonizeNodeCubeCell(nodeCubeCell, currTris);
 
       const finalTris = [];
       for (const tri of currTris) {
         const {a,b,c} = tri;
-        const {min,max} = tcBoundingBox;
-
-        // If the Terrain column doesn't have one of the points in the triangle in it or all the points form
-        // a triangle on the ground plane then don't keep the triangle
-        /*
-        // Cut the triangle at the boundaries and keep the portion that's inside the TerrainColumns bounds
-        const containsA = tcBoundingBox.containsPoint(a),
-          containsB = tcBoundingBox.containsPoint(b),
-          containsC = tcBoundingBox.containsPoint(c);
-
-        if (!containsA || !containsB || !containsC) {
-          if (containsA) {
-            if (containsB) {
-              // a and b are inside the bounding box, c is outside
-              const ac = new THREE.Line3(a,c);
-              const bc = new THREE.Line3(b,c);
-            }
-            else {
-              if (containsC) {
-                // a and c are inside the box, b is outside
-                const ab = new THREE.Line3(a,b);
-                const cb = new THREE.Line3(c,b);
-
-              }
-              else {
-                // a is inside the box, b and c are outside
-                const ac = new THREE.Line3(a,c);
-                const ab = new THREE.Line3(a,b);
-              }
-            }
-          }
-          else if (containsB) {
-            if (containsC) {
-              // b and c are inside the box, a is outside
-            }
-            else {
-              // b is inside the box, a and c are outside 
-            }
-          }
-          else if (containsC) {
-            // c is inside the box, a and b are outside
-          }
-          else {
-            // All the points are outside the box
-            continue;
-          }
-        }
-        */
-        if (!tcBoundingBox.containsPoint(a) || !tcBoundingBox.containsPoint(b) || !tcBoundingBox.containsPoint(c) ||
-            (MathUtils.approxEquals(a.y, min.y) && MathUtils.approxEquals(b.y, min.y) && MathUtils.approxEquals(c.y, min.y))) {
+        const {min} = tcBoundingBox;
+        if ((MathUtils.approxEquals(a.y, min.y) && MathUtils.approxEquals(b.y, min.y) && MathUtils.approxEquals(c.y, min.y))) {
           continue;
         }
-
-        if (isBoundary) {
-          // Super-special cases... the triangle is on the +/-x or +/-z boundary, we need a tie-breaker:
-          // Don't include the triangle if the normal is facing inwards towards the center of the terrainColumn!
-          tcBoundingBox.getCenter(tempVec3);
-          // Get the vector from the triangle to the bounding box center
-          tri.getMidpoint(tempVec3a);
-          tempVec3.subVectors(tempVec3, tempVec3a);
-          tri.getNormal(tempVec3a);
-          // If the dot product is positive then the triangle is facing inward and we shouldn't draw it
-          const tieBreaker = tempVec3.dot(tempVec3a) < 0;
-
-          if (MathUtils.approxEquals(a.x, min.x) && MathUtils.approxEquals(b.x, min.x) && MathUtils.approxEquals(c.x, min.x)) {
-            if (tieBreaker) { finalTris.push(tri); }
-            else { continue; }
-          }
-          else if (MathUtils.approxEquals(a.x, max.x) && MathUtils.approxEquals(b.x, max.x) && MathUtils.approxEquals(c.x, max.x)) {
-            if (tieBreaker) { finalTris.push(tri); } 
-            else { continue; }
-          }
-          else if (MathUtils.approxEquals(a.z, min.z) && MathUtils.approxEquals(b.z, min.z) && MathUtils.approxEquals(c.z, min.z)) {
-            if (tieBreaker) { finalTris.push(tri); } 
-            else { continue; }
-          } 
-          else if (MathUtils.approxEquals(a.z, max.z) && MathUtils.approxEquals(b.z, max.z) && MathUtils.approxEquals(c.z, max.z)) {
-            if (tieBreaker) { finalTris.push(tri); } 
-            else {  continue; }
-          }
-        }
-
         finalTris.push(tri);
       }
       triangles.push.apply(triangles, finalTris);
@@ -160,7 +73,7 @@ const interpolateVertex = (nodeObj1, nodeObj2) => {
     n2 = nodeObj1;
   }
 
-  const isoVal = 0; //0.5;
+  const isoVal = .5;
   const n1Val = n1.node ? 0 : 1;
   const n2Val = n2.node ? 0 : 1;
   const point = new THREE.Vector3(n1.pos.x, n1.pos.y, n1.pos.z);

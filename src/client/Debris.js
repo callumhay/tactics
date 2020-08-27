@@ -28,6 +28,10 @@ class Debris {
       console.warn("A physics object has already been added for this debris!");
       return;
     }
+    if (!this.mesh) {
+      console.warn("Trying to make a physics object out of a null mesh.");
+      return;
+    }
 
     const physicsConfig = {
       gameObject: this,
@@ -36,6 +40,7 @@ class Debris {
       density: this.density,
     };
     this.physicsObj = physics.addDebris(physicsConfig);
+    return this.physicsObj;
   }
 
   _regenerate(rigidBodyLattice, nodes) {
@@ -60,6 +65,12 @@ class Debris {
 
     // Create the debris geometry, center it (so that we can do physics stuff cleanly) and move the translation over to the mesh
     const geometry = GeometryUtils.buildBufferGeometryFromTris(triangles);
+    // If there isn't enough geometry in this object to make a convex shape then
+    // this isn't going to be valid, exit now and leave the geometry/mesh null
+    if (geometry.getAttribute('position').count < 4) {
+      return;
+    }
+
     geometry.computeBoundingBox();
     const {boundingBox} = geometry;
     boundingBox.getCenter(tempVec3);
@@ -70,7 +81,6 @@ class Debris {
     this.mesh.translateY(tempVec3.y);
     this.mesh.translateZ(tempVec3.z);
     this.mesh.updateMatrixWorld();
-
 
     this.mesh.castShadow = true;
     this.mesh.receiveShadow = false;

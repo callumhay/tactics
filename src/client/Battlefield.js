@@ -195,8 +195,12 @@ export default class Battlefield {
     let terrainColumnSet = new Set();
     for (const islandNodeSet of islands) {
       const debrisObj = new Debris(terrainGroup, rigidBodyLattice, islandNodeSet);
-      debris.push(debrisObj);
-      debrisObj.addPhysics(physics);
+      if (debrisObj.mesh !== null) {
+        const physObj = debrisObj.addPhysics(physics);
+        if (physObj) {
+          debris.push(debrisObj);
+        }
+      }
 
       for (const node of islandNodeSet) {
         terrainColumnSet = new Set([...terrainColumnSet, ...node.attachedTerrainCols]);

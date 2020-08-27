@@ -64,16 +64,21 @@ const TRAVERSAL_UNVISITED_STATE     = 1;
 const TRAVERSAL_FINISHED_STATE      = 2;
 
 export default class RigidBodyLattice {
-  static get DEFAULT_UNITS_BETWEEN_NODES() { return 5; }
-  
+  static get DEFAULT_NUM_NODES_PER_UNIT() { return 5; }
+
   constructor(terrainGroup) {
     this.terrainGroup = terrainGroup;
-    this.numNodesPerUnit = RigidBodyLattice.DEFAULT_UNITS_BETWEEN_NODES;
     this.clear();
   }
 
+  get numNodesPerUnit() {
+    return RigidBodyLattice.DEFAULT_NUM_NODES_PER_UNIT;
+  }
   get unitsBetweenNodes() {
-    return TerrainColumn.SIZE / (this.numNodesPerUnit-1);
+    return TerrainColumn.SIZE / this.numNodesPerUnit;
+  }
+  get halfUnitsBetweenNodes() {
+    return this.unitsBetweenNodes / 2;
   }
 
   clear() {
@@ -107,8 +112,8 @@ export default class RigidBodyLattice {
   _getXZIndexRangeForTerrainColumn(terrainColumn) {
     const { xIndex, zIndex } = terrainColumn;
     const numNodesPerUnitMinusOne = (this.numNodesPerUnit - 1);
-    const nodeXIdxStart = xIndex * numNodesPerUnitMinusOne;
-    const nodeZIdxStart = zIndex * numNodesPerUnitMinusOne;
+    const nodeXIdxStart = this._unitsToNodeIndex(xIndex * TerrainColumn.SIZE);
+    const nodeZIdxStart = this._unitsToNodeIndex(zIndex * TerrainColumn.SIZE);
     return {
       nodeXIdxStart,
       nodeXIdxEnd: nodeXIdxStart + numNodesPerUnitMinusOne,
@@ -117,11 +122,12 @@ export default class RigidBodyLattice {
     };
   }
   _unitsToNodeIndex(unitVal) {
-    return Math.floor(unitVal * (this.numNodesPerUnit - 1));
+    return Math.floor(unitVal * this.numNodesPerUnit);
   }
   _nodeIndexToPosition(xIdx, yIdx, zIdx) {
     const nodePos = new THREE.Vector3(xIdx,yIdx,zIdx);
     nodePos.multiplyScalar(this.unitsBetweenNodes);
+    nodePos.addScalar(this.halfUnitsBetweenNodes);
     return nodePos;
   }
   _removeNode(xIdx, zIdx, yIdx) {
@@ -207,16 +213,7 @@ export default class RigidBodyLattice {
     const zOutside = (zIdx < 0);
     const yOutside = (yIdx < 0);
 
-    const yOutsideNode =  yIdx < 0 ? {} : null;
-
-    const n0 = (xOutside || zOutside || zIdx >= this.nodes[xIdx].length || yOutside || yIdx >= this.nodes[xIdx][zIdx].length) ?
-      {node: yOutsideNode, pos: xyzPt} : {node: this.nodes[xIdx][zIdx][yIdx], pos: xyzPt};
-    const n1 = (xPlus1Outside || zOutside || zIdx >= this.nodes[xPlus1].length || yOutside || yIdx >= this.nodes[xPlus1][zIdx].length) ? 
-      {node: yOutsideNode, pos: x1yzPt} : {node: this.nodes[xPlus1][zIdx][yIdx], pos: x1yzPt};
-    const n2 = (xPlus1Outside || zPlus1 >= this.nodes[xPlus1].length || yOutside || yIdx >= this.nodes[xPlus1][zPlus1].length) ? 
-      {node: yOutsideNode, pos: x1yz1Pt} : {node: this.nodes[xPlus1][zPlus1][yIdx], pos: x1yz1Pt};
-    const n3 = (xOutside || zPlus1 >= this.nodes[xIdx].length || yOutside || yIdx >= this.nodes[xIdx][zPlus1].length) ? 
-      {node: yOutsideNode, pos: xyz1Pt} : {node: this.nodes[xIdx][zPlus1][yIdx], pos: xyz1Pt};
+    
     const n4 = (xOutside || zOutside || zIdx >= this.nodes[xIdx].length || yPlus1 >= this.nodes[xIdx][zIdx].length) ? 
       {node: null, pos: xy1zPt} : {node: this.nodes[xIdx][zIdx][yPlus1], pos: xy1zPt};
     const n5 = (xPlus1Outside || zOutside || zIdx >= this.nodes[xPlus1].length || yPlus1 >= this.nodes[xPlus1][zIdx].length) ? 
@@ -225,6 +222,15 @@ export default class RigidBodyLattice {
       {node: null, pos: x1y1z1Pt} : {node: this.nodes[xPlus1][zPlus1][yPlus1], pos: x1y1z1Pt};
     const n7 = (xOutside || zPlus1 >= this.nodes[xIdx].length || yPlus1 >= this.nodes[xIdx][zPlus1].length) ? 
       {node: null, pos: xy1z1Pt} : {node: this.nodes[xIdx][zPlus1][yPlus1], pos: xy1z1Pt};
+
+    const n0 = yOutside ? {...n4, pos: xyzPt} : (xOutside || zOutside || zIdx >= this.nodes[xIdx].length || yOutside || yIdx >= this.nodes[xIdx][zIdx].length) ?
+      { node: null, pos: xyzPt } : { node: this.nodes[xIdx][zIdx][yIdx], pos: xyzPt };
+    const n1 = yOutside ? {...n5, pos: x1yzPt} : (xPlus1Outside || zOutside || zIdx >= this.nodes[xPlus1].length || yOutside || yIdx >= this.nodes[xPlus1][zIdx].length) ?
+      { node: null, pos: x1yzPt } : { node: this.nodes[xPlus1][zIdx][yIdx], pos: x1yzPt };
+    const n2 = yOutside ? {...n6, pos: x1yz1Pt} : (xPlus1Outside || zPlus1 >= this.nodes[xPlus1].length || yOutside || yIdx >= this.nodes[xPlus1][zPlus1].length) ?
+      { node: null, pos: x1yz1Pt } : { node: this.nodes[xPlus1][zPlus1][yIdx], pos: x1yz1Pt };
+    const n3 = yOutside ? {...n7, pos: xyz1Pt} : (xOutside || zPlus1 >= this.nodes[xIdx].length || yOutside || yIdx >= this.nodes[xIdx][zPlus1].length) ?
+      { node: null, pos: xyz1Pt } : { node: this.nodes[xIdx][zPlus1][yIdx], pos: xyz1Pt };
 
     return [n0,n1,n2,n3,n4,n5,n6,n7];
   }
@@ -389,14 +395,15 @@ export default class RigidBodyLattice {
         this._removeNode(xIdx, zIdx, yIdx);
         return;
       }
-
-      const nodeTraversalInfo = traversalInfo[node.id];
-      nodeTraversalInfo.islandNum = islandNum;
-      nodeTraversalInfo.visitState = TRAVERSAL_FINISHED_STATE;
-      islandNodes.add(node);
+      else {
+        const nodeTraversalInfo = traversalInfo[node.id];
+        nodeTraversalInfo.islandNum = islandNum;
+        nodeTraversalInfo.visitState = TRAVERSAL_FINISHED_STATE;
+        islandNodes.add(node);
+      }
 
       for (const neighbour of neighbours) {
-        if (traversalInfo[neighbour.id] && traversalInfo[neighbour.id].visitState === TRAVERSAL_UNVISITED_STATE) {
+        if (neighbour && traversalInfo[neighbour.id] && traversalInfo[neighbour.id].visitState === TRAVERSAL_UNVISITED_STATE) {
           depthFirstSearch(neighbour, islandNodes, islandNodes);
         }
       }

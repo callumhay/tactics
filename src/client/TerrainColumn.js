@@ -116,6 +116,9 @@ class TerrainColumn {
       mesh: this.mesh,
     };
     this.physObject = physics.addTerrain(config);
+    if (this.physObject === null) {
+      this.clear();
+    }
   }
 
   getTerrainSpaceTranslation() {

@@ -54,7 +54,7 @@ class GamePhysics {
   addObject(type, gameType, config) {
     const { gameObject, mesh, density, material } = config;
     const shape = threeToCannon(mesh, {type: threeToCannon.Type.HULL});
-    assert(shape !== null, "Cannon.js shape is null, this shouldn't happen.");
+    if (shape === null) { return null; }
     const mass = (density || material.density) * shape.volume();
     const body = new CANNON.Body({
       type: type,
