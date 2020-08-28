@@ -126,9 +126,11 @@ class GamePhysics {
     switch (gameObj.gameType) {
       
       case GameTypes.DEBRIS:
+        // This wakes the object up: gameObj.wakeUp();
+
         // When a dynamic chunk of terrain falls asleep we need to merge it back into the environment
-        //this.gameModel.reattachTerrain(gameObj);
-        //gameObj.remove = true;
+        this.gameModel.reattachTerrain(gameObj);
+        gameObj.remove = true;
         break;
 
       default:

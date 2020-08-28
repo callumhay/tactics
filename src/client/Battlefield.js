@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 
 import Debug from '../debug';
+import MathUtils from '../MathUtils';
+
 import TerrainColumn from './TerrainColumn';
 import RigidBodyLattice from './RigidBodyLattice';
 import Debris from './Debris';
@@ -180,8 +182,117 @@ export default class Battlefield {
     return result;
   }
 
-  convertDebrisToTerrain(physicsObj) {
+  convertDebrisToTerrain(debrisPhysObj) {
+    const { gameType, gameObject: debrisObj, mesh } = debrisPhysObj;
+    if (gameType !== GameTypes.DEBRIS) {
+      console.error("Attempting to convert invalid game type back into terrain, ignoring.");
+      return;
+    }
 
+    const DIST_SNAP = TerrainColumn.SIZE / 3;
+    const ANGLE_SNAP_EPSILONS = {x: 10 * Math.PI / 180, y: 15 * Math.PI / 180, z: 10 * Math.PI / 180};
+    const PI_OVER_2 = Math.PI / 2;
+
+    mesh.updateMatrixWorld();
+
+    const { geometry, rotation } = mesh;
+    // Attempt to clean up the rotation so that the box lies cleanly in the terrain grid
+    for (const coord of ['x', 'y', 'z']) {
+      // Snap the rotation to the nearest 90 degree angle
+      const snappedRotation = Math.trunc(rotation[coord] / PI_OVER_2) * PI_OVER_2;
+      if (Math.abs(rotation[coord] - snappedRotation) <= ANGLE_SNAP_EPSILONS[coord]) {
+        rotation[coord] = snappedRotation;
+      }
+    }
+
+    // Bake the snapped rotation of the mesh into the geometry and remove it from the mesh
+    const rotationMatrix = new THREE.Matrix4();
+    rotationMatrix.makeRotationFromEuler(rotation);
+    geometry.applyMatrix4(rotationMatrix);
+    rotation.set(0,0,0);
+    mesh.updateMatrix();
+
+    geometry.computeBoundingBox();
+    const aabb = geometry.boundingBox.clone();
+    aabb.applyMatrix4(mesh.matrix);
+
+    //this.terrainGroup.add(new THREE.Box3Helper(aabb)); // Debugging
+
+    // Determine translation/snapping locations and distances
+    const closestMin = aabb.min.clone().divideScalar(TerrainColumn.SIZE).round();
+    const closestMax = aabb.max.clone().divideScalar(TerrainColumn.SIZE).round();
+
+    // Snap the x and z coordinates to the nearest terrain corner (if it's within snapping range)
+    const distMinX = Math.abs(aabb.min.x - closestMin.x);
+    const distMinZ = Math.abs(aabb.min.z - closestMin.z);
+    const distMaxX = Math.abs(aabb.max.x - closestMax.x);
+    const distMaxZ = Math.abs(aabb.max.z - closestMax.z);
+
+    const translation = new THREE.Vector3();
+    if (distMinX < distMaxX && distMinX <= DIST_SNAP) {
+      translation.x = closestMin.x - aabb.min.x;
+    }
+    else if (distMaxX <= DIST_SNAP) {
+      translation.x = closestMax.x - aabb.max.x;
+    }
+    if (distMinZ < distMaxZ && distMinZ <= DIST_SNAP) {
+      translation.z = closestMin.z - aabb.min.z;
+    }
+    else if (distMaxZ <= DIST_SNAP) {
+      translation.z = closestMax.z - aabb.max.z;
+    }
+    // If the bottom y coordinate is close to the origin snap it
+    if (Math.abs(aabb.min.y) <= TerrainColumn.EPSILON) {
+      translation.y = closestMin.y - aabb.min.y;
+    }
+    // Bake the new translation into the geometry and remove the remaining transform from the mesh
+    geometry.translate(
+      MathUtils.roundToDecimal(mesh.position.x + translation.x, 2), 
+      MathUtils.roundToDecimal(mesh.position.y + translation.y, 2), 
+      MathUtils.roundToDecimal(mesh.position.z + translation.z, 2)
+    );
+    geometry.computeBoundingBox();
+
+    mesh.translateX(-mesh.position.x);
+    mesh.translateY(-mesh.position.y);
+    mesh.translateZ(-mesh.position.z);
+    mesh.position.set(
+      MathUtils.roundToDecimal(mesh.position.x, 2), 
+      MathUtils.roundToDecimal(mesh.position.y, 2),
+      MathUtils.roundToDecimal(mesh.position.z, 2),
+    );
+    mesh.updateMatrix();
+
+    // Check to see if the mesh is inside the playable area anymore
+    let zOutsideOfTerrain = true;
+    for (let x = closestMin.x; x < closestMax.x; x++) {
+      if (this._terrain[x] && closestMin.z < this._terrain[x].length) {
+        zOutsideOfTerrain = false;
+        break;
+      }
+    }
+    if (closestMax.x <= 0 || closestMin.x >= this._terrain.length || closestMax.z <= 0 || zOutsideOfTerrain) {
+      console.log("Debris went outside of the battlefield bounds.");
+      console.warn("You need to implement debris dissolution, for the time being it just turns red!");
+      mesh.material = new THREE.MeshLambertMaterial({emissive:0xff0000});
+      return;
+    }
+
+  /*
+    // We need to reattach the debris to the terrain in all the 
+    // correct terrain columns and landing ranges that it now occupies
+    for (let x = closestMin.x; x < closestMax.x; x++) {
+      for (let z = closestMin.z; z < closestMax.z && x < this._terrain.length; z++) {
+        const currTerrainCol = this._terrain[x][z];
+        if (currTerrainCol) {
+          //console.log(`Terrain column: ${currTerrainCol}`);
+          currTerrainCol.attachDebris(debrisObj);
+        }
+      }
+    }
+    // Clean-up
+    this.debris.splice(this.debris.indexOf(debrisObj), 1);
+    */
   }
 
   // Do a check for floating "islands" (i.e., terrain blobs that aren't connected to the ground), 
