@@ -1,7 +1,5 @@
-
 import * as THREE from 'three';
 import MathUtils from '../MathUtils';
-import { assert } from 'chai';
 
 class MarchingCubes {
 
@@ -56,7 +54,6 @@ class MarchingCubes {
 export default MarchingCubes;
 
 const tempVec3 = new THREE.Vector3();
-const tempVec3a = new THREE.Vector3();
 
 const positionLessThan = (left, right) => {
   if (left.x < right.x) { return true; }

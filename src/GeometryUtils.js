@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-import { assert } from 'chai';
 
 import MathUtils from './MathUtils';
 
@@ -13,14 +12,6 @@ class GeometryUtils {
       positions.setZ(i, MathUtils.roundToDecimal(positions.getZ(i), decimals));
     }
   }
-
-  // static removeTrianglesOutsideBoundingBox(boundingBox, triangles) {
-  //   const {min, max} = boundingBox;
-  //   return trianglesTarget.filter(triangle => {
-  //     const {a,b,c} = triangle;
-  //     return 
-  //   });
-  // }
 
   static buildBufferGeometryFromTris(triangles, smoothingAngle=40*Math.PI/180, tolerance=1e-4) {
     tolerance = Math.max(tolerance, Number.EPSILON);

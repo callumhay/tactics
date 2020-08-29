@@ -7,21 +7,19 @@ import Debug from '../debug';
 const tempVec3 = new THREE.Vector3();
 
 class LatticeNode {
-  constructor(id, xIdx, zIdx, yIdx, pos, terrainColumns, materials) {
+  constructor(id, xIdx, zIdx, yIdx, pos, terrainColumn, materials) {
     assert(xIdx >= 0, "xIdx of a LatticeNode must be at least zero.");
     assert(yIdx >= 0, "yIdx of a LatticeNode must be at least zero.");
     assert(zIdx >= 0, "zIdx of a LatticeNode must be at least zero.");
-    assert(terrainColumns.length <= 4, "There should never be more than 4 TerrainColumns tied to a node.");
 
     this.id = id;
     this.xIdx = xIdx;
     this.zIdx = zIdx;
     this.yIdx = yIdx;
     this.pos = pos;
-    this.attachedTerrainCols = terrainColumns; // The size of this array should never be 
+    this.terrainColumn = terrainColumn || null;
     this.materials = materials;
     this.grounded = false;
-    //this.isEmpty = isEmpty; 
   }
 
   get density() {
@@ -32,33 +30,8 @@ class LatticeNode {
     return density;
   }
 
-  hasTerrainColumn(terrainCol) {
-    return this.attachedTerrainCols.indexOf(terrainCol) !== -1;
-  }
-
-  addTerrainColumn(terrainCol) {
-    if (this.hasTerrainColumn(terrainCol)) { return; }
-    this.attachedTerrainCols.push(terrainCol);
-    assert(this.attachedTerrainCols.length <= 4, "There should never be more than 4 TerrainColumns tied to a node.");
-  }
-
-  removeTerrainColumn(terrainCol) {
-    const index = this.attachedTerrainCols.indexOf(terrainCol);
-    this.attachedTerrainCols.splice(index, 1);
-    //this.materials.splice(index, 1);
-  }
-  clearTerrainColumns() {
-    this.attachedTerrainCols = [];
-  }
-
   debugColour() {
-    const colour = new THREE.Color(0,0,0);
-    for (const terrainCol of this.attachedTerrainCols) {
-      colour.add(terrainCol.debugColour());
-    }
-    assert(this.attachedTerrainCols.length > 0, "There shouldn't be a node in existance that has no associated TerrainColumns.");
-    colour.multiplyScalar(1/Math.max(1, this.attachedTerrainCols.length));
-    return colour;
+    return this.terrainColumn ? this.terrainColumn.debugColour() : new THREE.Color(0,0,0);
   }
 }
 
@@ -159,23 +132,13 @@ export default class RigidBodyLattice {
         for (let y = nodeYIdxStart; y <= nodeYIdxEnd; y++) {
           const node = nodesZ[y];
           if (node) {
-            node.addTerrainColumn(terrainColumn);
-            //node.isEmpty = false;
+            assert(false, "Nodes shouldn't have more than one TerrainColumn associated with them.");
+            node.terrainColumn = terrainColumn;
           }
           else {
-            nodesZ[y] = new LatticeNode(this.nextNodeId++, x, z, y, this._nodeIndexToPosition(x,y,z), [terrainColumn], [material]);
+            nodesZ[y] = new LatticeNode(this.nextNodeId++, x, z, y, this._nodeIndexToPosition(x,y,z), terrainColumn, [material]);
           }
         }
-      }
-    }
-  }
-
-  removeTerrainColumnFromNodes(terrainColumn, nodeSet) {
-    for (const node of nodeSet) {
-      node.removeTerrainColumn(terrainColumn);
-      if (node.attachedTerrainCols.length === 0) {
-        const {xIdx, zIdx, yIdx} = node;
-        this._removeNode(xIdx, zIdx, yIdx);
       }
     }
   }

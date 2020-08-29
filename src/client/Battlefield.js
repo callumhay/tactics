@@ -314,7 +314,7 @@ export default class Battlefield {
       }
 
       for (const node of islandNodeSet) {
-        terrainColumnSet = new Set([...terrainColumnSet, ...node.attachedTerrainCols]);
+        terrainColumnSet.add(node.terrainColumn);
       }
     }
 
