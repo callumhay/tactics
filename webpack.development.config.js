@@ -31,7 +31,10 @@ const serverConfig = {...commonConfig,
   plugins: [
     new CopyPlugin({
       patterns: [
-        { from: 'index.html' }
+        { 
+          from: 'index.html',
+          from: 'assets/**'
+        }
       ]
     })
   ]

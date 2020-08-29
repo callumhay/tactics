@@ -9,16 +9,19 @@ const MATERIAL_TYPE_DIRT    = "dirt";
 const materials = {
   [MATERIAL_TYPE_BEDROCK]: {
     density: 2000,
-    three: new THREE.MeshLambertMaterial({color: 0x666666}),
+    dynamic: false,
+    three: new THREE.MeshLambertMaterial({color: 0xffffff}),
     cannon: new CANNON.Material(MATERIAL_TYPE_BEDROCK)
   },
   [MATERIAL_TYPE_ROCK]: { 
-    density: 1600, 
+    density: 1600,
+    dynamic: true,
     three: new THREE.MeshLambertMaterial({ color: 0xcccccc}),
     cannon: new CANNON.Material(MATERIAL_TYPE_ROCK)
   },
   [MATERIAL_TYPE_DIRT]: {
     density: 1225,
+    dynamic: true,
     three: new THREE.MeshLambertMaterial({ color: 0xa0522d }),
     cannon: new CANNON.Material(MATERIAL_TYPE_DIRT)
   }
@@ -40,10 +43,40 @@ const contactMaterials = [
   new CANNON.ContactMaterial(materials[MATERIAL_TYPE_BEDROCK], materials[MATERIAL_TYPE_ROCK], { friction: (ROCK_FRICTION + BEDROCK_FRICTION) / 2, restitution: (ROCK_RESTITUTION + BEDROCK_RESTITUTION) / 2 })
 ];
 
+const setTexProperties = (materialObj, texture) => {
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  materialObj.three.map = texture;
+};
+
 class GameMaterials {
   
   static get MATERIAL_TYPE_ROCK() { return MATERIAL_TYPE_ROCK; }
   static get MATERIAL_TYPE_BEDROCK() { return MATERIAL_TYPE_BEDROCK; }
+
+  static loadMaterials() {
+    for (const materialEntry of Object.entries(materials)) {
+      const [materialName, materialObj] = materialEntry;
+      if (materialObj.dynamic) {
+        if (!materialObj.xzTexture) {
+          const texture = materialObj.xzTexture = new THREE.TextureLoader().load(`assets/textures/${materialName}_xz.jpg`);
+          setTexProperties(materialObj, texture);
+        }
+        if (!materialObj.xyTexture) {
+          const texture = materialObj.xzTexture = new THREE.TextureLoader().load(`assets/textures/${materialName}_xy.jpg`);
+          setTexProperties(materialObj, texture);
+        }
+        if (!materialObj.zyTexture) {
+          const texture = materialObj.xzTexture = new THREE.TextureLoader().load(`assets/textures/${materialName}_zy.jpg`);
+          setTexProperties(materialObj, texture);
+        }
+      }
+      else {
+        const texture = materialObj.texture = new THREE.TextureLoader().load(`assets/textures/${materialName}.jpg`);
+        setTexProperties(materialObj, texture);
+      }
+    }
+  }
 
   static get materials() { return materials; }
   static get contactMaterials() { return contactMaterials; }

@@ -11,6 +11,7 @@ import GameMaterials from './GameMaterials';
 
 export default class Battlefield {
   static get MAX_SIZE() { return TerrainColumn.SIZE * 200; }
+  static get HALF_MAX_SIZE() { return Battlefield.MAX_SIZE / 2; }
   static get MAX_HEIGHT() { return TerrainColumn.SIZE * 25; }
   static get HALF_MAX_HEIGHT() { return Battlefield.MAX_HEIGHT/2; }
 
@@ -47,6 +48,7 @@ export default class Battlefield {
     this.rigidBodyLattice = new RigidBodyLattice(this.terrainGroup);
 
     const bedrockMat = GameMaterials.materials[GameMaterials.MATERIAL_TYPE_BEDROCK];
+    bedrockMat.three.map.repeat.set(Battlefield.HALF_MAX_SIZE, Battlefield.HALF_MAX_SIZE);
     const bedrockGeom = new THREE.BoxBufferGeometry(Battlefield.MAX_SIZE, Battlefield.MAX_SIZE, TerrainColumn.SIZE);
     bedrockGeom.translate(0, 0, -TerrainColumn.HALF_SIZE);
     this.bedrockMesh = new THREE.Mesh(bedrockGeom, bedrockMat.three);

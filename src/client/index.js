@@ -5,6 +5,7 @@ import GameModel from './GameModel';
 import GameClient from './GameClient';
 
 import CannonDebugRenderer from './CannonDebugRenderer';
+import GameMaterials from './GameMaterials';
 
 // Setup THREE library boilerplate for getting a scene + camera + basic controls up and running
 const renderer = new THREE.WebGLRenderer();
@@ -48,8 +49,10 @@ function onWindowResize(event) {
   renderer.render(scene, camera);
 }
 
-// Setup game objects
+// Setup game objects - ORDER MATTERS!
+GameMaterials.loadMaterials();
 const gameModel = new GameModel(scene);
+
 // Setup the client, connect to the game server
 const client = new GameClient();
 client.start(gameModel);
