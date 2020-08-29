@@ -48,9 +48,9 @@ class Debris {
 
     // Calculate the density based on node materials
     this.density = 0;
+    this.material = nodes.values().next().value.material;
     for (const node of nodes) {
       this.density += node.density;
-      this.material = node.materials[0];
     }
     this.density /= nodes.size;
     

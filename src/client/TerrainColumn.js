@@ -45,8 +45,6 @@ class TerrainColumn {
               throw `Invalid geometry type ${type} found.`;
           }
         }
-        
-        
       }
     }
   }
@@ -129,18 +127,10 @@ class TerrainColumn {
   }
 
   attachDebris(debris) {
-    //const {mesh} = debris;
-    //const {geometry} = mesh;
-
-    // TODO:
-    // 1. Find and activate all the nodes in this terrain column that are contained in the settled debris
-    // 2. Rebuild this column's geometry
-    // 3. Rebuild the geometry for this and recalculate landing ranges (regenerate)
-
-    // Re-traverse the rigid body node lattice, find out if anything is no longer attached to the ground
-    rigidBodyLattice.traverseGroundedNodes();
-    rigidBodyLattice.debugDrawNodes(true);
-    this.debugDrawAABBs(true);
+    const {rigidBodyLattice} = this.battlefield;
+    // Find and activate all the nodes in this terrain column that are contained in the settled debris
+    rigidBodyLattice.addTerrainColumnDebris(this, debris);
+    this.regenerate();
   }
 
   toString() {

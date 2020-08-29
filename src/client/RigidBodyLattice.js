@@ -3,11 +3,12 @@ import {assert} from 'chai'
 
 import TerrainColumn from './TerrainColumn';
 import Debug from '../debug';
+import Battlefield from './Battlefield';
 
 const tempVec3 = new THREE.Vector3();
 
 class LatticeNode {
-  constructor(id, xIdx, zIdx, yIdx, pos, terrainColumn, materials) {
+  constructor(id, xIdx, zIdx, yIdx, pos, terrainColumn, material) {
     assert(xIdx >= 0, "xIdx of a LatticeNode must be at least zero.");
     assert(yIdx >= 0, "yIdx of a LatticeNode must be at least zero.");
     assert(zIdx >= 0, "zIdx of a LatticeNode must be at least zero.");
@@ -18,16 +19,12 @@ class LatticeNode {
     this.yIdx = yIdx;
     this.pos = pos;
     this.terrainColumn = terrainColumn || null;
-    this.materials = materials;
+    this.material = material;
     this.grounded = false;
   }
 
   get density() {
-    let density = 0;
-    for (const material of this.materials) {
-      density += material.density;
-    }
-    return density;
+    return this.material.density;
   }
 
   debugColour() {
@@ -136,11 +133,76 @@ export default class RigidBodyLattice {
             node.terrainColumn = terrainColumn;
           }
           else {
-            nodesZ[y] = new LatticeNode(this.nextNodeId++, x, z, y, this._nodeIndexToPosition(x,y,z), terrainColumn, [material]);
+            nodesZ[y] = new LatticeNode(this.nextNodeId++, x, z, y, this._nodeIndexToPosition(x,y,z), terrainColumn, material);
           }
         }
       }
     }
+  }
+
+  addTerrainColumnDebris(terrainColumn, debris) {
+    const {mesh, material} = debris;
+    const {geometry} = mesh;
+    const {boundingBox} = geometry;
+    assert(boundingBox, "The bounding box for the geometry should already be generated.");
+    //terrainColumn.battlefield.terrainGroup.add(Debug.buildDebugBoundingBoxMesh(boundingBox));
+    
+    // Create a node-index bounding box for the terrain column
+    const {nodeXIdxStart, nodeXIdxEnd, nodeZIdxStart, nodeZIdxEnd} = this._getXZIndexRangeForTerrainColumn(terrainColumn);
+    const nodeYIdxStart = 0, nodeYIdxEnd = this._unitsToNodeIndex(Battlefield.MAX_HEIGHT);
+    const tcBoundingBox = new THREE.Box3(
+      new THREE.Vector3(nodeXIdxStart, nodeYIdxStart, nodeZIdxStart), new THREE.Vector3(nodeXIdxEnd, nodeYIdxEnd, nodeZIdxEnd)
+    );
+    // Convert the geometry bounding box into a node-index based box
+    const geomBoundingBox = boundingBox.clone();
+    {
+      const {min,max} = geomBoundingBox;
+      min.set(this._unitsToNodeIndex(min.x), this._unitsToNodeIndex(min.y), this._unitsToNodeIndex(min.z));
+      max.set(this._unitsToNodeIndex(max.x), this._unitsToNodeIndex(max.y), this._unitsToNodeIndex(max.z));
+    }
+
+    const raycaster = new THREE.Raycaster();
+    raycaster.ray.direction.set(0,1,0);
+    let rayPosTransform = null;
+    if (mesh.parent) { rayPosTransform = mesh.parent.matrixWorld;}
+    else { rayPosTransform = new THREE.Matrix4(); }
+
+    // In order for the raycaster to collide with interior faces of the mesh, we need to 
+    // temporarily set the material to be double-sided
+    const temp = mesh.material.side;
+    mesh.material.side = THREE.DoubleSide;
+
+    // Go through all the nodes in the bounding box where the geometry and the terrainColumn intersect
+    // Check whether each node is inside the geometry, if it is then add it
+    tcBoundingBox.intersect(geomBoundingBox);
+    const {min, max} = tcBoundingBox;
+
+    while (this.nodes.length <= max.x) { this.nodes.push([]); }
+    for (let x = min.x; x <= max.x; x++) {
+      const nodesX = this.nodes[x];
+      while (nodesX.length <= max.z) { nodesX.push([]); }
+      for (let z = min.z; z <= max.z; z++) {
+        const nodesXZ = this.nodes[x][z];
+        while (nodesXZ.length <= max.y) { nodesXZ.push(null); }
+        for (let y = min.y; y <= max.y; y++) {
+          const nodePos = this._nodeIndexToPosition(x,y,z);
+          let intersections = [];
+          raycaster.ray.origin.set(nodePos.x, nodePos.y, nodePos.z).applyMatrix4(rayPosTransform);
+
+          //const temp = new THREE.ArrowHelper(raycaster.ray.direction, raycaster.ray.origin, 0.1);
+          //temp.line.material.depthFunc=THREE.AlwaysDepth;
+          //temp.cone.material.depthFunc = THREE.AlwaysDepth;
+          //terrainColumn.battlefield._scene.add(temp);
+    
+          mesh.raycast(raycaster, intersections);
+          if (intersections.length > 0) {
+            nodesXZ[y] = new LatticeNode(this.nextNodeId++, x, z, y, nodePos, terrainColumn, material);
+          }
+        }
+      }
+    }
+
+    mesh.material.side = temp;
   }
 
   _getNodeCubePositions(xIdx, yIdx, zIdx) {

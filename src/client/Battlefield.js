@@ -261,7 +261,7 @@ export default class Battlefield {
       MathUtils.roundToDecimal(mesh.position.y, 2),
       MathUtils.roundToDecimal(mesh.position.z, 2),
     );
-    mesh.updateMatrix();
+    mesh.updateMatrixWorld();
 
     // Check to see if the mesh is inside the playable area anymore
     let zOutsideOfTerrain = true;
@@ -278,21 +278,30 @@ export default class Battlefield {
       return;
     }
 
-  /*
+
     // We need to reattach the debris to the terrain in all the 
-    // correct terrain columns and landing ranges that it now occupies
-    for (let x = closestMin.x; x < closestMax.x; x++) {
-      for (let z = closestMin.z; z < closestMax.z && x < this._terrain.length; z++) {
+    // correct terrain columns that it now occupies
+    const {min, max} = geometry.boundingBox;
+    const {clamp} = THREE.MathUtils;
+    const startX = clamp(Math.trunc(min.x), 0, this._terrain.length-1);
+    const endX = clamp(Math.trunc(max.x), 0, this._terrain.length-1);
+
+    for (let x = startX; x <= endX; x++) {
+      const startZ = clamp(Math.trunc(min.z), 0, this._terrain[x].length-1);
+      const endZ = clamp(Math.trunc(max.z), 0, this._terrain[x].length-1);
+      for (let z = startZ; z <= endZ; z++) {
         const currTerrainCol = this._terrain[x][z];
-        if (currTerrainCol) {
-          //console.log(`Terrain column: ${currTerrainCol}`);
-          currTerrainCol.attachDebris(debrisObj);
-        }
+        currTerrainCol.attachDebris(debrisObj);
       }
     }
+
+    // Re-traverse the rigid body node lattice
+    this.rigidBodyLattice.traverseGroundedNodes();
+    this.rigidBodyLattice.debugDrawNodes(true);
+
     // Clean-up
+    debrisObj.clearGeometry();
     this.debris.splice(this.debris.indexOf(debrisObj), 1);
-    */
   }
 
   // Do a check for floating "islands" (i.e., terrain blobs that aren't connected to the ground), 
