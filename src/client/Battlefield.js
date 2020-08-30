@@ -8,6 +8,7 @@ import RigidBodyLattice from './RigidBodyLattice';
 import Debris from './Debris';
 import GameTypes from './GameTypes';
 import GameMaterials from './GameMaterials';
+import MarchingCubes from './MarchingCubes';
 
 export default class Battlefield {
   static get MAX_SIZE() { return TerrainColumn.SIZE * 200; }
@@ -105,7 +106,7 @@ export default class Battlefield {
     // Traverse the lattice, find anything that might not be connected to the ground, 
     // remove it from the terrain and turn it into a physical object
     
-    this.rigidBodyLattice.debugDrawNodes(true);
+    //this.rigidBodyLattice.debugDrawNodes(true);
   }
 
   clear() {
@@ -115,6 +116,7 @@ export default class Battlefield {
       }
     }
     this._terrain = [];
+    MarchingCubes.clearCubeCellRegister();
   }
 
   // NOTE: We assume that the explosionShape is in the same coordinate space as the terrain
@@ -158,7 +160,7 @@ export default class Battlefield {
       terrainCol.regenerate();
     }
 
-    this.rigidBodyLattice.debugDrawNodes(true); // TODO: Remove this
+    //this.rigidBodyLattice.debugDrawNodes(true); // TODO: Remove this
   }
 
   getTerrainColumn(xIdx, zIdx) {
@@ -299,7 +301,7 @@ export default class Battlefield {
 
     // Re-traverse the rigid body node lattice
     this.rigidBodyLattice.traverseGroundedNodes();
-    this.rigidBodyLattice.debugDrawNodes(true);
+    //this.rigidBodyLattice.debugDrawNodes(true);
 
     // Clean-up
     debrisObj.clearGeometry();

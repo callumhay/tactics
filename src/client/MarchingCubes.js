@@ -1,25 +1,50 @@
 import * as THREE from 'three';
 import MathUtils from '../MathUtils';
+import { assert } from 'chai';
+import TerrainColumn from './TerrainColumn';
+
+const posXZPlane = new THREE.Plane(new THREE.Vector3(0,1,0));
+const negXZPlane = new THREE.Plane(new THREE.Vector3(0,-1,0));
+const posXYPlane = new THREE.Plane(new THREE.Vector3(0,0,1));
+const negXYPlane = new THREE.Plane(new THREE.Vector3(0,0,-1));
+const posZYPlane = new THREE.Plane(new THREE.Vector3(1,0,0));
+const negZYPlane = new THREE.Plane(new THREE.Vector3(-1,0,0));
+const boundingBoxPlanes = [
+  posXZPlane, negXZPlane, posXYPlane, negXYPlane, posZYPlane, negZYPlane
+];
+const intersectPt1 = new THREE.Vector3();
+const intersectPt2 = new THREE.Vector3();
+
+// A mapping of cube cell IDs to their owning TerrainColumns
+const cubeCellRegister = {};
 
 class MarchingCubes {
+
+  static clearCubeCellRegister() {
+    cubeCellRegister = {};
+  }
 
   static convertTerrainColumnToTriangles(terrainColumn, nodeCubeCells) {
     const triangles = [];
     const tcBoundingBox = terrainColumn.getBoundingBox();
     for (const nodeCubeCell of nodeCubeCells) {
-      const currTris = [];
-      MarchingCubes.polygonizeNodeCubeCell(nodeCubeCell, currTris);
+      const {id, corners} = nodeCubeCell;
 
-      const finalTris = [];
-      for (const tri of currTris) {
+      // Check whether the cube cell has already been registered with another TerrainColumn, this prevents
+      // us from overdrawing parts of the terrain that may overlap with other TerrainColumns.
+      const tcOwner = cubeCellRegister[id];
+      if (!tcOwner) { cubeCellRegister[id] = terrainColumn; }
+      else if (tcOwner !== terrainColumn) { continue; }
+
+      const currTris = [];
+      MarchingCubes.polygonizeNodeCubeCell(corners, currTris);
+
+      // Clean up any triangles that are just lying flat on the y=0 plane
+      triangles.push.apply(triangles, currTris.filter(tri => {
         const {a,b,c} = tri;
         const {min} = tcBoundingBox;
-        if ((MathUtils.approxEquals(a.y, min.y) && MathUtils.approxEquals(b.y, min.y) && MathUtils.approxEquals(c.y, min.y))) {
-          continue;
-        }
-        finalTris.push(tri);
-      }
-      triangles.push.apply(triangles, finalTris);
+        return !(MathUtils.approxEquals(a.y, min.y) && MathUtils.approxEquals(b.y, min.y) && MathUtils.approxEquals(c.y, min.y));
+      }));
     }
 
     return triangles;
@@ -54,6 +79,7 @@ class MarchingCubes {
 export default MarchingCubes;
 
 const tempVec3 = new THREE.Vector3();
+const tempVec3a = new THREE.Vector3();
 
 const positionLessThan = (left, right) => {
   if (left.x < right.x) { return true; }
