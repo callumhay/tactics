@@ -134,6 +134,7 @@ class GeometryUtils {
     threeGeometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(vertices), 3));
     threeGeometry.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(normalVecs), 3, true));
     threeGeometry.setIndex(indices);
+    
     return threeGeometry;
   }
 

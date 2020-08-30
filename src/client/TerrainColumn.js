@@ -96,24 +96,22 @@ class TerrainColumn {
     boundingBox.getCenter(tempVec3);
     geometry.translate(-tempVec3.x, -tempVec3.y, -tempVec3.z);
 
-    const debugColour = this.debugColour();
-    debugColour.setRGB(debugColour.b, debugColour.g, debugColour.r).multiplyScalar(0.25);
-    //const material = new MeshLambertMaterial({color:0xcccccc});//{emissive:debugColour});
+    //const debugColour = this.debugColour();
+    //debugColour.setRGB(debugColour.b, debugColour.g, debugColour.r).multiplyScalar(0.25);
     this.mesh = new THREE.Mesh(geometry, this.material.three);
     this.mesh.castShadow = true;
     this.mesh.receiveShadow = false;
 
     this.mesh.translateX(tempVec3.x);
     this.mesh.translateY(tempVec3.y);
-    this.mesh.translateZ(tempVec3.z);
-    this.mesh.updateMatrixWorld();
-
+    this.mesh.translateZ(tempVec3.z);    
     terrainGroup.add(this.mesh);
+    this.mesh.updateMatrixWorld();
 
     const { physics } = this.battlefield;
     const config = {
       gameObject: this,
-      material: GameMaterials.materials[GameMaterials.MATERIAL_TYPE_ROCK].cannon, // TODO FIX THIS
+      material: this.material.cannon,
       mesh: this.mesh,
     };
     this.physObject = physics.addTerrain(config);

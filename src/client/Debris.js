@@ -69,6 +69,7 @@ class Debris {
     // If there isn't enough geometry in this object to make a convex shape then
     // this isn't going to be valid, exit now and leave the geometry/mesh null
     if (geometry.getAttribute('position').count < 4) {
+      geometry.dispose();
       return;
     }
 
@@ -77,7 +78,7 @@ class Debris {
     boundingBox.getCenter(tempVec3);
     geometry.translate(-tempVec3.x, -tempVec3.y, -tempVec3.z);
 
-    this.mesh = new THREE.Mesh(geometry, new THREE.MeshLambertMaterial({color:0xcccccc}));
+    this.mesh = new THREE.Mesh(geometry, this.material.three);
     this.mesh.translateX(tempVec3.x);
     this.mesh.translateY(tempVec3.y);
     this.mesh.translateZ(tempVec3.z);
