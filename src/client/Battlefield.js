@@ -83,8 +83,8 @@ export default class Battlefield {
     for (let x = 0; x < this._terrain.length; x++) {
       maxZLength = Math.max(maxZLength, this._terrain[x].length);
     }
-
-
+    const terrainSize = terrain.length * TerrainColumn.SIZE;
+    this.terrainGroup.position.set(-terrainSize / 2, 0, -terrainSize / 2);
 
     // Regenerate the terrain
     for (let x = 0; x < this._terrain.length; x++) {
@@ -92,16 +92,18 @@ export default class Battlefield {
         this._terrain[x].push(new TerrainColumn(this, x,this._terrain[x].length, null));
       }
     }
+
+    this.terrainPhysicsCleanup();
+
     for (let x = 0; x < this._terrain.length; x++) {
       for (let z = 0; z < this._terrain[x].length; z++) {
         this._terrain[x][z].regenerate();
       }
     }
 
-    const terrainSize = terrain.length * TerrainColumn.SIZE;
-    this.terrainGroup.position.set(-terrainSize / 2, 0, -terrainSize / 2);
 
-    this.terrainPhysicsCleanup();
+
+    
 
     // Traverse the lattice, find anything that might not be connected to the ground, 
     // remove it from the terrain and turn it into a physical object
@@ -146,21 +148,35 @@ export default class Battlefield {
     this.rigidBodyLattice.removeNodesInsideShape(explosionShape);
 
     // Update the terrain physics for any islands that may have been formed
-    const regenTerrainCols = this.terrainPhysicsCleanup(false);
+    const regenTerrainCols = this.terrainPhysicsCleanup();
     for (const terrainCol of terrainCols) {
       regenTerrainCols.add(terrainCol);
-      const adjTerrainCols = this.getAdjacentTerrainColumns(terrainCol);
-      for (const adjTerrainCol of adjTerrainCols) {
-        regenTerrainCols.add(adjTerrainCol);
-      }
     }
-
-    // Rebuild the geometry for all the affected TerrainColumns
-    for (const terrainCol of regenTerrainCols) {
-      terrainCol.regenerate();
-    }
-
+    this.regenerateTerrainColumns(regenTerrainCols);
+  
     //this.rigidBodyLattice.debugDrawNodes(true); // TODO: Remove this
+  }
+
+  regenerateTerrainColumns(regenTerrainColumnSet) {
+
+    let affectedTerrainCols = new Set();
+    for (const terrainCol of regenTerrainColumnSet) {
+      const otherAffectedCols = terrainCol.regenerate();
+      affectedTerrainCols = new Set([...affectedTerrainCols, ...otherAffectedCols]);
+    }
+    while (affectedTerrainCols.size > 0) {
+      const terrainCol = affectedTerrainCols.values().next().value;
+      if (!regenTerrainColumnSet.has(terrainCol)) {
+        const otherAffectedCols = terrainCol.regenerate();
+        for (const otherTc of otherAffectedCols) {
+          if (!regenTerrainColumnSet.has(otherTc)) { 
+            affectedTerrainCols.add(otherTc);
+          }
+        }
+        regenTerrainColumnSet.add(terrainCol);
+      }
+      affectedTerrainCols.delete(terrainCol);
+    }
   }
 
   getTerrainColumn(xIdx, zIdx) {
@@ -168,22 +184,6 @@ export default class Battlefield {
       return this._terrain[xIdx][zIdx] || null;
     }
     return null;
-  }
-  getAdjacentTerrainColumns(terrainColumn) {
-    const {xIndex, zIndex} = terrainColumn;
-    const result = [];
-
-    const increments = [
-      [-1,-1], [-1,0], [-1,1], [1,-1], [1,0], [1,1], [0,-1], [0,1]
-    ];
-
-    for (const inc of increments) {
-      const [xInc,zInc] = inc;
-      const adjTc = this.getTerrainColumn(xIndex+xInc, zIndex+zInc);
-      if (adjTc) { result.push(adjTc); }
-    }
-
-    return result;
   }
 
   convertDebrisToTerrain(debrisPhysObj) {
@@ -193,23 +193,11 @@ export default class Battlefield {
       return;
     }
 
-    const DIST_SNAP = TerrainColumn.SIZE / 3;
-    const ANGLE_SNAP_EPSILONS = {x: 10 * Math.PI / 180, y: 15 * Math.PI / 180, z: 10 * Math.PI / 180};
-    const PI_OVER_2 = Math.PI / 2;
-
     mesh.updateMatrixWorld();
 
     const { geometry, rotation } = mesh;
-    // Attempt to clean up the rotation so that the box lies cleanly in the terrain grid
-    for (const coord of ['x', 'y', 'z']) {
-      // Snap the rotation to the nearest 90 degree angle
-      const snappedRotation = Math.trunc(rotation[coord] / PI_OVER_2) * PI_OVER_2;
-      if (Math.abs(rotation[coord] - snappedRotation) <= ANGLE_SNAP_EPSILONS[coord]) {
-        rotation[coord] = snappedRotation;
-      }
-    }
 
-    // Bake the snapped rotation of the mesh into the geometry and remove it from the mesh
+    // Bake the rotation of the mesh into the geometry and remove it from the mesh
     const rotationMatrix = new THREE.Matrix4();
     rotationMatrix.makeRotationFromEuler(rotation);
     geometry.applyMatrix4(rotationMatrix);
@@ -220,46 +208,22 @@ export default class Battlefield {
     const aabb = geometry.boundingBox.clone();
     aabb.applyMatrix4(mesh.matrix);
 
-    //this.terrainGroup.add(new THREE.Box3Helper(aabb)); // Debugging
-
     // Determine translation/snapping locations and distances
-    const closestMin = aabb.min.clone().divideScalar(TerrainColumn.SIZE).round();
-    const closestMax = aabb.max.clone().divideScalar(TerrainColumn.SIZE).round();
+    const closestMin = aabb.min;//.clone().divideScalar(TerrainColumn.SIZE).floor();
+    const closestMax = aabb.max;//.clone().divideScalar(TerrainColumn.SIZE).ceil();
 
-    // Snap the x and z coordinates to the nearest terrain corner (if it's within snapping range)
-    const distMinX = Math.abs(aabb.min.x - closestMin.x);
-    const distMinZ = Math.abs(aabb.min.z - closestMin.z);
-    const distMaxX = Math.abs(aabb.max.x - closestMax.x);
-    const distMaxZ = Math.abs(aabb.max.z - closestMax.z);
-
-    const translation = new THREE.Vector3();
-    if (distMinX < distMaxX && distMinX <= DIST_SNAP) {
-      translation.x = closestMin.x - aabb.min.x;
-    }
-    else if (distMaxX <= DIST_SNAP) {
-      translation.x = closestMax.x - aabb.max.x;
-    }
-    if (distMinZ < distMaxZ && distMinZ <= DIST_SNAP) {
-      translation.z = closestMin.z - aabb.min.z;
-    }
-    else if (distMaxZ <= DIST_SNAP) {
-      translation.z = closestMax.z - aabb.max.z;
-    }
-    // If the bottom y coordinate is close to the origin snap it
-    if (Math.abs(aabb.min.y) <= TerrainColumn.EPSILON) {
-      translation.y = closestMin.y - aabb.min.y;
-    }
-    // Bake the new translation into the geometry and remove the remaining transform from the mesh
-    geometry.translate(
-      MathUtils.roundToDecimal(mesh.position.x + translation.x, 2), 
-      MathUtils.roundToDecimal(mesh.position.y + translation.y, 2), 
-      MathUtils.roundToDecimal(mesh.position.z + translation.z, 2)
+    // Bake the translation into the geometry and remove the remaining transform from the mesh
+    const translation = new THREE.Vector3(
+      MathUtils.roundToDecimal(mesh.position.x, 2), 
+      MathUtils.roundToDecimal(mesh.position.y, 2), 
+      MathUtils.roundToDecimal(mesh.position.z, 2)
     );
+    geometry.translate(translation.x, translation.y, translation.z);
     geometry.computeBoundingBox();
 
-    mesh.translateX(-mesh.position.x);
-    mesh.translateY(-mesh.position.y);
-    mesh.translateZ(-mesh.position.z);
+    mesh.translateX(-translation.x);
+    mesh.translateY(-translation.y);
+    mesh.translateZ(-translation.z);
     mesh.position.set(
       MathUtils.roundToDecimal(mesh.position.x, 2), 
       MathUtils.roundToDecimal(mesh.position.y, 2),
@@ -268,10 +232,11 @@ export default class Battlefield {
     mesh.updateMatrixWorld();
 
     // Check to see if the mesh is inside the playable area anymore
-    let zOutsideOfTerrain = true;
+    //this.terrainGroup.add(new THREE.Box3Helper(new THREE.Box3(closestMin.clone(), closestMax.clone()))); // Debugging
+    let zOutsideOfTerrain = false;
     for (let x = closestMin.x; x < closestMax.x; x++) {
-      if (this._terrain[x] && closestMin.z < this._terrain[x].length) {
-        zOutsideOfTerrain = false;
+      if (this._terrain[x] && closestMin.z >= this._terrain[x].length) {
+        zOutsideOfTerrain = true;
         break;
       }
     }
@@ -282,7 +247,6 @@ export default class Battlefield {
       return;
     }
 
-
     // We need to reattach the debris to the terrain in all the 
     // correct terrain columns that it now occupies
     const {min, max} = geometry.boundingBox;
@@ -290,14 +254,18 @@ export default class Battlefield {
     const startX = clamp(Math.trunc(min.x), 0, this._terrain.length-1);
     const endX = clamp(Math.trunc(max.x), 0, this._terrain.length-1);
 
+    const regenTerrainColumnSet = new Set();
     for (let x = startX; x <= endX; x++) {
       const startZ = clamp(Math.trunc(min.z), 0, this._terrain[x].length-1);
       const endZ = clamp(Math.trunc(max.z), 0, this._terrain[x].length-1);
       for (let z = startZ; z <= endZ; z++) {
         const currTerrainCol = this._terrain[x][z];
-        currTerrainCol.attachDebris(debrisObj);
+        this.rigidBodyLattice.addTerrainColumnDebris(currTerrainCol, debrisObj);
+        regenTerrainColumnSet.add(currTerrainCol);
       }
     }
+
+    this.regenerateTerrainColumns(regenTerrainColumnSet);
 
     // Re-traverse the rigid body node lattice
     this.rigidBodyLattice.traverseGroundedNodes();
@@ -310,10 +278,11 @@ export default class Battlefield {
 
   // Do a check for floating "islands" (i.e., terrain blobs that aren't connected to the ground), 
   // remove them from the terrain and turn them into physics objects
-  terrainPhysicsCleanup(regenerateColumns=true) {
+  terrainPhysicsCleanup() {
     const { rigidBodyLattice, terrainGroup, physics, debris} = this;
     rigidBodyLattice.traverseGroundedNodes();
-    let islands = rigidBodyLattice.traverseIslands();
+
+    const islands = rigidBodyLattice.traverseIslands();
 
     // Build debris for each island and find all the terrain columns associated with each island
     let terrainColumnSet = new Set();
@@ -334,25 +303,6 @@ export default class Battlefield {
     // The nodes are longer part of the terrain, remove them
     for (const nodeSet of islands) {
       rigidBodyLattice.removeNodes(nodeSet);
-    }
-
-    // If the node set is less than 4 points then we ignore it - you can't compute
-    // a proper convex hull from it... also the geometry would be insignificant, regardless
-    islands = islands.filter(nodeSet => nodeSet.count >= 4);
-
-    // The terrain columns that we need to regenerate need to include all 
-    // adjacent terrain columns to the ones effected
-    const adjTerrainCols = [];
-    for (const terrainColumn of terrainColumnSet) {
-      adjTerrainCols.push.apply(adjTerrainCols, this.getAdjacentTerrainColumns(terrainColumn));
-    }
-    terrainColumnSet = new Set([...terrainColumnSet, ...adjTerrainCols]);
-
-    if (regenerateColumns) {
-      // Regenerate the geometry for the terrain columns
-      for (const terrainColumn of terrainColumnSet) {
-        terrainColumn.regenerate();
-      }
     }
 
     return terrainColumnSet;

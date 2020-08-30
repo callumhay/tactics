@@ -60,7 +60,8 @@ class Debris {
     const nodeCubeCells = rigidBodyLattice.getNodeIslandCubeCells(nodes);
     const triangles = [];
     for (const nodeCubeCell of nodeCubeCells) {
-      MarchingCubes.polygonizeNodeCubeCell(nodeCubeCell, triangles);
+      const {corners} = nodeCubeCell;
+      MarchingCubes.polygonizeNodeCubeCell(corners, triangles);
     }
 
     // Create the debris geometry, center it (so that we can do physics stuff cleanly) and move the translation over to the mesh

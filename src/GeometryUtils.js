@@ -2,6 +2,10 @@ import * as THREE from 'three';
 
 import MathUtils from './MathUtils';
 
+const tempVec3 = new THREE.Vector3();
+const tempVec3a = new THREE.Vector3();
+const tempVec3b = new THREE.Vector3();
+
 class GeometryUtils {
   static roundVertices(geometry, decimals=4) {
     // Go through all the positions in the geometry and round them as specified
@@ -11,6 +15,21 @@ class GeometryUtils {
       positions.setY(i, MathUtils.roundToDecimal(positions.getY(i), decimals));
       positions.setZ(i, MathUtils.roundToDecimal(positions.getZ(i), decimals));
     }
+  }
+
+  static intersectPlanes(plane1, plane2) {
+    const dir = tempVec3.crossVectors(plane1.normal, plane2.normal).clone();
+    const denom = dir.dot(dir);
+    if (denom < 1e-6) { return null; }
+
+    tempVec3a.copy(plane1.normal);
+    tempVec3a.multiplyScalar(plane2.constant);
+    tempVec3b.copy(plane2.normal);
+    tempVec3b.multiplyScalar(plane1.constant);
+    tempVec3b.sub(tempVec3a);
+
+    const point = tempVec3.crossVectors(tempVec3b, dir).divideScalar(denom).clone();
+    return new THREE.Line3(point, dir.add(point));
   }
 
   static buildBufferGeometryFromTris(triangles, smoothingAngle=40*Math.PI/180, tolerance=1e-4) {
@@ -24,8 +43,6 @@ class GeometryUtils {
       const {x,y,z} = vertex;
       return `${makeValueHash(x)},${makeValueHash(y)},${makeValueHash(z)}`;
     }
-
-    const tempVec3 = new THREE.Vector3();
 
     const faces = [];
     const vertexMap = {};

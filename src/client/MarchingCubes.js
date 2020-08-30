@@ -2,52 +2,91 @@ import * as THREE from 'three';
 import MathUtils from '../MathUtils';
 import { assert } from 'chai';
 import TerrainColumn from './TerrainColumn';
+import GeometryUtils from '../GeometryUtils';
 
 const posXZPlane = new THREE.Plane(new THREE.Vector3(0,1,0));
-const negXZPlane = new THREE.Plane(new THREE.Vector3(0,-1,0));
+const negXZPlane = new THREE.Plane(new THREE.Vector3(0,1,0));
 const posXYPlane = new THREE.Plane(new THREE.Vector3(0,0,1));
-const negXYPlane = new THREE.Plane(new THREE.Vector3(0,0,-1));
+const negXYPlane = new THREE.Plane(new THREE.Vector3(0,0,1));
 const posZYPlane = new THREE.Plane(new THREE.Vector3(1,0,0));
-const negZYPlane = new THREE.Plane(new THREE.Vector3(-1,0,0));
+const negZYPlane = new THREE.Plane(new THREE.Vector3(1,0,0));
 const boundingBoxPlanes = [
   posXZPlane, negXZPlane, posXYPlane, negXYPlane, posZYPlane, negZYPlane
 ];
 const intersectPt1 = new THREE.Vector3();
 const intersectPt2 = new THREE.Vector3();
 
-// A mapping of cube cell IDs to their owning TerrainColumns
-const cubeCellRegister = {};
+// A mapping of cube cell IDs to their previous state and terrain column owner
+let cubeCellRegister = {}; // {terrainColumn: <object>, prevState: <corners_array>}
+
+const isCornersStateEqual = (corners1, corners2) => {
+  assert(corners1.length === corners2.length, "Corners arrays need to be the same length.");
+  for (let i = 0; i < corners1.length; i++) {
+    const {node:c1Node} = corners1[i];
+    const {node:c2Node} = corners2[i];
+    if (c1Node === null && c2Node !== null || c1Node !== null && c2Node === null) {
+      return false;
+    }
+  }
+  return true;
+}; 
 
 class MarchingCubes {
+
+  static createCubeCellRegisterKey(xIdx,yIdx,zIdx) {
+    return `${xIdx},${yIdx},${zIdx}`;
+  }
 
   static clearCubeCellRegister() {
     cubeCellRegister = {};
   }
 
-  static convertTerrainColumnToTriangles(terrainColumn, nodeCubeCells) {
-    const triangles = [];
+  static clearCubeCellRegisterKey(key) {
+    delete cubeCellRegister[key];
+  }
+
+  static convertTerrainColumnToTriangles(terrainColumn, nodeCubeCells, triangles) {
+    const affectedTerrainCols = new Set();
     const tcBoundingBox = terrainColumn.getBoundingBox();
     for (const nodeCubeCell of nodeCubeCells) {
       const {id, corners} = nodeCubeCell;
 
       // Check whether the cube cell has already been registered with another TerrainColumn, this prevents
       // us from overdrawing parts of the terrain that may overlap with other TerrainColumns.
-      const tcOwner = cubeCellRegister[id];
-      if (!tcOwner) { cubeCellRegister[id] = terrainColumn; }
-      else if (tcOwner !== terrainColumn) { continue; }
+      if (id in cubeCellRegister) { 
+        const {terrainColumn:tcOwner, prevState} = cubeCellRegister[id];
+        if (tcOwner !== terrainColumn) {
+          // Has the state of the cube cell changed - if so then we need to make note of it
+          if (!isCornersStateEqual(prevState, corners)) {
+            affectedTerrainCols.add(tcOwner); 
+          }
+          continue;
+        }
+        else {
+          cubeCellRegister[id].prevState = corners;
+        } 
+      }
+      else {
+        cubeCellRegister[id] = {terrainColumn, prevState:corners};
+      }
 
       const currTris = [];
       MarchingCubes.polygonizeNodeCubeCell(corners, currTris);
 
-      // Clean up any triangles that are just lying flat on the y=0 plane
-      triangles.push.apply(triangles, currTris.filter(tri => {
+      const finalTris = [];
+      for (const tri of currTris) {
         const {a,b,c} = tri;
-        const {min} = tcBoundingBox;
-        return !(MathUtils.approxEquals(a.y, min.y) && MathUtils.approxEquals(b.y, min.y) && MathUtils.approxEquals(c.y, min.y));
-      }));
+        const {min,max} = tcBoundingBox;
+        // Clean up any triangles that are just lying flat on the y=0 plane
+        if (MathUtils.approxEquals(a.y, min.y) && MathUtils.approxEquals(b.y, min.y) && MathUtils.approxEquals(c.y, min.y)) {
+          continue;
+        }
+        finalTris.push(tri);
+      }
+      triangles.push.apply(triangles, finalTris);
     }
 
-    return triangles;
+    return affectedTerrainCols;
   }
 
   static polygonizeNodeCubeCell(nodeCubeCell, trianglesTarget) {

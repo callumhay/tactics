@@ -85,10 +85,11 @@ class TerrainColumn {
 
     const { rigidBodyLattice, terrainGroup } = this.battlefield;
     const nodeCubeCells = rigidBodyLattice.getTerrainColumnCubeCells(this);
-    const triangles = MarchingCubes.convertTerrainColumnToTriangles(this, nodeCubeCells)
-    if (triangles.length === 0) { return; }
+    const triangles = [];
+    const otherAffectedTerrainCols = MarchingCubes.convertTerrainColumnToTriangles(this, nodeCubeCells, triangles);
+    if (triangles.length === 0) { return otherAffectedTerrainCols; }
     const geometry = GeometryUtils.buildBufferGeometryFromTris(triangles);
-    if (geometry.getAttribute('position').count === 0) { return; } // Empty terrain column
+    if (geometry.getAttribute('position').count === 0) { return otherAffectedTerrainCols; } // Empty terrain column
 
     geometry.computeBoundingBox();
     const {boundingBox} = geometry;
@@ -119,6 +120,8 @@ class TerrainColumn {
     if (this.physObject === null) {
       this.clear();
     }
+
+    return otherAffectedTerrainCols;
   }
 
   getTerrainSpaceTranslation() {
@@ -126,13 +129,6 @@ class TerrainColumn {
     return new THREE.Vector3(
       xIndex * TerrainColumn.SIZE + TerrainColumn.HALF_SIZE, 0, zIndex * TerrainColumn.SIZE + TerrainColumn.HALF_SIZE
     );
-  }
-
-  attachDebris(debris) {
-    const {rigidBodyLattice} = this.battlefield;
-    // Find and activate all the nodes in this terrain column that are contained in the settled debris
-    rigidBodyLattice.addTerrainColumnDebris(this, debris);
-    this.regenerate();
   }
 
   toString() {
