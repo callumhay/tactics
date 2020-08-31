@@ -64,9 +64,10 @@ export default class Battlefield {
 
     // TODO: Debug routine?
     const grid = new THREE.GridHelper(Battlefield.MAX_SIZE, Battlefield.MAX_SIZE, 0x00FF00);
+    grid.translateY(0.1);
     grid.renderOrder = Debug.GRID_RENDER_ORDER;
-    grid.material.depthFunc = THREE.AlwaysDepth;
-    grid.material.opacity = 0.25;
+    //grid.material.depthFunc = THREE.AlwaysDepth;
+    grid.material.opacity = 0.4;
     grid.material.transparent = true;
     this.terrainGroup.add(grid);
 
@@ -93,21 +94,17 @@ export default class Battlefield {
       }
     }
 
+    // Traverse the lattice, find anything that might not be connected to the ground, 
+    // remove it from the terrain and turn it into a physical object
     this.terrainPhysicsCleanup();
 
+    // Regenerate everything
     for (let x = 0; x < this._terrain.length; x++) {
       for (let z = 0; z < this._terrain[x].length; z++) {
         this._terrain[x][z].regenerate();
       }
     }
 
-
-
-    
-
-    // Traverse the lattice, find anything that might not be connected to the ground, 
-    // remove it from the terrain and turn it into a physical object
-    
     //this.rigidBodyLattice.debugDrawNodes(true);
   }
 
@@ -148,10 +145,8 @@ export default class Battlefield {
     this.rigidBodyLattice.removeNodesInsideShape(explosionShape);
 
     // Update the terrain physics for any islands that may have been formed
-    const regenTerrainCols = this.terrainPhysicsCleanup();
-    for (const terrainCol of terrainCols) {
-      regenTerrainCols.add(terrainCol);
-    }
+    const regenTerrainCols = this.terrainPhysicsCleanup(terrainCols);
+    for (const terrainCol of terrainCols) { regenTerrainCols.add(terrainCol); }
     this.regenerateTerrainColumns(regenTerrainCols);
   
     //this.rigidBodyLattice.debugDrawNodes(true); // TODO: Remove this
@@ -278,14 +273,16 @@ export default class Battlefield {
 
   // Do a check for floating "islands" (i.e., terrain blobs that aren't connected to the ground), 
   // remove them from the terrain and turn them into physics objects
-  terrainPhysicsCleanup() {
-    const { rigidBodyLattice, terrainGroup, physics, debris} = this;
-    rigidBodyLattice.traverseGroundedNodes();
+  // The given affectedTerrainCols are the ones to examine and update, if a list isn't given then
+  // ALL terrainColumns are examined.
+  terrainPhysicsCleanup(affectedTerrainCols=[]) {
+    const {rigidBodyLattice, terrainGroup, physics, debris} = this;
 
+    rigidBodyLattice.traverseGroundedNodes(affectedTerrainCols);
     const islands = rigidBodyLattice.traverseIslands();
 
     // Build debris for each island and find all the terrain columns associated with each island
-    let terrainColumnSet = new Set();
+    const terrainColumnSet = new Set();
     for (const islandNodeSet of islands) {
       const debrisObj = new Debris(terrainGroup, rigidBodyLattice, islandNodeSet);
       if (debrisObj.mesh !== null) {

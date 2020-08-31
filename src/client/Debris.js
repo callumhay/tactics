@@ -76,12 +76,10 @@ class Debris {
     geometry.computeBoundingBox();
     const {boundingBox} = geometry;
     boundingBox.getCenter(tempVec3);
-    geometry.translate(-tempVec3.x, -tempVec3.y, -tempVec3.z);
+    geometry.center();
 
-    this.mesh = new THREE.Mesh(geometry, this.material.three);
-    this.mesh.translateX(tempVec3.x);
-    this.mesh.translateY(tempVec3.y);
-    this.mesh.translateZ(tempVec3.z);
+    this.mesh = new THREE.Mesh(geometry, this.material.debrisThree);
+    this.mesh.position.copy(tempVec3);
     this.mesh.updateMatrixWorld();
 
     this.mesh.castShadow = true;

@@ -332,6 +332,30 @@ export default class RigidBodyLattice {
     return cubeCells;
   }
 
+  getNodesInTerrainColumn(terrainColumn) {
+    const { nodeXIdxStart, nodeXIdxEnd, nodeZIdxStart, nodeZIdxEnd } = 
+      this._getXZIndexRangeForTerrainColumn(terrainColumn);
+
+    const result = [];
+    for (let x = nodeXIdxStart; x <= nodeXIdxEnd; x++) {
+      const nodesX = this.nodes[x];
+      if (!nodesX) { continue; }
+      for (let z = nodeZIdxStart; z <= nodeZIdxEnd; z++) {
+        const nodesXZ = nodesX[z];
+        if (!nodesXZ) { continue; }
+        for (let y = 0; y < nodesXZ.length; y++) {
+          const node = nodesXZ[y];
+          if (node) {
+            assert(node.terrainColumn === terrainColumn);
+            result.push(node);
+          }
+        }
+      }
+    }
+    return result;
+  }
+
+
   removeNodesInsideShape(shape) {
     // Get all possible nodes in the AABB of the shape...
     const boundingBox = new THREE.Box3();
@@ -380,20 +404,66 @@ export default class RigidBodyLattice {
     return neighbours;
   }
 
-  traverseGroundedNodes() {
+  traverseGroundedNodes(affectedTerrainCols=[]) {
     const traversalInfo = {};
-    const queue = [];
+    let queue = [];
 
-    // Initialize the node traversal info
-    for (let x = 0; x < this.nodes.length; x++) {
-      for (let z = 0; z < this.nodes[x].length; z++) {
-        for (let y = 0; y < this.nodes[x][z].length; y++) {
-          const node = this.nodes[x][z][y];
+    if (affectedTerrainCols && affectedTerrainCols.length > 0) {
+      // When terrain columns are provided we only focus on traversing the nodes 
+      // (and those attached to the nodes) in those columns
+
+      // Get a list of all nodes connected to (and including) affected nodes
+      // Have a seperate set of all the grounded nodes that are connected
+      for (const terrainCol of affectedTerrainCols) {
+        queue.push(...this.getNodesInTerrainColumn(terrainCol));
+      }
+      const allAffectedNodes = new Set(queue);
+      const allAffectedGroundNodes = new Set();
+      while (queue.length > 0) {
+        const node = queue.shift();
+        if (node) {
+          if (node.yIdx <= 0) { allAffectedGroundNodes.add(node); }
+          const neighbours = this.getNeighboursForNode(node)
+            .filter(n => n !== null && !allAffectedNodes.has(n));
+          for (const neighbour of neighbours) {
+            allAffectedNodes.add(neighbour);
+            queue.push(neighbour);
+          }
+        }
+      }
+      
+      // If the set of grounded nodes is empty then *every* affected node is ungrounded
+      if (allAffectedGroundNodes.count === 0) {
+        for (const node of allAffectedGroundNodes) {
+          node.grounded = false;
+        }
+        return;
+      }
+      else {
+        // ... otherwise, only re-traverse the connected nodes
+        queue = [];
+        for (const node of allAffectedNodes) {
           if (node) {
             node.grounded = false;
             traversalInfo[node.id] = { visitState: TRAVERSAL_UNVISITED_STATE };
             // Fill the queue with all the ground nodes
-            if (y <= 0) { queue.push(node); }
+            if (node.yIdx <= 0) { queue.push(node); }
+          }
+        }
+      }
+    }
+    else {
+      // Initialize the node traversal info
+      for (let x = 0; x < this.nodes.length; x++) {
+        for (let z = 0; z < this.nodes[x].length; z++) {
+          for (let y = 0; y < this.nodes[x][z].length; y++) {
+            const node = this.nodes[x][z][y];
+            if (node) {
+              node.grounded = false;
+              traversalInfo[node.id] = { visitState: TRAVERSAL_UNVISITED_STATE };
+              // Fill the queue with all the ground nodes
+              if (y <= 0) { queue.push(node); }
+            }
           }
         }
       }
@@ -409,7 +479,7 @@ export default class RigidBodyLattice {
           const neighbours = this.getNeighboursForNode(node).filter(n => n !== null);
           
           // If there are almost no neighbours, then the node is stranded and it should be removed.
-          if (neighbours.length <= 2) {
+          if (neighbours.length <= 1) {
             const {xIdx, zIdx, yIdx} = node;
             delete traversalInfo[node.id];
             this._removeNode(xIdx, zIdx, yIdx);
@@ -421,8 +491,7 @@ export default class RigidBodyLattice {
     }
   }
 
-  // Find islands in this lattice (i.e., isolated node regions that are not grounded),
-  // optional landingRanges parameter will limit the serach to only nodes in those ranges.
+  // Find islands in this lattice (i.e., isolated node regions that are not grounded).
   traverseIslands() {
     const traversalInfo = {};
     const islands = [];
@@ -431,7 +500,7 @@ export default class RigidBodyLattice {
       const neighbours = this.getNeighboursForNode(node).filter(n => n !== null);
       
       // If there are too few neighbours, then the node is stranded and it should be removed.
-      if (neighbours.length <= 2) {
+      if (neighbours.length <= 1) {
         const {xIdx, zIdx, yIdx} = node;
         delete traversalInfo[node.id];
         this._removeNode(xIdx, zIdx, yIdx);
@@ -445,7 +514,7 @@ export default class RigidBodyLattice {
 
       for (const neighbour of neighbours) {
         if (neighbour && traversalInfo[neighbour.id] && traversalInfo[neighbour.id].visitState === TRAVERSAL_UNVISITED_STATE) {
-          depthFirstSearch(neighbour, islandNodes, islandNodes);
+          depthFirstSearch(neighbour, islandNum, islandNodes);
         }
       }
     }

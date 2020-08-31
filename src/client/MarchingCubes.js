@@ -83,7 +83,7 @@ class MarchingCubes {
         }
         finalTris.push(tri);
       }
-      triangles.push.apply(triangles, finalTris);
+      triangles.push(...finalTris);
     }
 
     return affectedTerrainCols;

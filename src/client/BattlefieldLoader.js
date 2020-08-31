@@ -27,7 +27,8 @@ class BattlefieldLoader {
           }
           else {
             BattlefieldLoader.verifyMaterialGroup(terrainColJsonObj);
-            terrainColumn = new TerrainColumn(battlefield, terrain.length, terrainCols.length, [terrainColJsonObj]);
+            terrainColumn = new TerrainColumn(battlefield, terrain.length, terrainCols.length, 
+              isEmpty(terrainColJsonObj) ? [] : [terrainColJsonObj]);
           }
 
 
@@ -47,7 +48,7 @@ class BattlefieldLoader {
     assert(materialGroup, "There must be an object (even if its an empty one) to represent a given terrain column.");
     if (isEmpty(materialGroup)) {
       // Empty object just means the terrain column has nothing in it
-      return;
+      return null;
     }
 
     const { material, geometry } = materialGroup;
@@ -56,6 +57,7 @@ class BattlefieldLoader {
     if (!geometry) { throw `Invalid terrain column entry found: ${materialGroup} could not find 'geometry'.`; }
 
     BattlefieldLoader.verifyGeometry(geometry);
+    return materialGroup;
   }
 
   static verifyGeometry(geometry) {

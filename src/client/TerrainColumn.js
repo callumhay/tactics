@@ -94,17 +94,14 @@ class TerrainColumn {
     geometry.computeBoundingBox();
     const {boundingBox} = geometry;
     boundingBox.getCenter(tempVec3);
-    geometry.translate(-tempVec3.x, -tempVec3.y, -tempVec3.z);
-
+    geometry.center();
+    
     //const debugColour = this.debugColour();
     //debugColour.setRGB(debugColour.b, debugColour.g, debugColour.r).multiplyScalar(0.25);
     this.mesh = new THREE.Mesh(geometry, this.material.three);
     this.mesh.castShadow = true;
     this.mesh.receiveShadow = true;
-
-    this.mesh.translateX(tempVec3.x);
-    this.mesh.translateY(tempVec3.y);
-    this.mesh.translateZ(tempVec3.z);    
+    this.mesh.position.copy(tempVec3);    
     terrainGroup.add(this.mesh);
     this.mesh.updateMatrixWorld();
 
