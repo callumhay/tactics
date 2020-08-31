@@ -76,7 +76,7 @@ class MarchingCubes {
       const finalTris = [];
       for (const tri of currTris) {
         const {a,b,c} = tri;
-        const {min,max} = tcBoundingBox;
+        const {min} = tcBoundingBox;
         // Clean up any triangles that are just lying flat on the y=0 plane
         if (MathUtils.approxEquals(a.y, min.y) && MathUtils.approxEquals(b.y, min.y) && MathUtils.approxEquals(c.y, min.y)) {
           continue;

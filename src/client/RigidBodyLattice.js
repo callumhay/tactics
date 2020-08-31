@@ -245,7 +245,7 @@ export default class RigidBodyLattice {
     const n3 = yOutside ? {...n7, pos: xyz1Pt} : (xOutside || zPlus1 >= nodeArray[xIdx].length || yOutside || yIdx >= nodeArray[xIdx][zPlus1].length) ?
       { node: null, pos: xyz1Pt } : { node: nodeArray[xIdx][zPlus1][yIdx], pos: xyz1Pt };
 
-    return {id:MarchingCubes.createCubeCellRegisterKey(xIdx,yIdx,zIdx), corners: [n0,n1,n2,n3,n4,n5,n6,n7]};
+    return {id: MarchingCubes.createCubeCellRegisterKey(xIdx,yIdx,zIdx), corners: [n0,n1,n2,n3,n4,n5,n6,n7]};
   }
 
   _makeNodeCubeCell(xIdx, yIdx, zIdx) {
