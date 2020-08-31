@@ -89,7 +89,7 @@ class TerrainColumn {
     const otherAffectedTerrainCols = MarchingCubes.convertTerrainColumnToTriangles(this, nodeCubeCells, triangles);
     if (triangles.length === 0) { return otherAffectedTerrainCols; }
     const geometry = GeometryUtils.buildBufferGeometryFromTris(triangles);
-    if (geometry.getAttribute('position').count === 0) { return otherAffectedTerrainCols; } // Empty terrain column
+    if (geometry.getAttribute('position').count === 0) { return otherAffectedTerrainCols; }
 
     geometry.computeBoundingBox();
     const {boundingBox} = geometry;
@@ -100,7 +100,7 @@ class TerrainColumn {
     //debugColour.setRGB(debugColour.b, debugColour.g, debugColour.r).multiplyScalar(0.25);
     this.mesh = new THREE.Mesh(geometry, this.material.three);
     this.mesh.castShadow = true;
-    this.mesh.receiveShadow = false;
+    this.mesh.receiveShadow = true;
 
     this.mesh.translateX(tempVec3.x);
     this.mesh.translateY(tempVec3.y);
