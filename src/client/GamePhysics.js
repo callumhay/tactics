@@ -1,12 +1,8 @@
 import * as CANNON from 'cannon-es';
-import {assert} from 'chai';
-
 import { threeToCannon } from './threetocannon';
 
 import GameMaterials from './GameMaterials';
 import GameTypes from './GameTypes';
-
-
 
 class GamePhysics {
   constructor(scene, gameModel) {
@@ -27,27 +23,27 @@ class GamePhysics {
 
     this.onBodyCollision = this.onBodyCollision.bind(this);
     this.onBodySleep = this.onBodySleep.bind(this);
-
-    // TODO: Remove this...
-
   }
 
   update(dt) {
+    const toRemove = [];
+    for (const gameObject of Object.values(this.gameObjects)) {
+      const { mesh, body, remove } = gameObject;
+      if (remove) {
+        toRemove.push(gameObject);
+        console.log("Removing physics object: " + gameObject.id);
+        continue;
+      }
+    }
+    toRemove.forEach(gameObject => this.removeObject(gameObject));
     if (dt <= 1 / 30) { this.world.step(dt); }
     
     // Copy transforms from cannon to three
-    const toRemove = [];
     for (const gameObject of Object.values(this.gameObjects)) {
-      const {mesh, body, remove} = gameObject;
-      if (remove) { 
-        toRemove.push(gameObject); 
-        console.log("Removing physics object: " + gameObject.id); 
-        continue; 
-      }
+      const {mesh, body} = gameObject;
       mesh.position.copy(body.position);
       mesh.quaternion.copy(body.quaternion);
     }
-    toRemove.forEach(gameObject => this.removeObject(gameObject));
   }
 
   addObject(shapeType, physType, gameType, config) {
@@ -68,6 +64,7 @@ class GamePhysics {
     });
     body.addEventListener('collide', this.onBodyCollision);
     body.addEventListener('sleep', this.onBodySleep);
+    body.sleepSpeedLimit = 0.2;
     this.world.addBody(body);
 
     const id = body.id

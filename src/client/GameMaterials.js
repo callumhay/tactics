@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 
+import GameTypes from './GameTypes';
+
 const MATERIAL_TYPE_BEDROCK = "bedrock";
 const MATERIAL_TYPE_ROCK    = "rock";
 const MATERIAL_TYPE_DIRT    = "dirt";
@@ -8,18 +10,21 @@ const MATERIAL_TYPE_DIRT    = "dirt";
 // NOTE: Material density is measured in kg/m^3
 const materials = {
   [MATERIAL_TYPE_BEDROCK]: {
+    type: GameTypes.BEDROCK,
     density: 2000,
     dynamic: false,
     three: new THREE.MeshPhongMaterial({color: 0xffffff, shininess:10}),
     cannon: new CANNON.Material(MATERIAL_TYPE_BEDROCK)
   },
   [MATERIAL_TYPE_ROCK]: { 
+    type: GameTypes.TERRAIN,
     density: 1600,
     dynamic: true,
     three: new THREE.MeshPhongMaterial({ color: 0xffffff, shininess:10}),
     cannon: new CANNON.Material(MATERIAL_TYPE_ROCK)
   },
   [MATERIAL_TYPE_DIRT]: {
+    type: GameTypes.TERRAIN,
     density: 1225,
     dynamic: true,
     three: new THREE.MeshPhongMaterial({ color: 0xffffff, shininess:0 }),
@@ -27,20 +32,42 @@ const materials = {
   }
 };
 
-const BEDROCK_FRICTION = 0.5;
-const BEDROCK_RESTITUTION = 0.3;
-const ROCK_FRICTION = 0.4;
-const ROCK_RESTITUTION = 0.315;
-const DIRT_FRICTION = 0.562;
-const DIRT_RESTITUTION = 0.3;
+const BEDROCK_FRICTION = 0.9;
+const BEDROCK_RESTITUTION = 0.2;
+const ROCK_FRICTION = 0.8;
+const ROCK_RESTITUTION = 0.2;
+const DIRT_FRICTION = 0.9;
+const DIRT_RESTITUTION = 0.1;
 
+const MODERATE_STIFFNESS = 1e8;
+const STRONG_STIFFNESS = 1e10;
 
 const contactMaterials = [
-  new CANNON.ContactMaterial(materials[MATERIAL_TYPE_ROCK], materials[MATERIAL_TYPE_ROCK], { friction: ROCK_FRICTION, restitution: ROCK_RESTITUTION}),
-  new CANNON.ContactMaterial(materials[MATERIAL_TYPE_DIRT], materials[MATERIAL_TYPE_DIRT], { friction: DIRT_FRICTION, restitution: DIRT_RESTITUTION}),
-  new CANNON.ContactMaterial(materials[MATERIAL_TYPE_ROCK], materials[MATERIAL_TYPE_DIRT], { friction: (ROCK_FRICTION+DIRT_FRICTION)/2, restitution: (ROCK_RESTITUTION+DIRT_RESTITUTION)/2}),
-  new CANNON.ContactMaterial(materials[MATERIAL_TYPE_BEDROCK], materials[MATERIAL_TYPE_DIRT], { friction: (BEDROCK_FRICTION + DIRT_FRICTION) / 2, restitution: (BEDROCK_RESTITUTION + DIRT_RESTITUTION) / 2 }),
-  new CANNON.ContactMaterial(materials[MATERIAL_TYPE_BEDROCK], materials[MATERIAL_TYPE_ROCK], { friction: (ROCK_FRICTION + BEDROCK_FRICTION) / 2, restitution: (ROCK_RESTITUTION + BEDROCK_RESTITUTION) / 2 })
+  new CANNON.ContactMaterial(materials[MATERIAL_TYPE_ROCK], materials[MATERIAL_TYPE_ROCK], { 
+    friction: ROCK_FRICTION, restitution: ROCK_RESTITUTION,
+    contactEquationStiffness: MODERATE_STIFFNESS, contactEquationRelaxation: 3,
+    frictionEquationStiffness: MODERATE_STIFFNESS, frictionEquationRegularizationTime: 3,
+  }),
+  new CANNON.ContactMaterial(materials[MATERIAL_TYPE_DIRT], materials[MATERIAL_TYPE_DIRT], { 
+    friction: DIRT_FRICTION, restitution: DIRT_RESTITUTION,
+    contactEquationStiffness: STRONG_STIFFNESS, contactEquationRelaxation: 3,
+    frictionEquationStiffness: STRONG_STIFFNESS, frictionEquationRegularizationTime: 3,
+  }),
+  new CANNON.ContactMaterial(materials[MATERIAL_TYPE_ROCK], materials[MATERIAL_TYPE_DIRT], { 
+    friction: DIRT_FRICTION, restitution: DIRT_RESTITUTION,
+    contactEquationStiffness: STRONG_STIFFNESS, contactEquationRelaxation: 3,
+    frictionEquationStiffness: STRONG_STIFFNESS, frictionEquationRegularizationTime: 3,
+  }),
+  new CANNON.ContactMaterial(materials[MATERIAL_TYPE_BEDROCK], materials[MATERIAL_TYPE_DIRT], {
+    friction: BEDROCK_FRICTION, restitution: (BEDROCK_RESTITUTION + DIRT_RESTITUTION) / 2,
+    contactEquationStiffness: STRONG_STIFFNESS, contactEquationRelaxation: 3,
+    frictionEquationStiffness: STRONG_STIFFNESS, frictionEquationRegularizationTime: 3,
+  }),
+  new CANNON.ContactMaterial(materials[MATERIAL_TYPE_BEDROCK], materials[MATERIAL_TYPE_ROCK], {
+    friction: BEDROCK_FRICTION, restitution: BEDROCK_RESTITUTION,
+    contactEquationStiffness: STRONG_STIFFNESS, contactEquationRelaxation: 3,
+    frictionEquationStiffness: STRONG_STIFFNESS, frictionEquationRegularizationTime: 3, 
+  })
 ];
 
 const setTexProperties = (texture) => {
