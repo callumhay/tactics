@@ -58,14 +58,16 @@ class Debris {
     // 1. Group the geometry by material
     // 2. Create separate rigid bodies with different materials??
     const nodeCubeCells = rigidBodyLattice.getNodeIslandCubeCells(nodes);
-    const triangles = [];
+    const cubeIdsToTriMap = [];
     for (const nodeCubeCell of nodeCubeCells) {
-      const {corners} = nodeCubeCell;
+      const {id, corners} = nodeCubeCell;
+      const triangles = [];
       MarchingCubes.polygonizeNodeCubeCell(corners, triangles);
+      cubeIdsToTriMap[id] = triangles;
     }
 
     // Create the debris geometry, center it (so that we can do physics stuff cleanly) and move the translation over to the mesh
-    const geometry = GeometryUtils.buildBufferGeometryFromTris(triangles);
+    const geometry = GeometryUtils.buildBufferGeometryFromCubeTriMap(cubeIdsToTriMap);
     // If there isn't enough geometry in this object to make a convex shape then
     // this isn't going to be valid, exit now and leave the geometry/mesh null
     if (geometry.getAttribute('position').count < 4) {

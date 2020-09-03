@@ -1,12 +1,12 @@
 import * as THREE from 'three';
-import { assert } from 'chai';
 
 import GeometryUtils from '../GeometryUtils';
 
 import GameMaterials from './GameMaterials';
 import MarchingCubes from './MarchingCubes';
-import { MeshLambertMaterial, Geometry } from 'three';
 import Battlefield from './Battlefield';
+import { assert } from 'chai';
+import { TetrahedronGeometry } from 'three';
 
 const tempVec3 = new THREE.Vector3();
 
@@ -52,18 +52,25 @@ class TerrainColumn {
     }
   }
 
+  get id() {
+    return `${this.xIndex},${this.zIndex}`;
+  }
+  _clearPhysics() {
+    if (this.physObject) {
+      const { physics } = this.battlefield;
+      physics.removeObject(this.physObject);
+      this.physObject = null;
+    }
+  }
   clear() {
     if (this.mesh) {
       const { terrainGroup } = this.battlefield;
       terrainGroup.remove(this.mesh);
       this.mesh.geometry.dispose();
       this.mesh = null;
+      this.cachedCubeIdToTris = null;
     }
-    if (this.physObject) {
-      const { physics } = this.battlefield;
-      physics.removeObject(this.physObject);
-      this.physObject = null;
-    }
+    this._clearPhysics();
   }
 
   getBoundingBox() {
@@ -80,30 +87,64 @@ class TerrainColumn {
     );
   }
 
-  regenerate() {
-    this.clear();
-
+  // Regenerate the geometry and associated data structures for this terrain column
+  // If a set of cubeIds are provided then only those cubes will be examined and regenerated.
+  regenerate(cubeIds=null) {
+    const cubeIdsExist = (cubeIds && cubeIds.size > 0);
     const { rigidBodyLattice, terrainGroup } = this.battlefield;
-    const nodeCubeCells = rigidBodyLattice.getTerrainColumnCubeCells(this);
-    const triangles = [];
-    const otherAffectedTerrainCols = MarchingCubes.convertTerrainColumnToTriangles(this, nodeCubeCells, triangles);
-    if (triangles.length === 0) { return otherAffectedTerrainCols; }
-    const geometry = GeometryUtils.buildBufferGeometryFromTris(triangles);
-    if (geometry.getAttribute('position').count === 0) { return otherAffectedTerrainCols; }
+
+    const nodeCubeCells = cubeIdsExist ?  
+      rigidBodyLattice.getAllAssociatedCubeCellsForCubeIds(cubeIds) : 
+      rigidBodyLattice.getTerrainColumnCubeCells(this);
+    
+    const cubeIdToTriMap = {};
+    const affectedTcMap = MarchingCubes.convertTerrainColumnToTriangles(this, nodeCubeCells, cubeIdToTriMap);
+    
+    // If there's geometry already present then we rebuild it's geometry with the
+    // updated cube triangles
+    const maxTris = Math.floor(2 * Math.pow(rigidBodyLattice.numNodesPerUnit * TerrainColumn.SIZE - 1, 2) *
+      (rigidBodyLattice.numNodesPerUnit * Battlefield.MAX_HEIGHT - 1));
+    const maxVertices = 3 * maxTris;
+
+    let geometry = null;
+    if (this.mesh) {
+      const cubeIdToTriMapEntries = Object.entries(cubeIdToTriMap); 
+      if (cubeIdToTriMapEntries.length === 0) { return affectedTcMap; } // Nothing was changed
+
+      // Update our cached cube to triangle mapping with the changed cubes/tris
+      for (const cubeIdToTriEntry of cubeIdToTriMapEntries) {
+        const [id, triangles] = cubeIdToTriEntry;
+        this.cachedCubeIdToTris[id] = triangles;
+      }
+
+      this._clearPhysics();
+      geometry = this.mesh.geometry;
+      const drawCount = GeometryUtils.updateBufferGeometryFromCubeTriMap(
+        geometry, this.cachedCubeIdToTris, maxVertices);
+      if (drawCount === 0) { return affectedTcMap; }
+    }
+    else {
+      this.clear();
+      if (Object.values(cubeIdToTriMap).filter(tris => tris.length > 0).length === 0) { return affectedTcMap; } // Empty geometry
+      this.cachedCubeIdToTris = cubeIdToTriMap;
+      geometry = GeometryUtils.buildBufferGeometryFromCubeTriMap(this.cachedCubeIdToTris, maxVertices);
+      if (geometry.drawRange.count === 0) { geometry.dispose(); return affectedTcMap; } // Empty geometry
+      this.mesh = new THREE.Mesh(geometry, this.material.three);
+      this.mesh.castShadow = true;
+      this.mesh.receiveShadow = true;
+      terrainGroup.add(this.mesh);
+    }
 
     geometry.computeBoundingBox();
     const {boundingBox} = geometry;
     boundingBox.getCenter(tempVec3);
     geometry.center();
-    
     //const debugColour = this.debugColour();
     //debugColour.setRGB(debugColour.b, debugColour.g, debugColour.r).multiplyScalar(0.25);
-    this.mesh = new THREE.Mesh(geometry, this.material.three);
-    this.mesh.castShadow = true;
-    this.mesh.receiveShadow = true;
     this.mesh.position.copy(tempVec3);    
-    terrainGroup.add(this.mesh);
     this.mesh.updateMatrixWorld();
+
+    //terrainGroup.add(new THREE.Box3Helper(boundingBox.clone().applyMatrix4(this.mesh.matrixWorld)));
 
     const { physics } = this.battlefield;
     const config = {
@@ -116,7 +157,7 @@ class TerrainColumn {
       this.clear();
     }
 
-    return otherAffectedTerrainCols;
+    return affectedTcMap;
   }
 
   getTerrainSpaceTranslation() {

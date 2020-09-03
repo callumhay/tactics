@@ -104,7 +104,6 @@ const render = function () {
   gameModel.update(dt);
   controls.update();
 
-
   //cannonDebugRenderer.update();
 
   // Render the scene

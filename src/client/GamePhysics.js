@@ -33,9 +33,8 @@ class GamePhysics {
   }
 
   update(dt) {
-    const cleandt = Math.min(0.1, dt); // If the dt is too large it can do some fucked up things to our physics
-    this.world.step(cleandt);
-
+    if (dt <= 1 / 30) { this.world.step(dt); }
+    
     // Copy transforms from cannon to three
     const toRemove = [];
     for (const gameObject of Object.values(this.gameObjects)) {
@@ -51,13 +50,13 @@ class GamePhysics {
     toRemove.forEach(gameObject => this.removeObject(gameObject));
   }
 
-  addObject(type, gameType, config) {
+  addObject(shapeType, physType, gameType, config) {
     const { gameObject, mesh, density, material } = config;
-    const shape = threeToCannon(mesh, {type: threeToCannon.Type.HULL});
+    const shape = threeToCannon(mesh, { type: shapeType });
     if (shape === null) { return null; }
     const mass = (density || material.density) * shape.volume();
     const body = new CANNON.Body({
-      type: type,
+      type: physType,
       shape: shape,
       position: mesh.position,
       quaternion: mesh.quaternion,
@@ -77,8 +76,8 @@ class GamePhysics {
     return gameObj;
   }
 
-  addDebris(config) { return this.addObject(CANNON.Body.DYNAMIC, GameTypes.DEBRIS, config); }
-  addTerrain(config) { return this.addObject(CANNON.Body.STATIC, GameTypes.TERRAIN, config); }
+  addDebris(config) { return this.addObject(threeToCannon.Type.HULL, CANNON.Body.DYNAMIC, GameTypes.DEBRIS, config); }
+  addTerrain(config) { return this.addObject(threeToCannon.Type.HULL, CANNON.Body.STATIC, GameTypes.TERRAIN, config); }
 
   addBedrock(config) {
     const { gameType, gameObject, mesh, material } = config;

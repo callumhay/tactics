@@ -115,7 +115,8 @@ export default class RigidBodyLattice {
 
   addTerrainColumnBox(terrainColumn, config) {
     const {startY, endY, material} = config;
-    const {nodeXIdxStart, nodeXIdxEnd, nodeZIdxStart, nodeZIdxEnd} = this._getXZIndexRangeForTerrainColumn(terrainColumn);
+    const {nodeXIdxStart, nodeXIdxEnd, nodeZIdxStart, nodeZIdxEnd} = 
+      this._getXZIndexRangeForTerrainColumn(terrainColumn);
     const nodeYIdxStart = this._unitsToNodeIndex(startY);
     const nodeYIdxEnd = this._unitsToNodeIndex(endY);
 
@@ -154,19 +155,24 @@ export default class RigidBodyLattice {
     const tcBoundingBox = new THREE.Box3(
       new THREE.Vector3(nodeXIdxStart, nodeYIdxStart, nodeZIdxStart), new THREE.Vector3(nodeXIdxEnd, nodeYIdxEnd, nodeZIdxEnd)
     );
+
+    const raycaster = new THREE.Raycaster();
+    raycaster.ray.direction.set(0, 1, 0);
+    let rayPosTransform = null;
+    if (mesh.parent) { rayPosTransform = mesh.parent.matrixWorld; }
+    else { rayPosTransform = new THREE.Matrix4(); }
+
     // Convert the geometry bounding box into a node-index based box
     const geomBoundingBox = boundingBox.clone();
     {
       const {min,max} = geomBoundingBox;
+      min.subScalar(this.halfUnitsBetweenNodes);
+      max.subScalar(this.halfUnitsBetweenNodes);
       min.set(this._unitsToNodeIndex(min.x), this._unitsToNodeIndex(min.y), this._unitsToNodeIndex(min.z));
       max.set(this._unitsToNodeIndex(max.x), this._unitsToNodeIndex(max.y), this._unitsToNodeIndex(max.z));
     }
-
-    const raycaster = new THREE.Raycaster();
-    raycaster.ray.direction.set(0,1,0);
-    let rayPosTransform = null;
-    if (mesh.parent) { rayPosTransform = mesh.parent.matrixWorld;}
-    else { rayPosTransform = new THREE.Matrix4(); }
+    geomBoundingBox.expandByScalar(1);
+    
 
     // In order for the raycaster to collide with interior faces of the mesh, we need to 
     // temporarily set the material to be double-sided
@@ -177,6 +183,8 @@ export default class RigidBodyLattice {
     // Check whether each node is inside the geometry, if it is then add it
     tcBoundingBox.intersect(geomBoundingBox);
     const {min, max} = tcBoundingBox;
+
+    const addedNodes = [];
 
     while (this.nodes.length <= max.x) { this.nodes.push([]); }
     for (let x = min.x; x <= max.x; x++) {
@@ -189,37 +197,40 @@ export default class RigidBodyLattice {
           const nodePos = this._nodeIndexToPosition(x,y,z);
           let intersections = [];
           raycaster.ray.origin.set(nodePos.x, nodePos.y, nodePos.z).applyMatrix4(rayPosTransform);
-
           //const temp = new THREE.ArrowHelper(raycaster.ray.direction, raycaster.ray.origin, 0.1);
           //temp.line.material.depthFunc=THREE.AlwaysDepth;
           //temp.cone.material.depthFunc = THREE.AlwaysDepth;
           //terrainColumn.battlefield._scene.add(temp);
-    
           mesh.raycast(raycaster, intersections);
-          if (intersections.length > 0) {
+          intersections.sort((a,b) => a.distance-b.distance);
+
+          if (intersections.length > 0 /*&& intersections[0].face.normal.dot(raycaster.ray.direction) >= 0*/) {
             nodesXZ[y] = new LatticeNode(this.nextNodeId++, x, z, y, nodePos, terrainColumn, material);
+            addedNodes.push(nodesXZ[y]);
           }
         }
       }
     }
-
     mesh.material.side = temp;
+    return addedNodes;
   }
 
   _getNodeCubePositions(xIdx, yIdx, zIdx) {
+    const indices = MarchingCubes.getNodeIndices(xIdx,yIdx,zIdx);
     return {
-      xyzPt    : this._nodeIndexToPosition(xIdx,yIdx,zIdx),
-      x1yzPt   : this._nodeIndexToPosition(xIdx+1,yIdx,zIdx),
-      x1yz1Pt  : this._nodeIndexToPosition(xIdx+1,yIdx,zIdx+1),
-      xyz1Pt   : this._nodeIndexToPosition(xIdx,yIdx,zIdx+1),
-      xy1zPt   : this._nodeIndexToPosition(xIdx,yIdx+1,zIdx),
-      x1y1zPt  : this._nodeIndexToPosition(xIdx+1,yIdx+1,zIdx),
-      x1y1z1Pt : this._nodeIndexToPosition(xIdx+1,yIdx+1,zIdx+1),
-      xy1z1Pt  : this._nodeIndexToPosition(xIdx,yIdx+1,zIdx+1),
+      xyzPt: this._nodeIndexToPosition(...indices[0]),
+      x1yzPt: this._nodeIndexToPosition(...indices[1]),
+      x1yz1Pt: this._nodeIndexToPosition(...indices[2]),
+      xyz1Pt: this._nodeIndexToPosition(...indices[3]),
+      xy1zPt: this._nodeIndexToPosition(...indices[4]),
+      x1y1zPt: this._nodeIndexToPosition(...indices[5]),
+      x1y1z1Pt: this._nodeIndexToPosition(...indices[6]),
+      xy1z1Pt: this._nodeIndexToPosition(...indices[7]),
     };
   }
 
   static _makeNodeCubeCellFromNodeArray(xIdx, yIdx, zIdx, nodeArray, positionFunc) {
+    if (xIdx < -1 || yIdx < -1 || zIdx < -1) { return null; }
     const {xyzPt, x1yzPt, x1yz1Pt, xyz1Pt, xy1zPt, x1y1zPt, x1y1z1Pt, xy1z1Pt} = positionFunc(xIdx,yIdx,zIdx);
     const xPlus1 = xIdx+1, yPlus1 = yIdx+1, zPlus1 = zIdx+1;
     const xOutside = (xIdx < 0 || xIdx >= nodeArray.length);
@@ -245,7 +256,7 @@ export default class RigidBodyLattice {
     const n3 = yOutside ? {...n7, pos: xyz1Pt} : (xOutside || zPlus1 >= nodeArray[xIdx].length || yOutside || yIdx >= nodeArray[xIdx][zPlus1].length) ?
       { node: null, pos: xyz1Pt } : { node: nodeArray[xIdx][zPlus1][yIdx], pos: xyz1Pt };
 
-    return {id: MarchingCubes.createCubeCellRegisterKey(xIdx,yIdx,zIdx), corners: [n0,n1,n2,n3,n4,n5,n6,n7]};
+    return { id: MarchingCubes.createCubeCellRegisterKey(xIdx, yIdx, zIdx), xIdx, yIdx, zIdx, corners: [n0,n1,n2,n3,n4,n5,n6,n7]};
   }
 
   _makeNodeCubeCell(xIdx, yIdx, zIdx) {
@@ -269,11 +280,62 @@ export default class RigidBodyLattice {
     for (let x = nodeXIdxStart-1; x <= nodeXIdxEnd; x++) {
       for (let z = nodeZIdxStart-1; z <= nodeZIdxEnd; z++) {
         for (let y = -1; y <= maxYIdx; y++) {
-          cubeCells.push(this._makeNodeCubeCell(x,y,z));
+          const cubeCell = this._makeNodeCubeCell(x, y, z);
+          assert(cubeCell, "The cube cells in this function should not be out of boundary this much!");
+          cubeCells.push(cubeCell);
         }
       }
     }
     return cubeCells;
+  }
+
+  getAllAssociatedCubeCellsForCubeIds(cubeIds) {
+    const queue = [];
+
+    for (const cubeId of cubeIds) {
+      // Parse the index from the ID
+      const {xIdx,yIdx,zIdx} = MarchingCubes.cubeCellRegisterKeyToIndex(cubeId);
+
+      const cubeCell = this._makeNodeCubeCell(xIdx, yIdx, zIdx);
+      assert(cubeCell);
+      queue.push(cubeCell);
+    }
+    
+    // We need to go through and find all corners that are different and make sure
+    // that we're accounting for connected cubes
+    const neighbourCornerIncrements = [
+      [0,0,0], [-1,0,0],  [-1,0,-1],  [0,0,-1],
+      [0,-1,0], [-1,-1,0], [-1,-1,-1], [0,-1,-1]
+    ];
+    const nodeCornerIncrements = MarchingCubes.getNodeIndexIncrements();
+    const cubeCellMap = {};
+    
+    while (queue.length > 0) {
+      //console.log(queue.length);
+      const cubeCell = queue.shift();
+      if (!cubeCell || cubeCell.id in cubeCellMap) { continue; }
+
+      cubeCellMap[cubeCell.id] = cubeCell;
+
+      const { xIdx, yIdx, zIdx } = cubeCell;
+      const diffCornerIndices = MarchingCubes.diffCornerIndicesToRegister(cubeCell);
+
+      // For each corner that's different we need to examine all cubes that the corner is attached to
+      for (const diffCornerIdx of diffCornerIndices) {
+        const cornerIncrement = nodeCornerIncrements[diffCornerIdx];
+        const cornerXIdx = xIdx + cornerIncrement[0],
+          cornerYIdx = yIdx + cornerIncrement[1],
+          cornerZIdx = zIdx + cornerIncrement[2];
+        for (const neighbourIncrement of neighbourCornerIncrements) {
+          const [xInc, yInc, zInc] = neighbourIncrement;
+          const x = cornerXIdx + xInc, y = cornerYIdx + yInc, z = cornerZIdx + zInc;
+          const neighbourCubeCell = this._makeNodeCubeCell(x, y, z);
+          queue.push(neighbourCubeCell);
+        }
+      }
+    }
+    
+    return Object.values(cubeCellMap).filter(cell => cell !== null);
   }
 
   getNodeIslandCubeCells(nodes) {
@@ -324,7 +386,9 @@ export default class RigidBodyLattice {
       for (let z = 0; z < zNodes.length; z++) {
         const yNodes = zNodes[z];
         for (let y = 0; y < yNodes.length; y++) {
-          cubeCells.push(RigidBodyLattice._makeNodeCubeCellFromNodeArray(x, y, z, isolatedNodes, isolatedNodePositionFunc));
+          const cubeCell = RigidBodyLattice._makeNodeCubeCellFromNodeArray(x, y, z, isolatedNodes, isolatedNodePositionFunc);
+          assert(cubeCell, "The cube cells in this function should not be this far out of index!");
+          cubeCells.push(cubeCell);
         }
       }
     }
@@ -357,20 +421,25 @@ export default class RigidBodyLattice {
 
 
   removeNodesInsideShape(shape) {
+    const removedNodes = [];
     // Get all possible nodes in the AABB of the shape...
     const boundingBox = new THREE.Box3();
     shape.getBoundingBox(boundingBox);
+    //boundingBox.min.addScalar(this.halfUnitsBetweenNodes);
+    //boundingBox.max.addScalar(this.halfUnitsBetweenNodes);
     const {nodeXIdxStart, nodeXIdxEnd, nodeYIdxStart, nodeYIdxEnd, nodeZIdxStart, nodeZIdxEnd} = this._getIndexRangeForBoundingBox(boundingBox);
     for (let x = nodeXIdxStart; x <= nodeXIdxEnd && x < this.nodes.length; x++) {
       for (let z = nodeZIdxStart; z <= nodeZIdxEnd && z < this.nodes[x].length; z++) {
         for (let y = nodeYIdxStart; y <= nodeYIdxEnd && y < this.nodes[x][z].length; y++) {
           const node = this.nodes[x][z][y];
           if (node && shape.containsPoint(node.pos)) {
+            removedNodes.push(node);
             this._removeNode(x,z,y);
           }
         }
       }
     }
+    return removedNodes;
   }
   removeNodes(nodes) {
     for (const node of nodes) {
@@ -478,12 +547,14 @@ export default class RigidBodyLattice {
           nodeTraversalInfo.visitState = TRAVERSAL_FINISHED_STATE;
           const neighbours = this.getNeighboursForNode(node).filter(n => n !== null);
           
+          /*
           // If there are almost no neighbours, then the node is stranded and it should be removed.
           if (neighbours.length <= 1) {
             const {xIdx, zIdx, yIdx} = node;
             delete traversalInfo[node.id];
             this._removeNode(xIdx, zIdx, yIdx);
           }
+          */
           
           queue.push(...neighbours);
         }
@@ -499,6 +570,7 @@ export default class RigidBodyLattice {
     const depthFirstSearch = (node, islandNum, islandNodes) => {
       const neighbours = this.getNeighboursForNode(node).filter(n => n !== null);
       
+      /*
       // If there are too few neighbours, then the node is stranded and it should be removed.
       if (neighbours.length <= 1) {
         const {xIdx, zIdx, yIdx} = node;
@@ -511,6 +583,11 @@ export default class RigidBodyLattice {
         nodeTraversalInfo.visitState = TRAVERSAL_FINISHED_STATE;
         islandNodes.add(node);
       }
+      */
+      const nodeTraversalInfo = traversalInfo[node.id];
+      nodeTraversalInfo.islandNum = islandNum;
+      nodeTraversalInfo.visitState = TRAVERSAL_FINISHED_STATE;
+      islandNodes.add(node);
 
       for (const neighbour of neighbours) {
         if (neighbour && traversalInfo[neighbour.id] && traversalInfo[neighbour.id].visitState === TRAVERSAL_UNVISITED_STATE) {

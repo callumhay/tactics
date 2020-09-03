@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 
 import MathUtils from './MathUtils';
+import { assert } from 'chai';
 
 const tempVec3 = new THREE.Vector3();
 const tempVec3a = new THREE.Vector3();
@@ -32,39 +33,44 @@ class GeometryUtils {
     return new THREE.Line3(point, dir.add(point));
   }
 
-  static buildBufferGeometryFromTris(triangles, smoothingAngle=40*Math.PI/180, tolerance=1e-4) {
+  static buildBuffersFromCubeTriMap(cubeIdToTriMap, smoothingAngle=40*Math.PI/180, tolerance=1e-4) {
     tolerance = Math.max(tolerance, Number.EPSILON);
     const decimalShift = Math.log10(1/tolerance);
     const shiftMultiplier = Math.pow(10, decimalShift);
     const makeValueHash = (value) => {
       return `${~ ~(value * shiftMultiplier)}`; // ~ ~ truncates the value
-    }
+    };
     const makeVertexHash = (vertex) => {
       const {x,y,z} = vertex;
       return `${makeValueHash(x)},${makeValueHash(y)},${makeValueHash(z)}`;
-    }
+    };
 
     const faces = [];
     const vertexMap = {};
-    for (const triangle of triangles) {
-      const {a,b,c} = triangle
-      const normal = triangle.getNormal(tempVec3).clone();
-      // If the normal is zero then we get rid of the triangle
-      if (normal.lengthSq() < tolerance*tolerance) {
-        continue;
-      }
+    for (const cubeIdToTris of Object.entries(cubeIdToTriMap)) {
+      const [cubeId, triangles] = cubeIdToTris;
+      for (const triangle of triangles) {
+        const {a,b,c} = triangle
+        const normal = triangle.getNormal(tempVec3).clone();
 
-      const face = [0,0,0];
-      faces.push(face);
-      [a,b,c].forEach((vertex,idx) => {
-        const hash = makeVertexHash(vertex);
-        let vertexLookup = vertexMap[hash];
-        if (!vertexLookup) {
-          vertexLookup = vertexMap[hash] = {vertex: vertex, normals:[], faces:[]};
+        // If the normal is zero then we get rid of the triangle
+        if (normal.lengthSq() < tolerance*tolerance) {
+          assert(false);
+          continue;
         }
-        vertexLookup.normals.push(normal);
-        vertexLookup.faces.push([face,idx])
-      });
+
+        const face = [0,0,0,cubeId];
+        faces.push(face);
+        [a,b,c].forEach((vertex,idx) => {
+          const hash = makeVertexHash(vertex);
+          let vertexLookup = vertexMap[hash];
+          if (!vertexLookup) {
+            vertexLookup = vertexMap[hash] = { vertex, normals: [], faces: []};
+          }
+          vertexLookup.normals.push(normal);
+          vertexLookup.faces.push([face,idx]);
+        });
+      }
     }
 
     const vertices = [];
@@ -119,23 +125,75 @@ class GeometryUtils {
           });
         }
       }
-
     }
 
     const indices = new Array(faces.length*3);
+    //const cubeIdMap = {}
     let indexCount = 0;
-    faces.forEach(face => {
+    faces.forEach((face/*,faceIdx*/) => {
       indices[indexCount++] = face[0];
       indices[indexCount++] = face[1];
       indices[indexCount++] = face[2];
+      //if (!cubeIdMap[face[3]]) { cubeIdMap[face[3]] = []; }
+      //cubeIdMap[face[3]].push(faceIdx);
     });
-  
-    let threeGeometry = new THREE.BufferGeometry();
-    threeGeometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(vertices), 3));
-    threeGeometry.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(normalVecs), 3, true));
-    threeGeometry.setIndex(indices);
-    
+
+    return { vertices, normals: normalVecs, indices };
+  }
+
+  static buildBufferGeometryFromCubeTriMap(cubeIdToTriMap, maxVertices=-1) {
+    const { vertices, normals, indices } = 
+      GeometryUtils.buildBuffersFromCubeTriMap(cubeIdToTriMap);
+    const useArraySizes = maxVertices === - 1;
+
+    const threeGeometry = new THREE.BufferGeometry();
+    const fullVertices = new Float32Array(useArraySizes ? vertices.length : maxVertices * 3);
+    fullVertices.set(vertices, 0);
+    const fullNormals = new Float32Array(useArraySizes ? normals.length : maxVertices * 3);
+    fullNormals.set(normals, 0);
+    const fullIndices = new Uint32Array(useArraySizes ? indices.length : maxVertices * 3);
+    fullIndices.set(indices, 0);
+
+    const posAttr = new THREE.BufferAttribute(fullVertices, 3);
+    posAttr.count = vertices.length/3;
+    const normalAttr = new THREE.BufferAttribute(fullNormals, 3, true);
+    normalAttr.count = normals.length/3;
+    const indexAttr = new THREE.Uint32BufferAttribute(fullIndices, 1);
+    indexAttr.count = indices.length;
+
+    threeGeometry.setAttribute('position', posAttr);
+    threeGeometry.setAttribute('normal', normalAttr);
+    threeGeometry.setIndex(indexAttr);
+    threeGeometry.setDrawRange(0,indices.length);
+
+    //threeGeometry.cubeIdMap = cubeIdMap;
     return threeGeometry;
+  }
+
+  static updateBufferGeometryFromCubeTriMap(bufferGeometry, cubeIdToTriMap, maxVertices) {
+    const { vertices, normals, indices } =
+      GeometryUtils.buildBuffersFromCubeTriMap(cubeIdToTriMap);
+    assert(vertices.length / 3 <= maxVertices, "Maximum vertices exceeded. This shouldn't happen, check your math!");
+    
+    const positionAttr = bufferGeometry.getAttribute('position'),
+      normalAttr = bufferGeometry.getAttribute('normal'),
+      indexAttr = bufferGeometry.index;
+
+    positionAttr.array.set(vertices,0);
+    positionAttr.count = vertices.length/3;
+    positionAttr.needsUpdate = true;
+
+    normalAttr.array.set(normals, 0);
+    normalAttr.count = normals.length/3;
+    normalAttr.needsUpdate = true;
+
+    indexAttr.array.set(indices, 0);
+    indexAttr.count = indices.length;
+    indexAttr.needsUpdate = true;
+    
+    bufferGeometry.setDrawRange(0, indices.length);
+
+    return indices.length;
   }
 
 }

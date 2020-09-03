@@ -95,26 +95,7 @@ threeToCannon.Type = Type;
  * @return {CANNON.Shape}
  */
 function createBoundingBoxShape (object) {
-  var clone = object.clone();
-  clone.quaternion.set(0, 0, 0, 1);
-  clone.updateMatrixWorld();
-
-  var box = new Box3().setFromObject(clone);
-
-  if (!isFinite(box.min.lengthSq())) return null;
-
-  var shape = new Box(new Vec3(
-    (box.max.x - box.min.x) / 2,
-    (box.max.y - box.min.y) / 2,
-    (box.max.z - box.min.z) / 2
-  ));
-
-  var localPosition = box.translate(clone.position.negate()).getCenter(new Vector3());
-  if (localPosition.lengthSq()) {
-    shape.offset = localPosition;
-  }
-
-  return shape;
+  return createBoxShape(object.geometry);
 }
 
 /**
