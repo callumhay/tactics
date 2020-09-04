@@ -211,10 +211,6 @@ class Battlefield {
     rotation.set(0,0,0);
     mesh.updateMatrix();
 
-    geometry.computeBoundingBox();
-    const aabb = geometry.boundingBox.clone();
-    aabb.applyMatrix4(mesh.matrix);
-
     // Bake the translation into the geometry and remove the remaining transform from the mesh
     const translation = new THREE.Vector3(
       MathUtils.roundToDecimal(mesh.position.x, 2), 
@@ -222,7 +218,6 @@ class Battlefield {
       MathUtils.roundToDecimal(mesh.position.z, 2)
     );
     geometry.translate(translation.x, translation.y, translation.z);
-    geometry.computeBoundingBox();
 
     mesh.translateX(-translation.x);
     mesh.translateY(-translation.y);
@@ -233,32 +228,45 @@ class Battlefield {
       MathUtils.roundToDecimal(mesh.position.z, 2),
     );
     mesh.updateMatrixWorld();
+    
 
     // Check to see if the mesh is inside the playable area anymore
     //this.terrainGroup.add(new THREE.Box3Helper(new THREE.Box3(closestMin.clone(), closestMax.clone()))); // Debugging
 
     // We need to reattach the debris to the terrain in all the 
     // correct terrain columns that it now occupies
+    geometry.computeBoundingBox();
     const {min, max} = geometry.boundingBox;
-    const {clamp} = THREE.MathUtils;
-    const startX = clamp(Math.floor(min.x), 0, this._terrain.length-1);
-    const endX = clamp(Math.ceil(max.x), 0, this._terrain.length-1);
+    const floorMinX = Math.floor(min.x);
+    const ceilMaxX = Math.ceil(max.x);
+    const floorMinZ = Math.floor(min.z);
+    const ceilMaxZ = Math.ceil(max.z);
 
     let numAddedNodes = 0;
     const tcCubeIdMap = {};
-    for (let x = startX; x <= endX; x++) {
-      const startZ = clamp(Math.floor(min.z), 0, this._terrain[x].length-1);
-      const endZ = clamp(Math.ceil(max.z), 0, this._terrain[x].length-1);
-      for (let z = startZ; z <= endZ; z++) {
-        const terrainColumn = this._terrain[x][z];
-        const { id } = terrainColumn;
-        const addedNodes = this.rigidBodyLattice.addTerrainColumnDebris(terrainColumn, debrisObj);
-        numAddedNodes += addedNodes.length;
-        if (addedNodes.length > 0 && !tcCubeIdMap[id]) { 
-          tcCubeIdMap[id] = { terrainColumn, cubeIds: addedNodes.map(n => {
-            const {xIdx, yIdx, zIdx} = n;
-            return MarchingCubes.createCubeCellRegisterKey(xIdx,yIdx,zIdx);
-          })} 
+    if (ceilMaxX >= 0 && floorMinX < this._terrain.length && ceilMaxZ >= 0 && floorMinZ < this._terrain[0].length) {
+
+      const startX = floorMinX;
+      const endX = ceilMaxX;
+      const startZ = floorMinZ;
+      const endZ = ceilMaxZ;
+
+      for (let x = startX; x <= endX; x++) {
+        if (this._terrain[x]) {
+          for (let z = startZ; z <= endZ; z++) {
+            if (this._terrain[x][z]) {
+              const terrainColumn = this._terrain[x][z];
+              const { id } = terrainColumn;
+              const addedNodes = this.rigidBodyLattice.addTerrainColumnDebris(terrainColumn, debrisObj);
+              numAddedNodes += addedNodes.length;
+              if (addedNodes.length > 0 && !tcCubeIdMap[id]) { 
+                tcCubeIdMap[id] = { terrainColumn, cubeIds: addedNodes.map(n => {
+                  const {xIdx, yIdx, zIdx} = n;
+                  return MarchingCubes.createCubeCellRegisterKey(xIdx,yIdx,zIdx);
+                })} 
+              }
+            }
+          }
         }
       }
     }

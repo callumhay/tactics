@@ -1,4 +1,4 @@
-import { Box, ConvexPolyhedron, Cylinder, Shape, Sphere, Quaternion as CQuaternion, Trimesh, Vec3 } from 'cannon-es';
+import { Plane, Box, ConvexPolyhedron, Cylinder, Shape, Sphere, Quaternion as CQuaternion, Trimesh, Vec3 } from 'cannon-es';
 import { ConvexHull } from 'three/examples/jsm/math/ConvexHull.js';
 import { Box3, BufferGeometry, Geometry, Math as _Math, Matrix4, Mesh, Quaternion, Vector3 } from 'three';
 
@@ -9,7 +9,8 @@ var Type = {
   CYLINDER: 'Cylinder',
   SPHERE: 'Sphere',
   HULL: 'ConvexPolyhedron',
-  MESH: 'Trimesh'
+  MESH: 'Trimesh',
+  PLANE: 'Plane',
 };
 
 /**
@@ -23,6 +24,8 @@ export const threeToCannon = function (object, options) {
   var geometry;
 
   switch (options.type) {
+    case Type.PLANE:
+      return new Plane();
     case Type.BOX:
       return createBoundingBoxShape(object);
     case Type.CYLINDER:

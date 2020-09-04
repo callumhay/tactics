@@ -6,29 +6,41 @@ import GameTypes from './GameTypes';
 const MATERIAL_TYPE_BEDROCK = "bedrock";
 const MATERIAL_TYPE_ROCK    = "rock";
 const MATERIAL_TYPE_DIRT    = "dirt";
+const MATERIAL_TYPE_MOSS    = "moss";
 
 // NOTE: Material density is measured in kg/m^3
 const materials = {
   [MATERIAL_TYPE_BEDROCK]: {
-    type: GameTypes.BEDROCK,
+    type: MATERIAL_TYPE_BEDROCK,
+    gameType: GameTypes.BEDROCK,
     density: 2000,
     dynamic: false,
     three: new THREE.MeshPhongMaterial({color: 0xffffff, shininess:10}),
-    cannon: new CANNON.Material(MATERIAL_TYPE_BEDROCK)
+    cannon: new CANNON.Material(MATERIAL_TYPE_BEDROCK),
   },
-  [MATERIAL_TYPE_ROCK]: { 
-    type: GameTypes.TERRAIN,
+  [MATERIAL_TYPE_ROCK]: {
+    type: MATERIAL_TYPE_ROCK,
+    gameType: GameTypes.TERRAIN,
     density: 1600,
     dynamic: true,
     three: new THREE.MeshPhongMaterial({ color: 0xffffff, shininess:10}),
-    cannon: new CANNON.Material(MATERIAL_TYPE_ROCK)
+    cannon: new CANNON.Material(MATERIAL_TYPE_ROCK),
   },
   [MATERIAL_TYPE_DIRT]: {
-    type: GameTypes.TERRAIN,
+    type: MATERIAL_TYPE_DIRT,
+    gameType: GameTypes.TERRAIN,
     density: 1225,
     dynamic: true,
     three: new THREE.MeshPhongMaterial({ color: 0xffffff, shininess:0 }),
-    cannon: new CANNON.Material(MATERIAL_TYPE_DIRT)
+    cannon: new CANNON.Material(MATERIAL_TYPE_DIRT),
+  },
+  [MATERIAL_TYPE_MOSS]: {
+    type: MATERIAL_TYPE_MOSS,
+    gameType: GameTypes.TERRAIN,
+    density: 1000,
+    dynamic: true,
+    three: new THREE.MeshPhongMaterial({ color: 0xffffff, shininess:20 }),
+    cannon: new CANNON.Material(MATERIAL_TYPE_MOSS),
   }
 };
 

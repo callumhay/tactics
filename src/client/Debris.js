@@ -2,6 +2,7 @@ import * as THREE from 'three';
 
 import GeometryUtils from '../GeometryUtils';
 import MarchingCubes from './MarchingCubes';
+import { assert } from 'chai';
 
 const tempVec3 = new THREE.Vector3();
 
@@ -48,7 +49,6 @@ class Debris {
 
     // Calculate the density based on node materials
     this.density = 0;
-    this.material = nodes.values().next().value.material;
     for (const node of nodes) {
       this.density += node.density;
     }
@@ -61,26 +61,27 @@ class Debris {
     const cubeIdsToTriMap = [];
     for (const nodeCubeCell of nodeCubeCells) {
       const {id, corners} = nodeCubeCell;
-      const triangles = [];
-      MarchingCubes.polygonizeNodeCubeCell(corners, triangles);
-      cubeIdsToTriMap[id] = triangles;
+      const triMatObjs = MarchingCubes.polygonizeNodeCubeCell(corners);
+      cubeIdsToTriMap[id] = triMatObjs;
     }
 
     // Create the debris geometry, center it (so that we can do physics stuff cleanly) and move the translation over to the mesh
-    const geometry = GeometryUtils.buildBufferGeometryFromCubeTriMap(cubeIdsToTriMap);
+    const {geometry, materials} = GeometryUtils.buildBufferGeometryFromCubeTriMap(cubeIdsToTriMap);
     // If there isn't enough geometry in this object to make a convex shape then
     // this isn't going to be valid, exit now and leave the geometry/mesh null
     if (geometry.getAttribute('position').count < 4) {
       geometry.dispose();
       return;
     }
+    assert(materials.length > 0);
+    this.material = materials[0]; // TODO: For now we just use the first material for the physics
 
     geometry.computeBoundingBox();
     const {boundingBox} = geometry;
     boundingBox.getCenter(tempVec3);
     geometry.center();
 
-    this.mesh = new THREE.Mesh(geometry, this.material.debrisThree);
+    this.mesh = new THREE.Mesh(geometry, materials.map(m => m.debrisThree));
     this.mesh.position.copy(tempVec3);
     this.mesh.updateMatrixWorld();
 

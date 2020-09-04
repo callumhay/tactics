@@ -67,8 +67,8 @@ class MarchingCubes {
     delete cubeCellRegister[key];
   }
 
-  static convertTerrainColumnToTriangles(terrainColumn, nodeCubeCells, cubeIdToTriMap) {
-    const { cachedCubeIdToTris } = terrainColumn;
+  static convertTerrainColumnToTriangles(terrainColumn, nodeCubeCells, cubeIdToTriMatMap) {
+    const { cachedCubeIdToTriMatObjs } = terrainColumn;
     const affectedTCMap = {};
     for (const nodeCubeCell of nodeCubeCells) {
       const {id:cubeId, xIdx, yIdx, zIdx, corners} = nodeCubeCell;
@@ -87,7 +87,7 @@ class MarchingCubes {
         }
 
         if (MarchingCubes.areCornersEqual(prevState, corners) && 
-            cachedCubeIdToTris && cachedCubeIdToTris[cubeId]) {
+            cachedCubeIdToTriMatObjs && cachedCubeIdToTriMatObjs[cubeId]) {
           continue;
         }
         else {
@@ -98,48 +98,51 @@ class MarchingCubes {
         cubeCellRegister[cubeId] = { terrainColumn, xIdx, yIdx, zIdx, prevState:corners};
       }
 
-      let currTris = [];
-      MarchingCubes.polygonizeNodeCubeCell(corners, currTris);
-      currTris = currTris.filter(tri => {
-        const { a, b, c } = tri;
-        return !(MathUtils.approxEquals(a.y, 0) && MathUtils.approxEquals(b.y, 0) && MathUtils.approxEquals(c.y, 0));
-      });
-      cubeIdToTriMap[cubeId] = currTris;
+      cubeIdToTriMatMap[cubeId] = MarchingCubes.polygonizeNodeCubeCell(corners);
     }
 
     return affectedTCMap;
   }
 
-  static polygonizeNodeCubeCell(nodeCubeCell, trianglesTarget) {
+  static polygonizeNodeCubeCell(nodeCubeCell) {
     // Determine the index into the edge table which tells us which vertices are inside of the surface
     // For nodes, a node is inside a surface if it exists (otherwise it would be null)
     const cubeindex = calcCubeIndex(nodeCubeCell);
     const edgeLookup = edgeTable[cubeindex];
     // Early out: Cube is entirely in/out of the surface
-    if (edgeLookup === 0) { return 0; }
-    // Find the vertices where the surface intersects the cube
-    const vertexList = calcEdgeLookupVertices(nodeCubeCell, edgeLookup);
+    if (edgeLookup === 0) { return []; }
 
-    // Create the triangles
+    // Find the vertices where the surface intersects the cube
+    const {vertexList, materialList} = calcEdgeLookupVertices(nodeCubeCell, edgeLookup);
+
+    // Create the triangles with the appropriate materials
     const triLookup = triTable[cubeindex];
-    let triCount = 0;
+    const triMaterialObjs = [];
+    let currMaterial = null;
     for (let i = 0; triLookup[i] !== -1; i += 3) {
       const a = vertexList[triLookup[i]], 
             b = vertexList[triLookup[i+1]], 
             c = vertexList[triLookup[i+2]];
-      trianglesTarget.push(new THREE.Triangle(a,b,c));
-      triCount++;
+      if (MathUtils.approxEquals(a.y, 0) || MathUtils.approxEquals(b.y, 0) || MathUtils.approxEquals(c.y, 0)) {
+        continue;
+      }
+
+      const v0Mat = materialList[triLookup[i]],
+            v1Mat = materialList[triLookup[i+1]],
+            v2Mat = materialList[triLookup[i+1]];
+      if (v0Mat === v1Mat || v0Mat === v2Mat) { currMaterial = v0Mat; }
+      else if (v0Mat === v1Mat || v1Mat === v2Mat) { currMaterial = v1Mat; } 
+      else { currMaterial = v2Mat; }
+
+      triMaterialObjs.push({triangle:new THREE.Triangle(a,b,c), material:currMaterial});
     }
-
-    return triCount;
+    return triMaterialObjs;
   }
-
 }
 
 export default MarchingCubes;
 
 const tempVec3 = new THREE.Vector3();
-const tempVec3a = new THREE.Vector3();
 
 const positionLessThan = (left, right) => {
   if (left.x < right.x) { return true; }
@@ -172,32 +175,35 @@ const interpolateVertex = (nodeObj1, nodeObj2) => {
 
 const calcCubeIndex = (nodeCubeCell) => {
   let cubeindex = 0;
-  if (nodeCubeCell[0].node) cubeindex |= 1;
-  if (nodeCubeCell[1].node) cubeindex |= 2;
-  if (nodeCubeCell[2].node) cubeindex |= 4;
-  if (nodeCubeCell[3].node) cubeindex |= 8;
-  if (nodeCubeCell[4].node) cubeindex |= 16;
-  if (nodeCubeCell[5].node) cubeindex |= 32;
-  if (nodeCubeCell[6].node) cubeindex |= 64;
-  if (nodeCubeCell[7].node) cubeindex |= 128;
+  if (nodeCubeCell[0].node) { cubeindex |= 1;  }
+  if (nodeCubeCell[1].node) { cubeindex |= 2;  }
+  if (nodeCubeCell[2].node) { cubeindex |= 4;  }
+  if (nodeCubeCell[3].node) { cubeindex |= 8;  }
+  if (nodeCubeCell[4].node) { cubeindex |= 16; }
+  if (nodeCubeCell[5].node) { cubeindex |= 32; }
+  if (nodeCubeCell[6].node) { cubeindex |= 64; }
+  if (nodeCubeCell[7].node) { cubeindex |= 128;}
   return cubeindex;
 };
 const calcEdgeLookupVertices = (nodeCubeCell, edgeLookup) => {
+
   // Find the vertices where the surface intersects the cube
+  const materials = nodeCubeCell.map(n => n.node ? n.node.material : null);
+  const materialList = new Array(12).fill(null);
   const vertexList = new Array(12).fill(null);
-  if (edgeLookup & 1)    { vertexList[0]  = interpolateVertex(nodeCubeCell[0], nodeCubeCell[1]); }
-  if (edgeLookup & 2)    { vertexList[1]  = interpolateVertex(nodeCubeCell[1], nodeCubeCell[2]); }
-  if (edgeLookup & 4)    { vertexList[2]  = interpolateVertex(nodeCubeCell[2], nodeCubeCell[3]); }
-  if (edgeLookup & 8)    { vertexList[3]  = interpolateVertex(nodeCubeCell[3], nodeCubeCell[0]); }
-  if (edgeLookup & 16)   { vertexList[4]  = interpolateVertex(nodeCubeCell[4], nodeCubeCell[5]); }
-  if (edgeLookup & 32)   { vertexList[5]  = interpolateVertex(nodeCubeCell[5], nodeCubeCell[6]); }
-  if (edgeLookup & 64)   { vertexList[6]  = interpolateVertex(nodeCubeCell[6], nodeCubeCell[7]); }
-  if (edgeLookup & 128)  { vertexList[7]  = interpolateVertex(nodeCubeCell[7], nodeCubeCell[4]); }
-  if (edgeLookup & 256)  { vertexList[8]  = interpolateVertex(nodeCubeCell[0], nodeCubeCell[4]); }
-  if (edgeLookup & 512)  { vertexList[9]  = interpolateVertex(nodeCubeCell[1], nodeCubeCell[5]); }
-  if (edgeLookup & 1024) { vertexList[10] = interpolateVertex(nodeCubeCell[2], nodeCubeCell[6]); }
-  if (edgeLookup & 2048) { vertexList[11] = interpolateVertex(nodeCubeCell[3], nodeCubeCell[7]); }
-  return vertexList;
+  if (edgeLookup & 1)    { vertexList[0]  = interpolateVertex(nodeCubeCell[0], nodeCubeCell[1]); materialList[0] = materials[0] || materials[1]; }
+  if (edgeLookup & 2)    { vertexList[1]  = interpolateVertex(nodeCubeCell[1], nodeCubeCell[2]); materialList[1] = materials[1] || materials[2]; }
+  if (edgeLookup & 4)    { vertexList[2]  = interpolateVertex(nodeCubeCell[2], nodeCubeCell[3]); materialList[2] = materials[2] || materials[3]; }
+  if (edgeLookup & 8)    { vertexList[3]  = interpolateVertex(nodeCubeCell[3], nodeCubeCell[0]); materialList[3] = materials[3] || materials[0]; }
+  if (edgeLookup & 16)   { vertexList[4]  = interpolateVertex(nodeCubeCell[4], nodeCubeCell[5]); materialList[4] = materials[4] || materials[5]; }
+  if (edgeLookup & 32)   { vertexList[5]  = interpolateVertex(nodeCubeCell[5], nodeCubeCell[6]); materialList[5] = materials[5] || materials[6]; }
+  if (edgeLookup & 64)   { vertexList[6]  = interpolateVertex(nodeCubeCell[6], nodeCubeCell[7]); materialList[6] = materials[6] || materials[7]; }
+  if (edgeLookup & 128)  { vertexList[7]  = interpolateVertex(nodeCubeCell[7], nodeCubeCell[4]); materialList[7] = materials[7] || materials[4]; }
+  if (edgeLookup & 256)  { vertexList[8]  = interpolateVertex(nodeCubeCell[0], nodeCubeCell[4]); materialList[8] = materials[0] || materials[4]; }
+  if (edgeLookup & 512)  { vertexList[9]  = interpolateVertex(nodeCubeCell[1], nodeCubeCell[5]); materialList[9] = materials[1] || materials[5]; }
+  if (edgeLookup & 1024) { vertexList[10] = interpolateVertex(nodeCubeCell[2], nodeCubeCell[6]); materialList[10] = materials[2] || materials[6]; }
+  if (edgeLookup & 2048) { vertexList[11] = interpolateVertex(nodeCubeCell[3], nodeCubeCell[7]); materialList[11] = materials[3] || materials[7]; }
+  return {vertexList, materialList};
 }
 
 const edgeTable = [

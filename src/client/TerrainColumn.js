@@ -5,8 +5,6 @@ import GeometryUtils from '../GeometryUtils';
 import GameMaterials from './GameMaterials';
 import MarchingCubes from './MarchingCubes';
 import Battlefield from './Battlefield';
-import { assert } from 'chai';
-import { TetrahedronGeometry } from 'three';
 
 const tempVec3 = new THREE.Vector3();
 
@@ -31,8 +29,9 @@ class TerrainColumn {
         const {material, geometry} = matGrp;
         const gameMaterial = GameMaterials.materials[material];
 
-        // TODO: Materials??
-        if (gameMaterial) { this.material = gameMaterial; }
+        if (gameMaterial) { 
+          this.material = gameMaterial; 
+        }
 
         for (const geomPiece of geometry) {
           const {type} = geomPiece;
@@ -68,7 +67,7 @@ class TerrainColumn {
       terrainGroup.remove(this.mesh);
       this.mesh.geometry.dispose();
       this.mesh = null;
-      this.cachedCubeIdToTris = null;
+      this.cachedCubeIdToTriMatObjs = null;
     }
     this._clearPhysics();
   }
@@ -97,43 +96,44 @@ class TerrainColumn {
       rigidBodyLattice.getAllAssociatedCubeCellsForCubeIds(cubeIds) : 
       rigidBodyLattice.getTerrainColumnCubeCells(this);
     
-    const cubeIdToTriMap = {};
-    const affectedTcMap = MarchingCubes.convertTerrainColumnToTriangles(this, nodeCubeCells, cubeIdToTriMap);
+    const cubeIdToTriMatMap = {};
+    const affectedTcMap = MarchingCubes.convertTerrainColumnToTriangles(this, nodeCubeCells, cubeIdToTriMatMap);
     
     // If there's geometry already present then we rebuild it's geometry with the updated cube triangles
     const maxTris = Math.floor(2 * Math.pow(rigidBodyLattice.numNodesPerUnit * TerrainColumn.SIZE - 1, 2) *
       (rigidBodyLattice.numNodesPerUnit * Battlefield.MAX_HEIGHT - 1));
     const maxVertices = 3 * maxTris;
 
-    let geometry = null;
     if (this.mesh) {
-      const cubeIdToTriMapEntries = Object.entries(cubeIdToTriMap); 
+      const cubeIdToTriMapEntries = Object.entries(cubeIdToTriMatMap); 
       if (cubeIdToTriMapEntries.length === 0) { return affectedTcMap; } // Nothing was changed
 
       // Update our cached cube to triangle mapping with the changed cubes/tris
       for (const cubeIdToTriEntry of cubeIdToTriMapEntries) {
-        const [id, triangles] = cubeIdToTriEntry;
-        this.cachedCubeIdToTris[id] = triangles;
+        const [id, triMatObjs] = cubeIdToTriEntry;
+        this.cachedCubeIdToTriMatObjs[id] = triMatObjs;
       }
 
       this._clearPhysics();
-      geometry = this.mesh.geometry;
-      const drawCount = GeometryUtils.updateBufferGeometryFromCubeTriMap(
-        geometry, this.cachedCubeIdToTris, maxVertices);
-      if (drawCount === 0) { return affectedTcMap; }
+      const {geometry} = this.mesh;
+      const {materials} = GeometryUtils.updateBufferGeometryFromCubeTriMap(
+        geometry, this.cachedCubeIdToTriMatObjs, maxVertices);
+      this.mesh.material = materials.map(m => m.three);
+      if (geometry.index.count === 0) { return affectedTcMap; }
     }
     else {
       this.clear();
-      if (Object.values(cubeIdToTriMap).filter(tris => tris.length > 0).length === 0) { return affectedTcMap; } // Empty geometry
-      this.cachedCubeIdToTris = cubeIdToTriMap;
-      geometry = GeometryUtils.buildBufferGeometryFromCubeTriMap(this.cachedCubeIdToTris, maxVertices);
+      if (Object.values(cubeIdToTriMatMap).filter(tris => tris.length > 0).length === 0) { return affectedTcMap; } // Empty geometry
+      this.cachedCubeIdToTriMatObjs = cubeIdToTriMatMap;
+      const {geometry, materials} = GeometryUtils.buildBufferGeometryFromCubeTriMap(this.cachedCubeIdToTriMatObjs, maxVertices);
       if (geometry.drawRange.count === 0) { geometry.dispose(); return affectedTcMap; } // Empty geometry
-      this.mesh = new THREE.Mesh(geometry, this.material.three);
+      this.mesh = new THREE.Mesh(geometry, materials.map(m => m.three));
       this.mesh.castShadow = true;
       this.mesh.receiveShadow = true;
       terrainGroup.add(this.mesh);
     }
 
+    const {geometry} = this.mesh;
     geometry.computeBoundingBox();
     const {boundingBox} = geometry;
     boundingBox.getCenter(tempVec3);
@@ -142,8 +142,6 @@ class TerrainColumn {
     //debugColour.setRGB(debugColour.b, debugColour.g, debugColour.r).multiplyScalar(0.25);
     this.mesh.position.copy(tempVec3);    
     this.mesh.updateMatrixWorld();
-
-    //terrainGroup.add(new THREE.Box3Helper(boundingBox.clone().applyMatrix4(this.mesh.matrixWorld)));
 
     const { physics } = this.battlefield;
     const config = {

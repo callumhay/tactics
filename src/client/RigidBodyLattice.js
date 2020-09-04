@@ -130,13 +130,8 @@ export default class RigidBodyLattice {
         while (nodesZ.length <= nodeYIdxEnd) { nodesZ.push(null); }
         for (let y = nodeYIdxStart; y <= nodeYIdxEnd; y++) {
           const node = nodesZ[y];
-          if (node) {
-            assert(false, "Nodes shouldn't have more than one TerrainColumn associated with them.");
-            node.terrainColumn = terrainColumn;
-          }
-          else {
-            nodesZ[y] = new LatticeNode(this.nextNodeId++, x, z, y, this._nodeIndexToPosition(x,y,z), terrainColumn, material);
-          }
+          assert(!node || node.terrainColumn === terrainColumn, "Nodes shouldn't have more than one TerrainColumn associated with them.");
+          if (!node) { nodesZ[y] = new LatticeNode(this.nextNodeId++, x, z, y, this._nodeIndexToPosition(x,y,z), terrainColumn, material); }
         }
       }
     }
@@ -176,8 +171,11 @@ export default class RigidBodyLattice {
 
     // In order for the raycaster to collide with interior faces of the mesh, we need to 
     // temporarily set the material to be double-sided
-    const temp = mesh.material.side;
-    mesh.material.side = THREE.DoubleSide;
+    const originalMaterialSides = [];
+    mesh.material.forEach(m => {
+      originalMaterialSides.push(m.side);
+      m.side = THREE.DoubleSide;
+    });
 
     // Go through all the nodes in the bounding box where the geometry and the terrainColumn intersect
     // Check whether each node is inside the geometry, if it is then add it
@@ -204,14 +202,16 @@ export default class RigidBodyLattice {
           mesh.raycast(raycaster, intersections);
           intersections.sort((a,b) => a.distance-b.distance);
 
-          if (intersections.length > 0 /*&& intersections[0].face.normal.dot(raycaster.ray.direction) >= 0*/) {
+          if (intersections.length > 0 /* && intersections[0].face.normal.dot(raycaster.ray.direction) >= 0*/) {
             nodesXZ[y] = new LatticeNode(this.nextNodeId++, x, z, y, nodePos, terrainColumn, material);
             addedNodes.push(nodesXZ[y]);
           }
         }
       }
     }
-    mesh.material.side = temp;
+    mesh.material.forEach((m,idx) => {
+      m.side = originalMaterialSides[idx];
+    });
     return addedNodes;
   }
 
@@ -255,8 +255,9 @@ export default class RigidBodyLattice {
       { node: null, pos: x1yz1Pt } : { node: nodeArray[xPlus1][zPlus1][yIdx], pos: x1yz1Pt };
     const n3 = yOutside ? {...n7, pos: xyz1Pt} : (xOutside || zPlus1 >= nodeArray[xIdx].length || yOutside || yIdx >= nodeArray[xIdx][zPlus1].length) ?
       { node: null, pos: xyz1Pt } : { node: nodeArray[xIdx][zPlus1][yIdx], pos: xyz1Pt };
-
-    return { id: MarchingCubes.createCubeCellRegisterKey(xIdx, yIdx, zIdx), xIdx, yIdx, zIdx, corners: [n0,n1,n2,n3,n4,n5,n6,n7]};
+    
+    const corners = [n0,n1,n2,n3,n4,n5,n6,n7];
+    return { id: MarchingCubes.createCubeCellRegisterKey(xIdx, yIdx, zIdx), xIdx, yIdx, zIdx, corners};
   }
 
   _makeNodeCubeCell(xIdx, yIdx, zIdx) {

@@ -30,8 +30,6 @@ class BattlefieldLoader {
             terrainColumn = new TerrainColumn(battlefield, terrain.length, terrainCols.length, 
               isEmpty(terrainColJsonObj) ? [] : [terrainColJsonObj]);
           }
-
-
           terrainCols.push(terrainColumn);
         }
         terrain.push(terrainCols);

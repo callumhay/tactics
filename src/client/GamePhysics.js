@@ -4,6 +4,8 @@ import { threeToCannon } from './threetocannon';
 import GameMaterials from './GameMaterials';
 import GameTypes from './GameTypes';
 
+const MIN_SLOW_FRAME_TIME = 1/30;
+
 class GamePhysics {
   constructor(scene, gameModel) {
     this.scene = scene; // THREE.js scene
@@ -20,30 +22,38 @@ class GamePhysics {
     GameMaterials.contactMaterials.forEach(contactMaterial => this.world.addContactMaterial(contactMaterial));
 
     this.gameObjects = {};
+    this.toAdd = [];
 
     this.onBodyCollision = this.onBodyCollision.bind(this);
     this.onBodySleep = this.onBodySleep.bind(this);
   }
 
   update(dt) {
+    if (dt > MIN_SLOW_FRAME_TIME) { return; } // If we don't do this then the physics goes crazy on long frames/hangs
+    if (this.toAdd.length > 0) {
+      this.toAdd.forEach(gameObj => this.world.addBody(gameObj.body));
+      this.toAdd = [];
+    }
+
+    this.world.step(dt);
+
+    // Copy transforms from cannon to three
     const toRemove = [];
     for (const gameObject of Object.values(this.gameObjects)) {
-      const { mesh, body, remove } = gameObject;
+      const {mesh, body, remove} = gameObject;
       if (remove) {
         toRemove.push(gameObject);
         console.log("Removing physics object: " + gameObject.id);
         continue;
       }
-    }
-    toRemove.forEach(gameObject => this.removeObject(gameObject));
-    if (dt <= 1 / 30) { this.world.step(dt); }
-    
-    // Copy transforms from cannon to three
-    for (const gameObject of Object.values(this.gameObjects)) {
-      const {mesh, body} = gameObject;
       mesh.position.copy(body.position);
       mesh.quaternion.copy(body.quaternion);
     }
+    toRemove.forEach(gameObject => {
+      const {body, id} = gameObject;
+      this.world.removeBody(body);
+      delete this.gameObjects[id];
+    });
   }
 
   addObject(shapeType, physType, gameType, config) {
@@ -65,11 +75,11 @@ class GamePhysics {
     body.addEventListener('collide', this.onBodyCollision);
     body.addEventListener('sleep', this.onBodySleep);
     body.sleepSpeedLimit = 0.2;
-    this.world.addBody(body);
-
+    
     const id = body.id
     const gameObj = { id, mesh, body, gameType, gameObject };
     this.gameObjects[id] = gameObj;
+    this.toAdd.push(gameObj);
     return gameObj;
   }
 
@@ -77,27 +87,14 @@ class GamePhysics {
   addTerrain(config) { return this.addObject(threeToCannon.Type.HULL, CANNON.Body.STATIC, GameTypes.TERRAIN, config); }
 
   addBedrock(config) {
-    const { gameType, gameObject, mesh, material } = config;
-    const shape = new CANNON.Plane();
-    const body = new CANNON.Body({
-      type: CANNON.Body.STATIC,
-      mass: 0,
-      shape: shape,
-      material: material,
-    });
+    const gameObj = this.addObject(threeToCannon.Type.PLANE, CANNON.Body.STATIC, GameTypes.BEDROCK, config);
+    const {body} = gameObj;
     body.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), -Math.PI / 2);
-    this.world.addBody(body);
-    
-    const id = body.id
-    const gameObj = { id, mesh, body, gameType, gameObject };
-    this.gameObjects[id] = gameObj;
     return gameObj;
   }
 
   removeObject(gameObj) {
-    const {body, id} = gameObj;
-    this.world.removeBody(body);
-    delete this.gameObjects[id];
+    gameObj.remove = true;
   }
 
   clear(force) {
@@ -126,7 +123,7 @@ class GamePhysics {
 
         // When a dynamic chunk of terrain falls asleep we need to merge it back into the environment
         this.gameModel.reattachTerrain(gameObj);
-        gameObj.remove = true;
+        this.removeObject(gameObj);
         break;
 
       default:
