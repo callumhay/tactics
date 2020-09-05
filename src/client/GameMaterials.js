@@ -8,12 +8,23 @@ const MATERIAL_TYPE_ROCK    = "rock";
 const MATERIAL_TYPE_DIRT    = "dirt";
 const MATERIAL_TYPE_MOSS    = "moss";
 
+const BEDROCK_FRICTION = 0.9; const BEDROCK_RESTITUTION = 0.2;
+const ROCK_FRICTION = 0.8; const ROCK_RESTITUTION = 0.2;
+const DIRT_FRICTION = 0.9; const DIRT_RESTITUTION = 0.1;
+const MOSS_FRICTION = 0.8; const MOSS_RESTITUTION = 0.15;
+
+const MODERATE_STIFFNESS = 1e8;
+const STRONG_STIFFNESS = 1e10;
+
 // NOTE: Material density is measured in kg/m^3
 const materials = {
   [MATERIAL_TYPE_BEDROCK]: {
     type: MATERIAL_TYPE_BEDROCK,
     gameType: GameTypes.BEDROCK,
     density: 2000,
+    stiffness:STRONG_STIFFNESS,
+    friction: BEDROCK_FRICTION, 
+    restitution: BEDROCK_RESTITUTION,
     dynamic: false,
     three: new THREE.MeshPhongMaterial({color: 0xffffff, shininess:10}),
     cannon: new CANNON.Material(MATERIAL_TYPE_BEDROCK),
@@ -22,6 +33,9 @@ const materials = {
     type: MATERIAL_TYPE_ROCK,
     gameType: GameTypes.TERRAIN,
     density: 1600,
+    stiffness: STRONG_STIFFNESS,
+    friction: ROCK_FRICTION, 
+    restitution: ROCK_RESTITUTION,
     dynamic: true,
     three: new THREE.MeshPhongMaterial({ color: 0xffffff, shininess:10}),
     cannon: new CANNON.Material(MATERIAL_TYPE_ROCK),
@@ -30,6 +44,9 @@ const materials = {
     type: MATERIAL_TYPE_DIRT,
     gameType: GameTypes.TERRAIN,
     density: 1225,
+    stiffness: MODERATE_STIFFNESS,
+    friction: DIRT_FRICTION, 
+    restitution: DIRT_RESTITUTION,
     dynamic: true,
     three: new THREE.MeshPhongMaterial({ color: 0xffffff, shininess:0 }),
     cannon: new CANNON.Material(MATERIAL_TYPE_DIRT),
@@ -38,49 +55,36 @@ const materials = {
     type: MATERIAL_TYPE_MOSS,
     gameType: GameTypes.TERRAIN,
     density: 1000,
+    friction: MOSS_FRICTION, 
+    restitution: MOSS_RESTITUTION,
+    stiffness: MODERATE_STIFFNESS,
     dynamic: true,
     three: new THREE.MeshPhongMaterial({ color: 0xffffff, shininess:20 }),
     cannon: new CANNON.Material(MATERIAL_TYPE_MOSS),
   }
 };
 
-const BEDROCK_FRICTION = 0.9;
-const BEDROCK_RESTITUTION = 0.2;
-const ROCK_FRICTION = 0.8;
-const ROCK_RESTITUTION = 0.2;
-const DIRT_FRICTION = 0.9;
-const DIRT_RESTITUTION = 0.1;
-
-const MODERATE_STIFFNESS = 1e8;
-const STRONG_STIFFNESS = 1e10;
-
-const contactMaterials = [
-  new CANNON.ContactMaterial(materials[MATERIAL_TYPE_ROCK], materials[MATERIAL_TYPE_ROCK], { 
-    friction: ROCK_FRICTION, restitution: ROCK_RESTITUTION,
-    contactEquationStiffness: MODERATE_STIFFNESS, contactEquationRelaxation: 3,
-    frictionEquationStiffness: MODERATE_STIFFNESS, frictionEquationRegularizationTime: 3,
-  }),
-  new CANNON.ContactMaterial(materials[MATERIAL_TYPE_DIRT], materials[MATERIAL_TYPE_DIRT], { 
-    friction: DIRT_FRICTION, restitution: DIRT_RESTITUTION,
-    contactEquationStiffness: STRONG_STIFFNESS, contactEquationRelaxation: 3,
-    frictionEquationStiffness: STRONG_STIFFNESS, frictionEquationRegularizationTime: 3,
-  }),
-  new CANNON.ContactMaterial(materials[MATERIAL_TYPE_ROCK], materials[MATERIAL_TYPE_DIRT], { 
-    friction: DIRT_FRICTION, restitution: DIRT_RESTITUTION,
-    contactEquationStiffness: STRONG_STIFFNESS, contactEquationRelaxation: 3,
-    frictionEquationStiffness: STRONG_STIFFNESS, frictionEquationRegularizationTime: 3,
-  }),
-  new CANNON.ContactMaterial(materials[MATERIAL_TYPE_BEDROCK], materials[MATERIAL_TYPE_DIRT], {
-    friction: BEDROCK_FRICTION, restitution: (BEDROCK_RESTITUTION + DIRT_RESTITUTION) / 2,
-    contactEquationStiffness: STRONG_STIFFNESS, contactEquationRelaxation: 3,
-    frictionEquationStiffness: STRONG_STIFFNESS, frictionEquationRegularizationTime: 3,
-  }),
-  new CANNON.ContactMaterial(materials[MATERIAL_TYPE_BEDROCK], materials[MATERIAL_TYPE_ROCK], {
-    friction: BEDROCK_FRICTION, restitution: BEDROCK_RESTITUTION,
-    contactEquationStiffness: STRONG_STIFFNESS, contactEquationRelaxation: 3,
-    frictionEquationStiffness: STRONG_STIFFNESS, frictionEquationRegularizationTime: 3, 
-  })
-];
+const contactMaterials = [];
+const initContactMaterials = (materials) => {
+  const materialValues = Object.values(materials);
+  for (let i = 0; i < materialValues.length; i++) {
+    const {cannon:cMat1, friction:mat1Friction, restitution:mat1Restitution,
+       stiffness:mat1Stiffness} = materialValues[i];
+    
+    for (let j = i; j < materialValues.length; j++) {
+      const { cannon: cMat2, friction: mat2Friction, restitution: mat2Restitution,
+        stiffness:mat2Stiffness} = materialValues[j];
+      contactMaterials.push(
+        new CANNON.ContactMaterial(cMat1, cMat2, {
+          friction: Math.max(mat1Friction, mat2Friction),
+          restitution: Math.min(mat1Restitution, mat2Restitution),
+          contactEquationStiffness: (mat1Stiffness + mat2Stiffness)/2,
+          frictionEquationStiffness: Math.max(mat1Stiffness, mat2Stiffness)
+        })
+      );
+    }
+  }
+}
 
 const setTexProperties = (texture) => {
   texture.wrapS = THREE.RepeatWrapping;
@@ -141,6 +145,7 @@ class GameMaterials {
         three.map = texture;
       }
     }
+    initContactMaterials(GameMaterials.materials);
   }
 
   static get materials() { return materials; }
