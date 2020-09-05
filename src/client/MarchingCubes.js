@@ -118,7 +118,6 @@ class MarchingCubes {
     // Create the triangles with the appropriate materials
     const triLookup = triTable[cubeindex];
     const triMaterialObjs = [];
-    let currMaterial = null;
     for (let i = 0; triLookup[i] !== -1; i += 3) {
       const a = vertexList[triLookup[i]], 
             b = vertexList[triLookup[i+1]], 
@@ -126,15 +125,10 @@ class MarchingCubes {
       if (MathUtils.approxEquals(a.y, 0) || MathUtils.approxEquals(b.y, 0) || MathUtils.approxEquals(c.y, 0)) {
         continue;
       }
-
-      const v0Mat = materialList[triLookup[i]],
-            v1Mat = materialList[triLookup[i+1]],
-            v2Mat = materialList[triLookup[i+1]];
-      if (v0Mat === v1Mat || v0Mat === v2Mat) { currMaterial = v0Mat; }
-      else if (v0Mat === v1Mat || v1Mat === v2Mat) { currMaterial = v1Mat; } 
-      else { currMaterial = v2Mat; }
-
-      triMaterialObjs.push({triangle:new THREE.Triangle(a,b,c), material:currMaterial});
+      triMaterialObjs.push({
+        triangle:new THREE.Triangle(a,b,c), 
+        materials: new Set([ materialList[triLookup[i]], materialList[triLookup[i+1]], materialList[triLookup[i+2]] ])
+      });
     }
     return triMaterialObjs;
   }

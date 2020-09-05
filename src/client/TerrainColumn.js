@@ -100,7 +100,7 @@ class TerrainColumn {
     const affectedTcMap = MarchingCubes.convertTerrainColumnToTriangles(this, nodeCubeCells, cubeIdToTriMatMap);
     
     // If there's geometry already present then we rebuild it's geometry with the updated cube triangles
-    const maxTris = Math.floor(2 * Math.pow(rigidBodyLattice.numNodesPerUnit * TerrainColumn.SIZE - 1, 2) *
+    const maxTris = Math.floor(3 * Math.pow(rigidBodyLattice.numNodesPerUnit * TerrainColumn.SIZE - 1, 2) *
       (rigidBodyLattice.numNodesPerUnit * Battlefield.MAX_HEIGHT - 1));
     const maxVertices = 3 * maxTris;
 

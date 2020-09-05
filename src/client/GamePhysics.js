@@ -30,12 +30,11 @@ class GamePhysics {
 
   update(dt) {
     if (dt > MIN_SLOW_FRAME_TIME) { return; } // If we don't do this then the physics goes crazy on long frames/hangs
+
     if (this.toAdd.length > 0) {
       this.toAdd.forEach(gameObj => this.world.addBody(gameObj.body));
       this.toAdd = [];
     }
-
-    this.world.step(dt);
 
     // Copy transforms from cannon to three
     const toRemove = [];
@@ -54,6 +53,8 @@ class GamePhysics {
       this.world.removeBody(body);
       delete this.gameObjects[id];
     });
+
+    this.world.step(dt);
   }
 
   addObject(shapeType, physType, gameType, config) {
@@ -75,7 +76,8 @@ class GamePhysics {
     body.addEventListener('collide', this.onBodyCollision);
     body.addEventListener('sleep', this.onBodySleep);
     body.sleepSpeedLimit = 0.2;
-    
+    //this.world.addBody(body);
+
     const id = body.id
     const gameObj = { id, mesh, body, gameType, gameObject };
     this.gameObjects[id] = gameObj;

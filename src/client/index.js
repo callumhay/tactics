@@ -8,7 +8,7 @@ import CannonDebugRenderer from './CannonDebugRenderer';
 import GameMaterials from './GameMaterials';
 
 // Setup THREE library boilerplate for getting a scene + camera + basic controls up and running
-const renderer = new THREE.WebGLRenderer();
+const renderer = new THREE.WebGLRenderer({alpha:true});
 renderer.autoClear = false;
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;

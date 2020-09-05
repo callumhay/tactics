@@ -1,0 +1,10 @@
+{
+  "terrain": [
+    [
+      {"matgroups": [
+        {"material": "rock", "geometry": [{"type":"box", "range":[0,7]}]}, 
+        {"material": "moss", "geometry": [{"type":"box", "range":[7,8]}]}
+      ]}
+    ]
+  ]
+}
