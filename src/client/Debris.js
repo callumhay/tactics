@@ -7,14 +7,14 @@ import { assert } from 'chai';
 const tempVec3 = new THREE.Vector3();
 
 class Debris {
-  constructor(terrainGroup, rigidBodyLattice, nodes) {
+  constructor(terrainGroup, terrainNodeLattice, nodes) {
     this.mesh = null;
     this.physicsObj = null;
     this.density = 0;
     this.terrainGroup = terrainGroup;
     
     // Convert the nodes into geometry
-    this._regenerate(rigidBodyLattice, nodes);
+    this._regenerate(terrainNodeLattice, nodes);
   }
 
   clearGeometry() {
@@ -44,7 +44,7 @@ class Debris {
     return this.physicsObj;
   }
 
-  _regenerate(rigidBodyLattice, nodes) {
+  _regenerate(terrainNodeLattice, nodes) {
     this.clearGeometry();
 
     // Calculate the density based on node materials
@@ -57,7 +57,7 @@ class Debris {
     // TODO: 
     // 1. Group the geometry by material
     // 2. Create separate rigid bodies with different materials??
-    const nodeCubeCells = rigidBodyLattice.getNodeIslandCubeCells(nodes);
+    const nodeCubeCells = terrainNodeLattice.getNodeIslandCubeCells(nodes);
     const cubeIdsToTriMap = [];
     for (const nodeCubeCell of nodeCubeCells) {
       const {id, corners} = nodeCubeCell;
@@ -76,15 +76,8 @@ class Debris {
     assert(materials.length > 0);
     this.material = materials[0]; // TODO: For now we just use the first material for the physics
 
-    geometry.computeBoundingBox();
-    const {boundingBox} = geometry;
-    boundingBox.getCenter(tempVec3);
-    geometry.center();
-
     this.mesh = new THREE.Mesh(geometry, materials.map(m => m.debrisThree));
-    this.mesh.position.copy(tempVec3);
-    this.mesh.updateMatrixWorld();
-
+    GeometryUtils.centerMeshGeometryToTranslation(this.mesh);
     this.mesh.castShadow = true;
     this.mesh.receiveShadow = false;
     this.terrainGroup.add(this.mesh);

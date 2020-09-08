@@ -9,6 +9,7 @@ class GameModel {
 
   update(dt) {
     this.physics.update(dt);
+    this.battlefield.update(dt);
   }
 
   reattachTerrain(physicsObj) {

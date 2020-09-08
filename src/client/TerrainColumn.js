@@ -1,10 +1,12 @@
 import * as THREE from 'three';
+import { assert } from 'chai';
 
 import GeometryUtils from '../GeometryUtils';
 
 import GameMaterials from './GameMaterials';
 import MarchingCubes from './MarchingCubes';
 import Battlefield from './Battlefield';
+import GameTypes from './GameTypes';
 
 const tempVec3 = new THREE.Vector3();
 
@@ -18,19 +20,29 @@ class TerrainColumn {
     this.xIndex = u;
     this.zIndex = v;
 
-    this.mesh = null;
-    this.physObject = null;
-    this.material = null;
+    this.terrainMesh = null;
+    this.cachedTerrainCubeIdTriMatObjs = null;
+    this.waterMesh = null;
+    this.cachedWaterCubeIdTriMatObjs = null;
 
-    const {rigidBodyLattice} = this.battlefield;
+    this.physObject = null;
+
+    const {terrainNodeLattice, waterNodeLattice} = this.battlefield;
 
     if (materialGroups && Object.keys(materialGroups).length > 0) {
       for (const matGrp of Object.values(materialGroups)) {
         const {material, geometry} = matGrp;
         const gameMaterial = GameMaterials.materials[material];
+        assert(gameMaterial, "All material groups / geometry should have an associated material!");
 
-        if (gameMaterial) { 
-          this.material = gameMaterial; 
+        let nodeLattice = null;
+        switch (gameMaterial.gameType) {
+          case GameTypes.WATER:
+            nodeLattice = waterNodeLattice;
+            break;
+          default:
+            nodeLattice = terrainNodeLattice;
+            break;
         }
 
         for (const geomPiece of geometry) {
@@ -38,7 +50,7 @@ class TerrainColumn {
           switch (type) {
             case "box":
               const [startY, endY] = geomPiece.range;
-              rigidBodyLattice.addTerrainColumnBox(this, {startY, endY, material:gameMaterial});
+              nodeLattice.addTerrainColumnBox(this, {startY, endY, material:gameMaterial});
               break;
             default:
               throw `Invalid geometry type ${type} found.`;
@@ -46,30 +58,43 @@ class TerrainColumn {
         }
       }
     }
-    if (!this.material) {
-      this.material = GameMaterials.materials[GameMaterials.MATERIAL_TYPE_ROCK];
-    }
   }
 
   get id() {
     return `${this.xIndex},${this.zIndex}`;
   }
-  _clearPhysics() {
+
+  _clearTerrainPhysics() {
     if (this.physObject) {
       const { physics } = this.battlefield;
       physics.removeObject(this.physObject);
       this.physObject = null;
     }
   }
-  clear() {
-    if (this.mesh) {
+  _clearTerrain() {
+    if (this.terrainMesh) {
       const { terrainGroup } = this.battlefield;
-      terrainGroup.remove(this.mesh);
-      this.mesh.geometry.dispose();
-      this.mesh = null;
-      this.cachedCubeIdToTriMatObjs = null;
+      terrainGroup.remove(this.terrainMesh);
+      this.terrainMesh.geometry.dispose();
+      this.terrainMesh = null;
+      this.cachedTerrainCubeIdTriMatObjs = null;
     }
-    this._clearPhysics();
+    this._clearTerrainPhysics();
+  }
+  _clearWaterPhysics() {}
+  _clearWater() {
+    if (this.waterMesh) {
+      const { terrainGroup } = this.battlefield;
+      terrainGroup.remove(this.waterMesh);
+      this.waterMesh.geometry.dispose();
+      this.waterMesh = null;
+      this.cachedWaterCubeIdTriMatObjs = null;
+    }
+  }
+
+  clear() {
+    this._clearTerrain();
+    this._clearWater();
   }
 
   getBoundingBox() {
@@ -89,73 +114,127 @@ class TerrainColumn {
   // Regenerate the geometry and associated data structures for this terrain column
   // If a set of cubeIds are provided then only those cubes will be examined and regenerated.
   regenerate(cubeIds=null) {
-    const cubeIdsExist = (cubeIds && cubeIds.size > 0);
-    const { rigidBodyLattice, terrainGroup } = this.battlefield;
+    const terrainTcAffectedMap = this._regenerateTerrain(cubeIds);
+    const waterTcAffectedMap = this._regenerateWater(cubeIds);
 
-    const nodeCubeCells = cubeIdsExist ?  
-      rigidBodyLattice.getAllAssociatedCubeCellsForCubeIds(cubeIds) : 
-      rigidBodyLattice.getTerrainColumnCubeCells(this);
-    
+    // Combine the two maps...
+    for (const entry of Object.entries(waterTcAffectedMap)) {
+      const [tcId, {terrainColumn, cubeIds:entryCubeIds}] = entry;
+      if (!(tcId in terrainTcAffectedMap)) {
+        terrainTcAffectedMap[tcId] = {terrainColumn, cubeIds:entryCubeIds};
+      }
+      else { 
+        terrainTcAffectedMap[tcId].cubeIds = new Set([...terrainTcAffectedMap[tcId].cubeIds, ...entryCubeIds]);
+      }
+    } 
+
+    return terrainTcAffectedMap;
+  }
+
+  _regenerateTerrain(cubeIds) {
+    const { terrainNodeLattice, terrainGroup } = this.battlefield;
     const cubeIdToTriMatMap = {};
-    const affectedTcMap = MarchingCubes.convertTerrainColumnToTriangles(this, nodeCubeCells, cubeIdToTriMatMap);
+    const affectedTcMap = terrainNodeLattice.convertToTriangles(this, this.cachedTerrainCubeIdTriMatObjs, cubeIdToTriMatMap, cubeIds);
     
     // If there's geometry already present then we rebuild it's geometry with the updated cube triangles
-    const maxTris = Math.floor(3 * Math.pow(rigidBodyLattice.numNodesPerUnit * TerrainColumn.SIZE - 1, 2) *
-      (rigidBodyLattice.numNodesPerUnit * Battlefield.MAX_HEIGHT - 1));
+    const maxTris = Math.floor(3 * Math.pow(terrainNodeLattice.numNodesPerUnit * TerrainColumn.SIZE - 1, 2) *
+      (terrainNodeLattice.numNodesPerUnit * Battlefield.MAX_HEIGHT - 1));
     const maxVertices = 3 * maxTris;
 
-    if (this.mesh) {
+    let material = null;
+    if (this.terrainMesh) {
       const cubeIdToTriMapEntries = Object.entries(cubeIdToTriMatMap); 
       if (cubeIdToTriMapEntries.length === 0) { return affectedTcMap; } // Nothing was changed
 
       // Update our cached cube to triangle mapping with the changed cubes/tris
       for (const cubeIdToTriEntry of cubeIdToTriMapEntries) {
         const [id, triMatObjs] = cubeIdToTriEntry;
-        this.cachedCubeIdToTriMatObjs[id] = triMatObjs;
+        this.cachedTerrainCubeIdTriMatObjs[id] = triMatObjs;
       }
 
-      this._clearPhysics();
-      const {geometry} = this.mesh;
+      this._clearTerrainPhysics();
+      const {geometry} = this.terrainMesh;
       const {materials} = GeometryUtils.updateBufferGeometryFromCubeTriMap(
-        geometry, this.cachedCubeIdToTriMatObjs, maxVertices);
-      this.mesh.material = materials.map(m => m.three);
-      if (geometry.index.count === 0) { return affectedTcMap; }
+        geometry, this.cachedTerrainCubeIdTriMatObjs, maxVertices);
+      this.terrainMesh.material = materials.map(m => m.three);
+      if (geometry.index.count === 0 || materials.length === 0) { return affectedTcMap; }
+      material = materials[0];
     }
     else {
-      this.clear();
+      this._clearTerrain();
       if (Object.values(cubeIdToTriMatMap).filter(tris => tris.length > 0).length === 0) { return affectedTcMap; } // Empty geometry
-      this.cachedCubeIdToTriMatObjs = cubeIdToTriMatMap;
-      const {geometry, materials} = GeometryUtils.buildBufferGeometryFromCubeTriMap(this.cachedCubeIdToTriMatObjs, maxVertices);
-      if (geometry.drawRange.count === 0) { geometry.dispose(); return affectedTcMap; } // Empty geometry
-      this.mesh = new THREE.Mesh(geometry, materials.map(m => m.three));
-      this.mesh.castShadow = true;
-      this.mesh.receiveShadow = true;
-      terrainGroup.add(this.mesh);
+      this.cachedTerrainCubeIdTriMatObjs = cubeIdToTriMatMap;
+      const {geometry, materials} = GeometryUtils.buildBufferGeometryFromCubeTriMap(this.cachedTerrainCubeIdTriMatObjs, maxVertices);
+      this.terrainMesh = new THREE.Mesh(geometry, materials.map(m => m.three));
+      this.terrainMesh.castShadow = true;
+      this.terrainMesh.receiveShadow = true;
+      terrainGroup.add(this.terrainMesh);
+      if (geometry.index.count === 0 || materials.length === 0) { return affectedTcMap; } // Empty geometry
+      material = materials[0];
     }
-
-    const {geometry} = this.mesh;
-    geometry.computeBoundingBox();
-    const {boundingBox} = geometry;
-    boundingBox.getCenter(tempVec3);
-    geometry.center();
-    //const debugColour = this.debugColour();
-    //debugColour.setRGB(debugColour.b, debugColour.g, debugColour.r).multiplyScalar(0.25);
-    this.mesh.position.copy(tempVec3);    
-    this.mesh.updateMatrixWorld();
+    GeometryUtils.centerMeshGeometryToTranslation(this.terrainMesh);
 
     const { physics } = this.battlefield;
     const config = {
       gameObject: this,
-      material: this.material.cannon,
-      mesh: this.mesh,
+      material: material.cannon,
+      mesh: this.terrainMesh,
     };
     this.physObject = physics.addTerrain(config);
     if (this.physObject === null) {
-      this.clear();
+      this._clearTerrain();
     }
 
     return affectedTcMap;
   }
+
+  _regenerateWater(cubeIds) {
+    const { waterNodeLattice, terrainGroup } = this.battlefield;
+    const cubeIdToTriMatMap = {};
+    const affectedTcMap = waterNodeLattice.convertToTriangles(this, this.cachedWaterCubeIdTriMatObjs, cubeIdToTriMatMap, cubeIds);
+
+    // If there's geometry already present then we rebuild it's geometry with the updated cube triangles
+    const maxTris = Math.floor(2 * Math.pow(waterNodeLattice.numNodesPerUnit * TerrainColumn.SIZE - 1, 2) *
+      (waterNodeLattice.numNodesPerUnit * Battlefield.HALF_MAX_HEIGHT - 1));
+    const maxVertices = 3 * maxTris;
+
+    if (this.waterMesh) {
+      const cubeIdToTriMapEntries = Object.entries(cubeIdToTriMatMap); 
+      if (cubeIdToTriMapEntries.length === 0) { return affectedTcMap; } // Nothing was changed
+
+      // Update our cached cube to triangle mapping with the changed cubes/tris
+      for (const cubeIdToTriEntry of cubeIdToTriMapEntries) {
+        const [id, triMatObjs] = cubeIdToTriEntry;
+        this.cachedWaterCubeIdTriMatObjs[id] = triMatObjs;
+      }
+
+      this._clearWaterPhysics();
+      const {geometry} = this.waterMesh;
+      const {materials} = GeometryUtils.updateBufferGeometryFromCubeTriMap(
+        geometry, this.cachedWaterCubeIdTriMatObjs, maxVertices);
+      assert(materials.length <= 1);
+      this.waterMesh.material = materials.map(m => m.three);
+      if (geometry.index.count === 0 || materials.length === 0) { return affectedTcMap; }
+      //material = materials[0];
+    }
+    else {
+      this._clearWater();
+      if (Object.values(cubeIdToTriMatMap).filter(tris => tris.length > 0).length === 0) { return affectedTcMap; } // Empty geometry
+      this.cachedWaterCubeIdTriMatObjs = cubeIdToTriMatMap;
+      const {geometry, materials} = GeometryUtils.buildBufferGeometryFromCubeTriMap(this.cachedWaterCubeIdTriMatObjs, maxVertices);
+      this.waterMesh = new THREE.Mesh(geometry, materials.map(m => m.three));
+      this.waterMesh.castShadow = true;
+      this.waterMesh.receiveShadow = true;
+      terrainGroup.add(this.waterMesh);
+      if (geometry.index.count === 0 || materials.length === 0) { return affectedTcMap; } // Empty geometry
+      //material = materials[0];
+    }
+    GeometryUtils.centerMeshGeometryToTranslation(this.waterMesh);
+
+    return affectedTcMap;
+  }
+
+  
 
   getTerrainSpaceTranslation() {
     const { xIndex, zIndex } = this;

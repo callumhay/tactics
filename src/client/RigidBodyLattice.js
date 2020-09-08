@@ -8,7 +8,7 @@ import MarchingCubes from './MarchingCubes';
 
 const tempVec3 = new THREE.Vector3();
 
-class LatticeNode {
+export class LatticeNode {
   constructor(id, xIdx, zIdx, yIdx, pos, terrainColumn, material) {
     assert(xIdx >= 0, "xIdx of a LatticeNode must be at least zero.");
     assert(yIdx >= 0, "yIdx of a LatticeNode must be at least zero.");
@@ -36,11 +36,12 @@ class LatticeNode {
 const TRAVERSAL_UNVISITED_STATE     = 1;
 const TRAVERSAL_FINISHED_STATE      = 2;
 
-export default class RigidBodyLattice {
+class RigidBodyLattice {
   static get DEFAULT_NUM_NODES_PER_UNIT() { return 5; }
 
   constructor(terrainGroup) {
     this.terrainGroup = terrainGroup;
+    this.marchingCubes = new MarchingCubes();
     this.clear();
   }
 
@@ -53,10 +54,14 @@ export default class RigidBodyLattice {
   get halfUnitsBetweenNodes() {
     return this.unitsBetweenNodes / 2;
   }
+  get diagonalUnitsBetweenNodes() {
+    return Math.SQRT2*this.unitsBetweenNodes;
+  }
 
   clear() {
     this.nodes = [];
     this.nextNodeId = 0;
+    this.marchingCubes.clearCubeCellRegister();
     this._clearDebugDraw();
   }
 
@@ -97,11 +102,11 @@ export default class RigidBodyLattice {
   _unitsToNodeIndex(unitVal) {
     return Math.floor(unitVal * this.numNodesPerUnit);
   }
+  _nodeIndexToUnits(idx) {
+    return idx*this.unitsBetweenNodes + this.halfUnitsBetweenNodes;
+  }
   _nodeIndexToPosition(xIdx, yIdx, zIdx) {
-    const nodePos = new THREE.Vector3(xIdx,yIdx,zIdx);
-    nodePos.multiplyScalar(this.unitsBetweenNodes);
-    nodePos.addScalar(this.halfUnitsBetweenNodes);
-    return nodePos;
+    return new THREE.Vector3(this._nodeIndexToUnits(xIdx), this._nodeIndexToUnits(yIdx), this._nodeIndexToUnits(zIdx));
   }
   _getNode(xIdx, zIdx, yIdx) {
     if (this.nodes[xIdx] && this.nodes[xIdx][zIdx]) {
@@ -292,7 +297,6 @@ export default class RigidBodyLattice {
 
   getAllAssociatedCubeCellsForCubeIds(cubeIds) {
     const queue = [];
-
     for (const cubeId of cubeIds) {
       // Parse the index from the ID
       const {xIdx,yIdx,zIdx} = MarchingCubes.cubeCellRegisterKeyToIndex(cubeId);
@@ -319,7 +323,7 @@ export default class RigidBodyLattice {
       cubeCellMap[cubeCell.id] = cubeCell;
 
       const { xIdx, yIdx, zIdx } = cubeCell;
-      const diffCornerIndices = MarchingCubes.diffCornerIndicesToRegister(cubeCell);
+      const diffCornerIndices = this.marchingCubes.diffCornerIndicesToRegister(cubeCell);
 
       // For each corner that's different we need to examine all cubes that the corner is attached to
       for (const diffCornerIdx of diffCornerIndices) {
@@ -337,6 +341,14 @@ export default class RigidBodyLattice {
     }
     
     return Object.values(cubeCellMap).filter(cell => cell !== null);
+  }
+
+  convertToTriangles(terrainColumn, cachedCubeIdTriMatMap, cubeIdToTriMatMapTarget, cubeIds=null) {
+    const nodeCubeCells = (cubeIds && cubeIds.size > 0) ?  
+      this.getAllAssociatedCubeCellsForCubeIds(cubeIds) : 
+      this.getTerrainColumnCubeCells(terrainColumn);
+
+    return this.marchingCubes.convertTerrainColumnToTriangles(terrainColumn, cachedCubeIdTriMatMap, nodeCubeCells, cubeIdToTriMatMapTarget);
   }
 
   getNodeIslandCubeCells(nodes) {
@@ -420,7 +432,6 @@ export default class RigidBodyLattice {
     return result;
   }
 
-
   removeNodesInsideShape(shape) {
     const removedNodes = [];
     // Get all possible nodes in the AABB of the shape...
@@ -442,6 +453,7 @@ export default class RigidBodyLattice {
     }
     return removedNodes;
   }
+
   removeNodes(nodes) {
     for (const node of nodes) {
       const {xIdx, zIdx, yIdx} = node;
@@ -665,7 +677,6 @@ export default class RigidBodyLattice {
     }
   }
 
-
-
-
 }
+
+export default RigidBodyLattice;

@@ -2,8 +2,7 @@ import * as THREE from 'three';
 import MathUtils from '../MathUtils';
 import { assert } from 'chai';
 
-// A mapping of cube cell IDs to their previous state and terrain column owner
-let cubeCellRegister = {}; // {terrainColumn: <object>, prevState: <corners_array>}
+
 const nodeIncrements = [
   [0, 0, 0], [1, 0, 0], [1, 0, 1], [0, 0, 1], [0, 1, 0], [1, 1, 0], [1, 1, 1], [0, 1, 1]
 ];
@@ -18,24 +17,6 @@ class MarchingCubes {
   } 
   static getNodeIndices(xIdx,yIdx,zIdx) {
     return nodeIncrements.map(i => [xIdx+i[0], yIdx+i[1], zIdx+i[2]]);
-  }
-  static diffCornerIndicesToRegister(cubeCell) {
-    const {id, corners} = cubeCell;
-    const prevCubeCell = cubeCellRegister[id];
-
-    let prevState = prevCubeCell ? prevCubeCell.prevState : 
-      [{ node: null }, { node: null }, { node: null }, { node: null }, 
-       { node: null }, { node: null }, { node: null }, { node: null }];
-       
-    const differentCorners = [];
-    for (let i = 0; i < corners.length; i++) {
-      const { node } = corners[i];
-      const { node: prevNode } = prevState[i];
-      if (!nodesStateIsEqual(node, prevNode)) {
-        differentCorners.push(i);
-      }
-    }
-    return differentCorners;
   }
   static areCornersEqual(corners1, corners2) {
     assert(corners1.length === corners2.length, "Corners arrays need to be the same length.");
@@ -57,26 +38,48 @@ class MarchingCubes {
     return {xIdx: parseInt(splitKey[0]), yIdx: parseInt(splitKey[1]), zIdx: parseInt(splitKey[2])};
   }
 
-  static clearCubeCellRegister() {
-    cubeCellRegister = {};
-  }
-  static getRegisteredCubeCell(key) {
-    return cubeCellRegister[key];
-  }
-  static clearCubeCellRegisterKey(key) {
-    delete cubeCellRegister[key];
+  constructor() {
+    // A mapping of cube cell IDs to their previous state and terrain column owner
+    this._cubeCellRegister = {}; // {terrainColumn: <object>, prevState: <corners_array>}
   }
 
-  static convertTerrainColumnToTriangles(terrainColumn, nodeCubeCells, cubeIdToTriMatMap) {
-    const { cachedCubeIdToTriMatObjs } = terrainColumn;
+  clearCubeCellRegister() {
+    this._cubeCellRegister = {};
+  }
+  getRegisteredCubeCell(key) {
+    return this._cubeCellRegister[key];
+  }
+  clearCubeCellRegisterKey(key) {
+    delete this._cubeCellRegister[key];
+  }
+  diffCornerIndicesToRegister(cubeCell) {
+    const {id, corners} = cubeCell;
+    const prevCubeCell = this._cubeCellRegister[id];
+
+    let prevState = prevCubeCell ? prevCubeCell.prevState : 
+      [{ node: null }, { node: null }, { node: null }, { node: null }, 
+       { node: null }, { node: null }, { node: null }, { node: null }];
+       
+    const differentCorners = [];
+    for (let i = 0; i < corners.length; i++) {
+      const { node } = corners[i];
+      const { node: prevNode } = prevState[i];
+      if (!nodesStateIsEqual(node, prevNode)) {
+        differentCorners.push(i);
+      }
+    }
+    return differentCorners;
+  }
+
+  convertTerrainColumnToTriangles(terrainColumn, cachedCubeIdToTriMatObjs, nodeCubeCells, cubeIdToTriMatMap) {
     const affectedTCMap = {};
     for (const nodeCubeCell of nodeCubeCells) {
       const {id:cubeId, xIdx, yIdx, zIdx, corners} = nodeCubeCell;
 
       // Check whether the cube cell has already been registered with another TerrainColumn, this prevents
       // us from overdrawing parts of the terrain that may overlap with other TerrainColumns.
-      if (cubeId in cubeCellRegister) { 
-        const {terrainColumn:tcOwner, prevState} = cubeCellRegister[cubeId];
+      if (cubeId in this._cubeCellRegister) { 
+        const {terrainColumn:tcOwner, prevState} = this._cubeCellRegister[cubeId];
         if (tcOwner !== terrainColumn) {
           const ownerId = tcOwner.id;
           if (!affectedTCMap[ownerId]) {
@@ -91,11 +94,11 @@ class MarchingCubes {
           continue;
         }
         else {
-          cubeCellRegister[cubeId].prevState = corners;
+          this._cubeCellRegister[cubeId].prevState = corners;
         }
       }
       else {
-        cubeCellRegister[cubeId] = { terrainColumn, xIdx, yIdx, zIdx, prevState:corners};
+        this._cubeCellRegister[cubeId] = { terrainColumn, xIdx, yIdx, zIdx, prevState:corners};
       }
 
       cubeIdToTriMatMap[cubeId] = MarchingCubes.polygonizeNodeCubeCell(corners);

@@ -21,7 +21,7 @@
      {"material": "rock", "geometry": [{"type":"box", "range":[0,3]}]},
      {"material": "rock", "geometry": [{"type":"box", "range":[0,2]}]},
      {"material": "rock", "geometry": [{"type":"box", "range":[0,1]}]},
-     {},
+     {"material": "water", "geometry": [{"type":"box", "range":[0,2]}]},
      {"material": "rock", "geometry": [{"type":"box", "range":[0,1]}]}
     ],
     [

@@ -10,6 +10,7 @@ import GameTypes from './GameTypes';
 import GameMaterials from './GameMaterials';
 import MarchingCubes from './MarchingCubes';
 import { assert } from 'chai';
+import GamePhysics from './GamePhysics';
 
 class Battlefield {
   static get MAX_SIZE() { return TerrainColumn.SIZE * 200; }
@@ -47,7 +48,8 @@ class Battlefield {
     );
 
     this.terrainGroup = new THREE.Group();
-    this.rigidBodyLattice = new RigidBodyLattice(this.terrainGroup);
+    this.terrainNodeLattice = new RigidBodyLattice(this.terrainGroup);
+    this.waterNodeLattice = new RigidBodyLattice(this.terrainGroup);
 
     const bedrockMat = GameMaterials.materials[GameMaterials.MATERIAL_TYPE_BEDROCK];
     bedrockMat.three.map.repeat.set(Battlefield.HALF_MAX_SIZE, Battlefield.HALF_MAX_SIZE);
@@ -76,8 +78,7 @@ class Battlefield {
   }
 
   setTerrain(terrain) {
-    // Order matters here!!!
-    this.clear();
+    this._clearTerrainColumns();
     this._terrain = terrain;
 
     // The map must be square... make sure of this
@@ -104,24 +105,41 @@ class Battlefield {
       }
     }
 
-    //this.rigidBodyLattice.debugDrawNodes(true);
-  }
+    this.initWaterPhysics();
 
-  clear() {
+    //this.terrainNodeLattice.debugDrawNodes(true);
+  }
+  _clearTerrainColumns() {
     for (let x = 0; x < this._terrain.length; x++) {
       for (let z = 0; z < this._terrain[x].length; z++) {
         this._terrain[x][z].clear();
       }
     }
     this._terrain = [];
-    MarchingCubes.clearCubeCellRegister();
+  }
+
+  clear() {
+    this._clearTerrainColumns();
+    this.terrainNodeLattice.clear();
+    this.waterNodeLattice.clear();
+  }
+
+  update(dt) {
+    this.waterPhysicsUpdate(dt);
+    if (this.count) {
+      if (this.count % 10 === 0) this.waterNodeLattice.debugDrawNodes(true);
+    }
+    else {
+      this.count = 0;
+    }
+    this.count++;
   }
 
   // NOTE: We assume that the explosionShape is in the same coordinate space as the terrain
   blowupTerrain(explosionShape) {
     // Blow up the nodes
     // Test all the nodes in this column against explosionShape and remove all nodes inside it
-    const removedNodes = this.rigidBodyLattice.removeNodesInsideShape(explosionShape);
+    const removedNodes = this.terrainNodeLattice.removeNodesInsideShape(explosionShape);
     
     // Build a set of TerrainColumns and associated cube IDs for all the removed nodes 
     // so that we know what to update
@@ -150,7 +168,7 @@ class Battlefield {
     }
 
     this.regenerateTerrainColumns(tcCubeIdMap);
-    //this.rigidBodyLattice.debugDrawNodes(true); // TODO: Remove this
+    //this.terrainNodeLattice.debugDrawNodes(true); // TODO: Remove this
   }
 
   regenerateTerrainColumns(terrainColCubeIdMap) {
@@ -257,7 +275,7 @@ class Battlefield {
             if (this._terrain[x][z]) {
               const terrainColumn = this._terrain[x][z];
               const { id } = terrainColumn;
-              const addedNodes = this.rigidBodyLattice.addTerrainColumnDebris(terrainColumn, debrisObj);
+              const addedNodes = this.terrainNodeLattice.addTerrainColumnDebris(terrainColumn, debrisObj);
               numAddedNodes += addedNodes.length;
               if (addedNodes.length > 0 && !tcCubeIdMap[id]) { 
                 tcCubeIdMap[id] = { terrainColumn, cubeIds: addedNodes.map(n => {
@@ -279,7 +297,7 @@ class Battlefield {
     }
 
     // Re-traverse the rigid body node lattice and regenerate the affected columns
-    this.rigidBodyLattice.traverseGroundedNodes();
+    this.terrainNodeLattice.traverseGroundedNodes();
     this.regenerateTerrainColumns(tcCubeIdMap);
 
     // Clean-up
@@ -292,15 +310,15 @@ class Battlefield {
   // The given affectedTerrainCols are the ones to examine and update, if a list isn't given then
   // ALL terrainColumns are examined.
   terrainPhysicsCleanup(affectedTerrainCols=[]) {
-    const {rigidBodyLattice, terrainGroup, physics, debris} = this;
+    const {terrainNodeLattice, terrainGroup, physics, debris} = this;
 
-    rigidBodyLattice.traverseGroundedNodes(affectedTerrainCols);
-    const islands = rigidBodyLattice.traverseIslands();
+    terrainNodeLattice.traverseGroundedNodes(affectedTerrainCols);
+    const islands = terrainNodeLattice.traverseIslands();
 
     // Return a map of terrainColumn -> cubeIds for terrain regeneration
     const tcCubeIdMap = {};
     for (const islandNodeSet of islands) {
-      const debrisObj = new Debris(terrainGroup, rigidBodyLattice, islandNodeSet);
+      const debrisObj = new Debris(terrainGroup, terrainNodeLattice, islandNodeSet);
       if (debrisObj.mesh !== null) {
         const physObj = debrisObj.addPhysics(physics);
         if (physObj) {
@@ -320,11 +338,288 @@ class Battlefield {
 
     // The nodes are longer part of the terrain, remove them
     for (const nodeSet of islands) {
-      rigidBodyLattice.removeNodes(nodeSet);
+      terrainNodeLattice.removeNodes(nodeSet);
     }
 
     return tcCubeIdMap;
   }
+
+
+
+  initWaterPhysics() {
+    const {waterNodeLattice} = this;
+    const {nodes:waterNodes, unitsBetweenNodes, diagonalUnitsBetweenNodes} = waterNodeLattice;
+    // TODO: THIS INITIALIZATION REQUIRES THE WATER TO BE IN A PHYSICALLY ACCURATE/REASONABLE STATE TO BEGIN WITH!!!
+    // WE WILL NEED TO DEAL WITH SITUATIONS WHERE THIS ISN'T THE CASE BEFORE INITIALIZING THIS!!! (e.g., floating / falling water volumes)
+    if (!waterNodeLattice.waterData) {
+      const waterData = waterNodeLattice.waterData = [];
+      while (waterData.length < waterNodes.length) { waterData.push([]); }
+      for (let x = 0; x < waterData.length; x++) {
+        while (waterData[x].length < waterNodes[x].length) { 
+          waterData[x].push(new WaterData());
+        }
+        for (let z = 0; z < waterData[x].length; z++) {
+
+          // Starting from the top of the current column, march down to the ground and find the y indices
+          // of the heights where any pool of water exists
+          const waterCol = waterNodes[x][z];
+          const waterPoolHeightYIndices = [];
+          const waterPoolDepths = [];
+          {
+            let inWater = false;
+            let inWaterCount = 0;
+            for (let y = waterCol.length-1; y >= 0; y--) {
+              const waterNode = waterCol[y];
+              if (waterNode) {
+                if (!inWater) {
+                  waterPoolHeightYIndices.push(waterNodeLattice._nodeIndexToUnits(y)+unitsBetweenNodes);
+                  inWater = true;
+                }
+                inWaterCount += unitsBetweenNodes;
+              }
+              else {
+                if (inWaterCount > 0) {
+                  waterPoolDepths.push(inWaterCount);
+                }
+                inWater = false;
+                inWaterCount = 0;
+              }
+            }
+            if (inWaterCount > 0) {
+              waterPoolDepths.push(inWaterCount);
+            }
+            assert(waterPoolHeightYIndices.length === waterPoolDepths.length);
+          }
+          // Build the water pool data
+          const waterDataObj = waterData[x][z];
+          waterDataObj.addPools(waterPoolHeightYIndices, waterPoolDepths);
+          /*
+          // Build the flow edge data structure for each WaterPool, sharing it with all adjacent pools
+          for (let i = 0; i < waterPools.length; i++) {
+            const waterPool = waterPools[i];
+            const {flowEdges} = waterPool;
+            if (x !== 0) {
+              flowEdges[0] = new WaterFlowEdge();
+              waterData[x-1][z].flowEdges[4] = flowEdges[0]; 
+              if (z !== 0) {
+                flowEdges[1] = new WaterFlowEdge();
+                waterData[x-1][z-1].flowEdges[5] = flowEdges[1];
+              }
+            }
+            if (z !== 0) {
+              flowEdges[2] = new WaterFlowEdge();
+              waterData[x][z-1].flowEdges[6] = flowEdges[2];
+              if (x < waterData.length-1) {
+                flowEdges[3] = new WaterFlowEdge();
+                waterData[x+1][z-1].flowEdges[7] = flowEdges[3];
+              }
+            }
+          }
+          */
+        }
+      }
+    }
+  }
+
+  waterPhysicsUpdate(dt) {
+    /*
+    const {waterNodeLattice, terrainNodeLattice} = this;
+    const {nodes:waterNodes, unitsBetweenNodes, diagonalUnitsBetweenNodes} = waterNodeLattice;
+    const {nodes:terrainNodes} = terrainNodeLattice;
+    const unitsBetweenNodesSqr = unitsBetweenNodes*unitsBetweenNodes;
+    const flowScaleMultiplier = 1.0;//Math.min(0.99, dt/(Battlefield.HALF_MAX_HEIGHT*Battlefield.HALF_MAX_HEIGHT*unitsBetweenNodes*GamePhysics.GRAVITY));
+    //console.log(flowScaleMultiplier);
+
+    const nodeOrNull = (nodeLookup, idx) => {
+      return nodeLookup ? (nodeLookup[idx] ? nodeLookup[idx] : null) : null;
+    };
+    // Using the Moore neighbourhood (all adjacent nodes including corners), the area of flow between neighbours (// (tan(pi/8)*unitsBetweenNodes*depth))
+    const calcFlowCrossSectionArea = (depth) => 0.41421356237 * waterNodeLattice.unitsBetweenNodes * depth; 
+    // NOTE: If we were just considering the adjacent (i.e., up,down,left,right) nodes then: flowCrossSectionArea = unitsBetweenNodes*depth
+    const {waterData} = waterNodeLattice;
+
+    for (let x = 0; x < waterNodes.length; x++) {
+      const waterCenterX = waterNodes[x];
+      for (let z = 0; z < waterNodes[x].length; z++) {
+        const waterDataObj = waterData[x][z];
+        const {waterPools} = waterDataObj;
+
+        const waterCenterCol  = waterCenterX[z];
+        if (waterCenterCol.length === 0) { continue; }
+
+        // Gather up any of the existing 8 possible neighbour node columns on the XZ plane of nodes
+        const neighbourCols = WaterPool.flowIncrements.map((inc,i) => {
+          const xIdx = x+inc[0], zIdx = z+inc[1];
+          return {
+            xIdx, zIdx, dD: (i % 2) ? diagonalUnitsBetweenNodes: unitsBetweenNodes,
+            //flowEdge: flowEdges[i],
+            waterCol: nodeOrNull(waterNodes[xIdx],zIdx), 
+            terrainCol: nodeOrNull(terrainNodes[xIdx],zIdx)
+          };
+        });
+
+       
+        
+
+        // For each pool of the column's water we will find the sum of flows in/out of the pool and
+        // recalculate the height, removing/adding nodes from the water lattice as needed
+        for (const waterPool of waterPools) {
+          const {depth, surfaceY} = waterPool;
+          
+          // For each neighbouring column that exists (i.e., is inside the bounds of the battlefield)
+          // we find the height difference for the current water pool and calculate the sum of flows in/out of the column
+          let flowSum = 0;
+          for (const neighbourCol of neighbourCols) {
+            const {xIdx, zIdx, dD, waterCol, terrainCol} = neighbourCol;
+
+            // If this neighbour doesn't exist in the battlefield, ignore it
+            if (waterCol === null) { continue; } 
+
+            let foundNeighbourPools = [];
+
+            // Try to find the closest connectable water pool
+            const {waterPools:neighbourWaterPools} = waterData[xIdx][zIdx];
+            for (const neighbourWaterPool of neighbourWaterPools) {
+              const {depth:neighbourDepth, surfaceY:neighbourSurfaceY} = neighbourWaterPool;
+              if (surfaceY+1e-6 >= neighbourSurfaceY-neighbourDepth && surfaceY-depth <= neighbourSurfaceY+1e-6) {
+                foundNeighbourPools.push(neighbourWaterPool);
+              }
+            }
+            if (foundNeighbourPools.length > 0) {
+              for (const pool of foundNeighbourPools) {
+                const deltaHeight = pool.surfaceY - surfaceY;
+                const sharedDepth = waterPool.overlapDepth(pool);
+                flowSum += calcFlowCrossSectionArea(Math.abs(sharedDepth)) * (GamePhysics.GRAVITY/dD) * deltaHeight * dt;
+              }
+            }
+            else {
+             
+              // If there are no neighbouring pools then we check how many openings there are in the terrain between
+              // the surface of the water and its depth, this will be the depth-surface-area (i.e., deltaHeight)
+              // Each opening in the terrain should generate a new pool of water with no depth (yet)
+              let deltaHeight = 0;
+              const newWaterPoolSurfaces = [];
+              {
+                const startY = Math.max(0, terrainNodeLattice._unitsToNodeIndex(surfaceY-depth-terrainNodeLattice.halfUnitsBetweenNodes));
+                const endY   = Math.max(0, terrainNodeLattice._unitsToNodeIndex(surfaceY-terrainNodeLattice.halfUnitsBetweenNodes));
+
+                let outsideTerrain = false;
+                for (let y = startY; y <= endY; y++) {
+                  if (!terrainCol[y]) {
+                    if (!outsideTerrain) {
+                      outsideTerrain = true;
+                      newWaterPoolSurfaces.push(terrainNodeLattice._nodeIndexToUnits(y));
+                    }
+                    deltaHeight++; 
+                  }
+                  else {
+                    outsideTerrain = false;
+                  }
+                }
+                
+              }
+              waterDataObj.addPools(newWaterPoolSurfaces, newWaterPoolSurfaces.map(_ => 0));
+              flowSum += calcFlowCrossSectionArea(Math.abs(deltaHeight)) * (GamePhysics.GRAVITY/dD) * deltaHeight * dt;
+            }
+          }
+
+          
+          // Apply a hydrostatic pressure equation (based on Newton's law) to calculate the new depth /surface height of the column:
+          const totalOutgoingFlow = dt*flowScaleMultiplier*(flowSum/unitsBetweenNodesSqr);
+          const minSurfaceY = waterPool.surfaceY-waterPool.depth;
+
+          // The depth cannot be negative, if it is then we need to scale the flow.
+          // NOTE: We may want to do this in two steps in the future and properly scale the flow values 
+          // based on if a column reaches zero depth
+          const prevSurfaceYIdx = waterNodeLattice._unitsToNodeIndex(surfaceY);
+          waterPool.surfaceY = Math.max(minSurfaceY, waterPool.surfaceY - totalOutgoingFlow);
+          const nextSurfaceYIdx = waterNodeLattice._unitsToNodeIndex(waterPool.surfaceY);
+          waterPool.depth = Math.max(0, depth - totalOutgoingFlow);
+          assert(prevSurfaceYIdx >= 0 && nextSurfaceYIdx >= 0);
+
+          // Add/remove nodes based on the new water surface y-index in this xz-column
+          if (nextSurfaceYIdx > prevSurfaceYIdx) {
+            let y = waterCenterCol.length;
+            while (waterCenterCol.length <= nextSurfaceYIdx) { waterCenterCol.push(null); }
+            for (y = prevSurfaceYIdx; y < nextSurfaceYIdx; y++) {
+              waterCenterCol[y] = new LatticeNode(waterNodeLattice.nextNodeId++, x,z,y++,waterCenterCol[0].terrainColumn, GameMaterials.materials[GameMaterials.MATERIAL_TYPE_WATER]);
+            }
+          }
+          else if (nextSurfaceYIdx < prevSurfaceYIdx) {
+            for (let y = nextSurfaceYIdx; y < prevSurfaceYIdx; y++) {
+              waterNodeLattice._removeNode(x,z,y);
+            }
+          }
+
+        }
+        
+
+      }
+    }
+    */
+  }
+
 }
+
+const flowIncrements = [ [-1,0],[-1,-1],[0,-1],[1,-1],[1,0],[1,1],[0,1],[-1,1] ];
+class WaterData {
+  constructor() { 
+    this.waterPools = [];
+    //this.waterBlobs = [];
+  }
+  addPool(surfaceY, depth) {
+    const newPool = new WaterPool(surfaceY, depth);
+    let insertAtEnd = true;
+
+    // Avoid overlapping pools by merging them as needed
+    for (let j = 0; j < this.waterPools.length; j++) {
+      const pool = this.waterPools[j];
+      if (pool.overlapDepth(newPool) >= 0) {
+        // Merge the two pools into a new pool
+        const bottomY = Math.min(surfaceY-depth, pool.surfaceY-pool.depth);
+        newPool.surfaceY = Math.max(surfaceY, pool.surfaceY);
+        newPool.depth = newPool.surfaceY - bottomY;
+        if (pool.surfaceY !== newPool.surfaceY || pool.depth !== newPool.depth) {
+          // Add back the merged pool recursively
+          this.waterPools.splice(j,1);
+          this.addPool(newPool.surfaceY, newPool.depth);
+        }
+        insertAtEnd = false;
+        break;
+      }
+      else if (pool.surfaceY > newPool.surfaceY) {
+        // Insert the new pool into the current water pool list index
+        this.waterPools.splice(j, 0, newPool);
+        insertAtEnd = false;
+        break;
+      }
+    }
+    if (insertAtEnd) { this.waterPools.push(newPool); }
+  }
+
+  addPools(surfaceYs, depths) {
+    assert(surfaceYs.length === depths.length);
+    for (let i = 0; i < surfaceYs.length; i++) {
+      this.addPool(surfaceYs[i], depths[i]);
+    }
+  }
+
+};
+class WaterPool {
+  static get flowIncrements() { return flowIncrements; }
+  constructor(surfaceY, depth) { 
+    assert(depth >= 0 && surfaceY >= 0);
+    this.depth = depth; 
+    this.surfaceY = surfaceY;
+    // There are always 8 flow edges and they are stored counter-clockwise starting from [x,z] = [-1,0]
+    //this.flowEdges = new Array(8).fill(null); 
+  }
+  overlapDepth(pool) {
+    return Math.min(this.surfaceY, pool.surfaceY) - Math.max(this.surfaceY-this.depth, pool.surfaceY-pool.depth);
+  }
+};
+//class WaterFlowEdge {
+//  constructor() { this.flow = 0; }
+//};
 
 export default Battlefield;
