@@ -4,7 +4,6 @@ import { assert } from 'chai';
 import GeometryUtils from '../GeometryUtils';
 
 import GameMaterials from './GameMaterials';
-import MarchingCubes from './MarchingCubes';
 import Battlefield from './Battlefield';
 import GameTypes from './GameTypes';
 

@@ -14,9 +14,9 @@ import GamePhysics from './GamePhysics';
 import { TetrahedronGeometry } from 'three';
 
 class Battlefield {
-  static get MAX_SIZE() { return TerrainColumn.SIZE * 200; }
+  static get MAX_SIZE() { return TerrainColumn.SIZE * 64; }
   static get HALF_MAX_SIZE() { return Battlefield.MAX_SIZE / 2; }
-  static get MAX_HEIGHT() { return TerrainColumn.SIZE * 25; }
+  static get MAX_HEIGHT() { return TerrainColumn.SIZE * 24; }
   static get HALF_MAX_HEIGHT() { return Battlefield.MAX_HEIGHT/2; }
 
   constructor(scene, physics) {
@@ -87,13 +87,17 @@ class Battlefield {
     for (let x = 0; x < this._terrain.length; x++) {
       maxZLength = Math.max(maxZLength, this._terrain[x].length);
     }
-    const terrainSize = terrain.length * TerrainColumn.SIZE;
-    this.terrainGroup.position.set(-terrainSize / 2, 0, -terrainSize / 2);
+    const terrainXSize = terrain.length * TerrainColumn.SIZE;
+    this.terrainGroup.position.set(-terrainXSize / 2, 0, -terrainXSize / 2);
     for (let x = 0; x < this._terrain.length; x++) {
       while (this._terrain[x].length !== maxZLength) {
         this._terrain[x].push(new TerrainColumn(this, x,this._terrain[x].length, null));
       }
     }
+
+    const terrainZSize = maxZLength * TerrainColumn.SIZE;
+    this.waterNodeLattice.initNodeSpace(terrainXSize, terrainZSize, this.MAX_HEIGHT);
+    this.terrainNodeLattice.initNodeSpace(terrainXSize, terrainZSize, this.MAX_HEIGHT);
 
     // Traverse the lattice, find anything that might not be connected to the ground, 
     // remove it from the terrain and turn it into a physical object
@@ -422,88 +426,6 @@ class Battlefield {
           }
         }
       }
-      // Initialize the edges between water data nodes
-      for (let x = 0; x < waterNodes.length; x++) {
-        for (let z = 0; z < waterNodes[x].length; z++) {
-          for (let y = 0; y < waterNodes[x][z].length; y++) {
-            const waterNode = waterNodes[x][z][y];
-            assert(waterNode);
-            const {flowEdges} = waterNode;
-            /*
-            if (x !== 0) {
-              const xMinus1WN = waterNodes[x - 1][z][y];
-              flowEdges[0] = new WaterFlowEdge(unitsBetweenNodes, xMinus1WN, waterNode);
-              xMinus1WN.flowEdges[4] = flowEdges[0];
-              waterEdges.push(flowEdges[0]);
-              
-              if (z !== 0) {
-                const xzMinus1WN = waterNodes[x - 1][z - 1][y];
-                flowEdges[1] = new WaterFlowEdge(diagonalUnitsBetweenNodes, xzMinus1WN, waterNode);
-                xzMinus1WN.flowEdges[5] = flowEdges[1];
-                waterEdges.push(flowEdges[1]);
-              }
-            }
-
-            if (z !== 0) {
-              const zMinus1WN = waterNodes[x][z-1][y];
-              flowEdges[2] = new WaterFlowEdge(unitsBetweenNodes, zMinus1WN, waterNode);
-              zMinus1WN.flowEdges[6] = flowEdges[2];
-              waterEdges.push(flowEdges[2]);
-
-              if (x !== waterNodes.length - 1) {
-                const xPlus1ZMinus1WN = waterNodes[x + 1][z - 1][y];
-                flowEdges[3] = new WaterFlowEdge(diagonalUnitsBetweenNodes, waterNode, xPlus1ZMinus1WN);
-                xPlus1ZMinus1WN.flowEdges[7] = flowEdges[3];
-                waterEdges.push(flowEdges[3]);
-              }
-            }
-
-            if (y !== 0) {
-              const yMinus1WN = waterNodes[x][z][y-1];
-              flowEdges[8] = new WaterFlowEdge(unitsBetweenNodes, yMinus1WN, waterNode);
-              yMinus1WN.flowEdges[9] = flowEdges[8];
-              waterEdges.push(flowEdges[8]);
-            }
-            */
-
-          
-            if (x !== 0) {
-              flowEdges[0] = new WaterFlowEdge(unitsBetweenNodes);
-              if (z !== 0) {
-                flowEdges[1] = new WaterFlowEdge(diagonalUnitsBetweenNodes);
-              }
-            }
-            if (x !== waterNodes.length-1) {
-              flowEdges[4] = new WaterFlowEdge(unitsBetweenNodes);
-              if (z !== waterNodes[x].length-1) {
-                flowEdges[5] = new WaterFlowEdge(diagonalUnitsBetweenNodes);
-              }
-            }
-
-            if (z !== 0) {
-              flowEdges[2] = new WaterFlowEdge(unitsBetweenNodes);
-              if (x !== waterNodes.length - 1) {
-                flowEdges[3] = new WaterFlowEdge(diagonalUnitsBetweenNodes);
-              }
-            }
-            if (z !== waterNodes[x].length - 1) {
-              flowEdges[6] = new WaterFlowEdge(unitsBetweenNodes);
-              if (x !== 0) {
-                flowEdges[7] = new WaterFlowEdge(diagonalUnitsBetweenNodes);
-              }
-            }
-
-            if (y !== 0) {
-              flowEdges[8] = new WaterFlowEdge(unitsBetweenNodes);
-            }
-            if (y !== waterNodes[x][z].length-1) {
-              flowEdges[9] = new WaterFlowEdge(unitsBetweenNodes);
-            }
-           
-          }
-
-        }
-      }
     }
   }
 
@@ -514,214 +436,185 @@ class Battlefield {
     if (!waterNodes) { return; }
     const waterNodeArea = unitsBetweenNodes*unitsBetweenNodes;
     const dtStable = Math.min(dt, 0.1);//unitsBetweenNodes/GamePhysics.GRAVITY);
-
-    // Using the Moore neighbourhood (all adjacent nodes including corners), the area of flow between neighbours
-    const sideCrossSectionArea = 0.41421356237 * waterNodeArea; // tan(pi/8)*waterNodeArea
-
-    // Calculate all of the flows...
-    for (let x = 0; x < waterNodes.length; x++) {
-      for (let z = 0; z < waterNodes[x].length; z++) {
-        for (let y = 0; y < waterNodes[x][z].length; y++) {
-          const waterNode = waterNodes[x][z][y];
-          const {flowEdges} = waterNode;
-
-          let resultMass = waterNode.mass;
-
-          const gravityOutEdge = flowEdges[8];
-          const gravityInEdge  = flowEdges[9];
-          if (gravityOutEdge) {
-            const feedNode = waterNodes[x][z][y - 1];
-            const dMass = resultMass - feedNode.mass;
-            let flowQtyGravity = (waterNodeArea / unitsBetweenNodes) * GamePhysics.GRAVITY * dMass * dtStable;
-            if (gravityInEdge) {
-              flowQtyGravity += Math.abs(gravityInEdge.flow)*dtStable;
-            }
-            let flowQtyFeed = flowQtyGravity;
-
-            /*
-            // We only care about keeping the mass steady in this waterNode, let the others
-            // take care of themselves via flows
-            if (waterNode.mass > 1) {
-              // Try to dump the water downward
-              flowQtyFeed += flow
-            }
-            */
-
-            /*
-            let massBefore = resultMass;
-            resultMass -= (gravityOutEdge.flow+flowQtyGravity) * dtStable;
-            if (resultMass < 0) {
-              waterNode.mass = 0;
-              gravityOutEdge.flow = 0;
-              feedNode.flowEdges[9].flow = 0;
-              
-              if (feedNode.mass > 1) {
-                waterNode.mass += feedNode.mass-1;
-                feedNode.mass = 1;
-              }
-            }
-            else {
-              if (resultMass > 1) {
-                waterNode.mass = 1;
-
-              }
-              massBefore = feedNode.mass;
-              resultMass = massBefore - (feedNode.flowEdges[9].flow - flowQtyGravity) * dtStable;
-              if (resultMass > 1) {
-                waterNode.mass += resultMass-1;
-                if (waterNode.mass > 1) {
-                  waterNode.mass = 1;
-                }
-
-                feedNode.mass = 1;
-                feedNode.flowEdges[9].flow = 0;
-                gravityOutEdge.flow = 0;
-
-              }
-              else {
-                gravityOutEdge.flow += flowQtyGravity;
-                feedNode.flowEdges[9].flow -= flowQtyGravity;
-              }
-            }
-            */
-          }
-
-
-
-
-
-
-          /*
-          // Side flows
-          let totalSideFlow = 0;
-          for (let i = 0; i < flowEdges.length-2; i++) {
-            const flowEdge = flowEdges[i];
-            if (flowEdge) {
-              const inc = flowIncrements[i];
-              const neighbourNode = waterNodes[x + inc[0]][z + inc[1]][y];
-              const dMass = resultMass - neighbourNode.mass;
-              flowEdge.flow += (sideCrossSectionArea / flowEdge.length) * GamePhysics.GRAVITY * dMass * dtStable;
-              totalSideFlow += flowEdge.flow;
-            }
-          }
-
-          const massBefore = resultMass;
-          const flowValue = totalSideFlow * dtStable;
-          resultMass -= flowValue;
-          let flowTotalAdjustMultiplier = 1;
-          if (resultMass < 0) {
-            flowTotalAdjustMultiplier = massBefore / flowValue;
-            resultMass = 0;
-          }
-          if (flowTotalAdjustMultiplier !== 1) {
-            for (let i = 0; i < flowEdges.length - 2; i++) {
-              const flowEdge = flowEdges[i];
-              if (flowEdge) {
-                flowEdge.flow = flowTotalAdjustMultiplier * (flowEdge.flow / totalSideFlow);
-              }
-            }
-          }
-          */
-        }
-      }
-    }
-
-    for (let x = 0; x < waterNodes.length; x++) {
-      for (let z = 0; z < waterNodes[x].length; z++) {
-        for (let y = 0; y < waterNodes[x][z].length; y++) {
-          const waterNode = waterNodes[x][z][y];
-          for (const flowEdge of waterNode.flowEdges) {
-            if (flowEdge) {
-              waterNode.mass -= flowEdge.flow * dtStable;
-            }
-          }
-          waterNode.mass = Math.max(0, waterNode.mass);
-        }
-      }
-    }
-
-
-    
   }
 
 }
 
-const flowIncrements = [
-  [-1, 0, 0], [-1, -1, 0], [0, -1, 0], [1, -1, 0], [1, 0, 0], [1, 1, 0], [0, 1, 0], [-1, 1, 0], [0, 0, -1], [0,0,1]];
-class WaterData {
-  constructor(xIdx,zIdx,yIdx,mass=1) {
-    this.xIdx = xIdx, this.yIdx = yIdx, this.zIdx = zIdx;
-    this.mass = mass;
-    // Stores the XZ side edges (indices 0-7) and finally going down (8) and flowing from up (9)
-    this.flowEdges = new Array(10).fill(null);
+const tempVec3 = new THREE.Vector3();
+const tempVec3a = new THREE.Vector3();
+
+const GRAVITY_VEC3 = new THREE.Vector3(0,-GamePhysics.GRAVITY,0);
+const FLUID_PARTICLE_MASS = 1;
+const STIFFNESS = 10;
+const STIFFNESS_NEAR = (100/35) * STIFFNESS;
+const REST_DENSITY = 5;
+
+class FluidState {
+  constructor(waterNodeLattice, terrainNodeLattice) {
+    this.waterNodeLattice = waterNodeLattice;
+    this.terrainNodeLattice = terrainNodeLattice;
+
+    const {unitsBetweenNodes} = this.waterNodeLattice;
+    this.interactionRadius = Math.sqrt(2*unitsBetweenNodes*unitsBetweenNodes) + TerrainColumn.EPSILON;
+    this.interactionRadiusSq = this.interactionRadius*this.interactionRadius;
+    this.interactionRadiusInv = 1 / this.interactionRadius;
+
+    this.positions = [];
+    this.oldPositions = [];
+    this.velocities = [];
+    this.pressures = [];
+    this.pressureNear = [];
+    this.gradients = [];
+
+    // We build enough particles for all the water present in the lattice
+    const {nodes} = waterNodeLattice;
+    for (let x = 0; x < nodes.length; x++) {
+      for (let z = 0; z < nodes[x].length; z++) {
+        for (let y = 0; y < nodes[x][z].length; y++) {
+          const node = nodes[x][z][y];
+          if (node) {
+            this.positions.push(node.pos.clone());
+            this.oldPositions.push(node.pos.clone());
+            this.velocities.push(new THREE.Vector3(0,0,0));
+            this.pressures.push(0);
+            this.pressureNear.push(0);
+            this.gradients.push(0);
+          }
+        }
+      }
+    }
+    this.hashMap = new SpatialHashMap(nodes.length, nodes[0][0].length, nodes[0].length);
   }
+
+  mass(i) { return FLUID_PARTICLE_MASS; }
+
+  update(dt) {
+    this.hashMap.clear();
+
+    // Pass 1: Update positions from velocities after applying global forces
+    for (let i = 0; i < this.positions.length; i++) {
+      // Update the old position
+      this.oldPositions[i].copy(this.positions[i]);
+
+      this.applyGlobalForces(i, dt);
+
+      // Update positions from the velocities
+      const position = this.positions[i];
+      tempVec3.copy(this.velocities[i]).multiplyScalar(dt);
+      position.add(tempVec3);
+
+      // Update the hashmap
+      this.waterNodeLattice._posToNodeIndex(position, tempVec3);
+      this.hashMap.add(tempVec3, i)
+    }
+
+    // Pass 2: update the pressure of each particle based on the surrounding neighbours and
+    // then do a "double density relaxation"
+    for (let i = 0; i < this.positions.length; i++) {
+      const neighbours = this.getNeighboursWithGradients(i);
+      this.updatePressure(i, neighbours);
+      this.relax(i, neighbours, dt);
+    }
+
+    // Pass 3: Constrain the particles to the terrain / container
+    this.waterNodeLattice.removeAllNodes();
+    for (let i = 0; i < this.positions.length; i++) {
+      this.contain(i,dt);
+      this.calculateVelocity(i,dt);
+      
+      // TODO: Final update for the water node lattice so we can draw it
+      /*
+       const terrainColumn = this.getTerrainColumn(Math.floor(position.x), Math.floor(position.z));
+        const node = this.waterNodeLattice.buildNode({
+          xIdx:tempVec3.x, zIdx:tempVec3.z, yIdx:tempVec3.y,
+          terrainColumn, material:GameMaterials.materials[GameMaterials.MATERIAL_TYPE_WATER]
+        });
+        */
+    }
+  }
+
+  applyGlobalForces(i, dt) {
+    const force = GRAVITY_VEC3;
+    // f = m*a, v += a*dt
+    // => v += f*dt/m
+    tempVec3.copy(force).multiplyScalar(dt/this.mass(i));
+    this.velocities[i].add(tempVec3);
+  }
+
+  getNeighboursWithGradients(i) {
+    const radius = this.interactionRadius;
+    const position = this.positions[i];
+    const foundNodes = this.waterNodeLattice.getNodesInRadius(position, radius);
+    const neighbourIndices = [];
+    for (const node of foundNodes) {
+      const {fluidStateIndices} = node;
+      for (const fluidIdx of fluidStateIndices) {
+        if (fluidIdx === i) { continue; }
+        // Calculate the gradients for each neighbour
+        const g = this.calcGradient(i,fluidIdx);
+        if (!g) { continue; }
+        this.gradients[fluidIdx] = g;
+        neighbourIndices.push(fluidIdx);
+      }
+    }
+    return neighbourIndices;
+  }
+
+  calcGradient(i, neighbourIdx) {
+    const a = this.positions[i];
+    const b = this.positions[neighbourIdx];
+    tempVec3.subVectors(a,b);
+    const lsq = tempVec3.lengthSq();
+    if (lsq > this.interactionRadiusSq) { return 0; }
+    return Math.max(0, 1-Math.sqrt(lsq)*this.interactionRadiusInv);
+  }
+
+  updatePressure(i, neighbours) {
+    let density = 0;
+    let nearDensity = 0;
+    const m = this.mass(i);
+
+    for (let k = 0; k < neighbours.length; k++) {
+      const g = this.gradients[neighbours[k]];
+      density += g*g*m;
+      nearDensity += g*g*g*m;
+    }
+
+    this.pressures[i] = STIFFNESS * (density - REST_DENSITY) * m;
+    this.pressureNear[i] = STIFFNESS_NEAR * nearDensity * m;
+  }
+
+  relax(i, neighbours, dt) {
+    const pos = this.positions[i];
+    for (let k = 0; k < neighbours.length; k++) {
+      const n = neighbours[k];
+      const g = this.gradients[n];
+      const nPos = this.positions[n];
+      const magnitude = this.pressures[i] * g + this.pressureNear[i] * g * g;
+
+      tempVec3.subVectors(nPos, pos).normalize();
+      const dI = tempVec3.multiplyScalar(magnitude * dt * dt);
+      const dN = tempVec3a.copy(dI);
+
+      const massI = this.mass(i);
+      const massN = this.mass(n);
+      const massTotal = massI + massN;
+      const massIPercentage = massI / massTotal;
+      const massNPercentage = massN / massTotal;
+      dI.multiplyScalar(massIPercentage);
+      dN.multiplyScalar(massNPercentage);
+
+      pos.sub(dI);
+      nPos.add(dN);
+    }
+  }
+
+  contain(i, dt) {
+    const position = this.positions[i];
+
+  }
+
 }
 
-class WaterFlowEdge {
-  constructor(length) {
-    this.length = length; 
-    this.flow = 0;
-  }
-};
 
-/*
-const flowIncrements = [ [-1,0],[-1,-1],[0,-1],[1,-1],[1,0],[1,1],[0,1],[-1,1] ];
-class WaterData {
-  constructor() { 
-    this.waterPools = [];
-    //this.waterBlobs = [];
-  }
-  addPool(surfaceY, depth) {
-    const newPool = new WaterPool(surfaceY, depth);
-    let insertAtEnd = true;
-
-    // Avoid overlapping pools by merging them as needed
-    for (let j = 0; j < this.waterPools.length; j++) {
-      const pool = this.waterPools[j];
-      if (pool.overlapDepth(newPool) >= 0) {
-        // Merge the two pools into a new pool
-        const bottomY = Math.min(surfaceY-depth, pool.surfaceY-pool.depth);
-        newPool.surfaceY = Math.max(surfaceY, pool.surfaceY);
-        newPool.depth = newPool.surfaceY - bottomY;
-        if (pool.surfaceY !== newPool.surfaceY || pool.depth !== newPool.depth) {
-          // Add back the merged pool recursively
-          this.waterPools.splice(j,1);
-          this.addPool(newPool.surfaceY, newPool.depth);
-        }
-        insertAtEnd = false;
-        break;
-      }
-      else if (pool.surfaceY > newPool.surfaceY) {
-        // Insert the new pool into the current water pool list index
-        this.waterPools.splice(j, 0, newPool);
-        insertAtEnd = false;
-        break;
-      }
-    }
-    if (insertAtEnd) { this.waterPools.push(newPool); }
-  }
-
-  addPools(surfaceYs, depths) {
-    assert(surfaceYs.length === depths.length);
-    for (let i = 0; i < surfaceYs.length; i++) {
-      this.addPool(surfaceYs[i], depths[i]);
-    }
-  }
-
-};
-class WaterPool {
-  static get flowIncrements() { return flowIncrements; }
-  constructor(surfaceY, depth) { 
-    assert(depth >= 0 && surfaceY >= 0);
-    this.depth = depth; 
-    this.surfaceY = surfaceY;
-    // There are always 8 flow edges and they are stored counter-clockwise starting from [x,z] = [-1,0]
-    //this.flowEdges = new Array(8).fill(null); 
-  }
-  overlapDepth(pool) {
-    return Math.min(this.surfaceY, pool.surfaceY) - Math.max(this.surfaceY-this.depth, pool.surfaceY-pool.depth);
-  }
-};
-
-*/
 export default Battlefield;

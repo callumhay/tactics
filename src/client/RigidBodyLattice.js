@@ -7,6 +7,7 @@ import Battlefield from './Battlefield';
 import MarchingCubes from './MarchingCubes';
 
 const tempVec3 = new THREE.Vector3();
+const tempVec3a = new THREE.Vector3();
 
 export class LatticeNode {
   constructor(id, xIdx, zIdx, yIdx, pos, terrainColumn, material) {
@@ -58,6 +59,11 @@ class RigidBodyLattice {
     return Math.SQRT2*this.unitsBetweenNodes;
   }
 
+  buildNode(nodeConfig) {
+    const {xIdx,zIdx,yIdx,terrainColumn,material} = nodeConfig;
+    return new LatticeNode(this.nextNodeId++, xIdx, zIdx, yIdx, this._nodeIndexToPosition(xIdx,yIdx,zIdx), terrainColumn, material); 
+  }
+
   clear() {
     this.nodes = [];
     this.nextNodeId = 0;
@@ -77,6 +83,9 @@ class RigidBodyLattice {
 
   _getIndexRangeForBoundingBox(boundingBox) {
     const {min,max} = boundingBox;
+    return this._getIndexRangeForMinMax(min,max);
+  }
+  _getIndexRangeForMinMax(min,max) {
     const {clamp} = THREE.MathUtils;
     return {
       nodeXIdxStart: clamp(this._unitsToNodeIndex(min.x), 0, this.nodes.length-1),
@@ -87,6 +96,7 @@ class RigidBodyLattice {
       nodeZIdxEnd: Math.max(0, this._unitsToNodeIndex(max.z))
     };
   }
+  
   _getXZIndexRangeForTerrainColumn(terrainColumn) {
     const { xIndex, zIndex } = terrainColumn;
     const numNodesPerUnitMinusOne = (this.numNodesPerUnit - 1);
@@ -99,6 +109,10 @@ class RigidBodyLattice {
       nodeZIdxEnd: nodeZIdxStart + numNodesPerUnitMinusOne,
     };
   }
+  _posToNodeIndex(unitPos, target) {
+    target.set(this._unitsToNodeIndex(unitPos.x), this._unitsToNodeIndex(unitPos.y), this._unitsToNodeIndex(unitPos.z));
+    return target;
+  } 
   _unitsToNodeIndex(unitVal) {
     return Math.floor(unitVal * this.numNodesPerUnit);
   }
@@ -116,6 +130,24 @@ class RigidBodyLattice {
   }
   _removeNode(xIdx, zIdx, yIdx) {
     this.nodes[xIdx][zIdx][yIdx] = null;
+  }
+
+  initNodeSpace(xUnitSize, zUnitSize, yUnitSize) {
+    const numXNodes = Math.round(xUnitSize * this.numNodesPerUnit);
+    const numZNodes = Math.round(zUnitSize * this.numNodesPerUnit);
+    const numYNodes = Math.round(yUnitSize * this.numNodesPerUnit);
+    while (this.nodes.length < numXNodes) { this.nodes.push([]); }
+    assert(this.nodes.length === numXNodes);
+    for (let x = 0; x < numXNodes; x++) {
+      const nodesX = this.nodes[x];
+      while (nodesX.length < numZNodes) { nodesX.push([]); }
+      assert(nodesX.length === numZNodes);
+      for (let z = 0; z < numZNodes; z++) {
+        const nodesZ = nodesX[z];
+        while (nodesZ.length < numYNodes) { nodesZ.push(null); }
+        assert(nodesZ.length === numYNodes);
+      }
+    }
   }
 
   addTerrainColumnBox(terrainColumn, config) {
@@ -136,7 +168,7 @@ class RigidBodyLattice {
         for (let y = nodeYIdxStart; y <= nodeYIdxEnd; y++) {
           const node = nodesZ[y];
           assert(!node || node.terrainColumn === terrainColumn, "Nodes shouldn't have more than one TerrainColumn associated with them.");
-          if (!node) { nodesZ[y] = new LatticeNode(this.nextNodeId++, x, z, y, this._nodeIndexToPosition(x,y,z), terrainColumn, material); }
+          if (!node) { nodesZ[y] = this.buildNode({xIdx:x,zIdx:z,yIdx:y,terrainColumn,material}); }
         }
       }
     }
@@ -208,7 +240,7 @@ class RigidBodyLattice {
           intersections.sort((a,b) => a.distance-b.distance);
 
           if (intersections.length > 0 /* && intersections[0].face.normal.dot(raycaster.ray.direction) >= 0*/) {
-            nodesXZ[y] = new LatticeNode(this.nextNodeId++, x, z, y, nodePos, terrainColumn, material);
+            nodesXZ[y] = this.buildNode({xIdx:x,zIdx:z,yIdx:y,terrainColumn,material});
             addedNodes.push(nodesXZ[y]);
           }
         }
@@ -431,6 +463,26 @@ class RigidBodyLattice {
     }
     return result;
   }
+  getNodesInRadius(position, radius) {
+    tempVec3.copy(position).subScalar(radius);
+    tempVec3a.copy(position).addScalar(radius);
+    const {
+      nodeXIdxStart, nodeXIdxEnd, 
+      nodeYIdxStart, nodeYIdxEnd, 
+      nodeZIdxStart, nodeZIdxEnd
+    } = this._getIndexRangeForMinMax(tempVec3, tempVec3a);
+
+    const result = [];
+    for (let x = nodeXIdxStart; x <= nodeXIdxEnd && x < this.nodes.length; x++) {
+      for (let z = nodeZIdxStart; z <= nodeZIdxEnd && z < this.nodes[x].length; z++) {
+        for (let y = nodeYIdxStart; y <= nodeYIdxEnd && y < this.nodes[x][z].length; y++) {
+          const node = this.nodes[x][z][y];
+          if (node) { result.push(node); }
+        }
+      }
+    }
+    return result;
+  }
 
   removeNodesInsideShape(shape) {
     const removedNodes = [];
@@ -458,6 +510,16 @@ class RigidBodyLattice {
     for (const node of nodes) {
       const {xIdx, zIdx, yIdx} = node;
       this._removeNode(xIdx, zIdx, yIdx);
+    }
+  }
+
+  removeAllNodes() {
+    for (let x = 0; x < this.nodes.length; x++) {
+      for (let z = 0; z < this.nodes[x].length; z++) {
+        for (let y = 0; y < this.nodes[x][z].length; y++) {
+          this._removeNode(x,z,y);
+        }
+      }
     }
   }
 
