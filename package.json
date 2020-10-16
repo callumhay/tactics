@@ -6,16 +6,17 @@
   "dependencies": {
     "cannon-es": "^0.15.1",
     "express": "^4.17.1",
-    "reload": "^3.1.0",
+    "gpu.js": "^2.10.4",
+    "reload": "^3.1.1",
     "three": "^0.119.1",
     "watch": "^1.0.2",
-    "webpack": "^4.44.1",
-    "webpack-node-externals": "^2.5.1"
+    "webpack": "^4.44.2",
+    "webpack-node-externals": "^2.5.2"
   },
   "devDependencies": {
     "chai": "*",
-    "copy-webpack-plugin": "^6.0.3",
-    "nodemon": "^2.0.4",
+    "copy-webpack-plugin": "^6.2.1",
+    "nodemon": "^2.0.5",
     "webpack-cli": "^3.3.12"
   },
   "scripts": {

@@ -23,7 +23,7 @@ class MarchingCubes {
     for (let i = 0; i < corners1.length; i++) {
       const { node: c1Node } = corners1[i];
       const { node: c2Node } = corners2[i];
-      if (!nodesStateIsEqual(c1Node,c2Node)) {
+      if (!nodesStateIsEqual(c1Node, c2Node)) {
         return false;
       }
     }
@@ -156,7 +156,7 @@ const interpolateVertex = (nodeObj1, nodeObj2) => {
     n2 = nodeObj1;
   }
 
-  const isoVal = .5;
+  const isoVal = 0.5;
   const n1Val = n1.node ? 0 : 1;
   const n2Val = n2.node ? 0 : 1;
   const point = new THREE.Vector3(n1.pos.x, n1.pos.y, n1.pos.z);

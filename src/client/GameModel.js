@@ -2,9 +2,10 @@ import GamePhysics from './GamePhysics';
 import Battlefield from './Battlefield';
 
 class GameModel {
-  constructor(scene) {
+  constructor(scene, gpuManager) {
+    this.gpuManager = gpuManager;
     this.physics = new GamePhysics(scene, this);
-    this.battlefield = new Battlefield(scene, this.physics);
+    this.battlefield = new Battlefield(scene, this);
   }
 
   update(dt) {

@@ -3,7 +3,7 @@ import {OrbitControls} from 'three/examples/jsm/controls/OrbitControls';
 
 import GameModel from './GameModel';
 import GameClient from './GameClient';
-
+import GPUKernelManager from './GPUKernelManager';
 import CannonDebugRenderer from './CannonDebugRenderer';
 import GameMaterials from './GameMaterials';
 
@@ -51,7 +51,8 @@ function onWindowResize(event) {
 
 // Setup game objects - ORDER MATTERS!
 GameMaterials.loadMaterials();
-const gameModel = new GameModel(scene);
+const gpuManager = new GPUKernelManager(renderer);
+const gameModel = new GameModel(scene, gpuManager);
 
 // Setup the client, connect to the game server
 const client = new GameClient();
@@ -91,7 +92,7 @@ function onMouseClick(event) {
 
 const {physics} = gameModel;
 const {terrainGroup} = gameModel.battlefield;
-const cannonDebugRenderer = new CannonDebugRenderer(terrainGroup, physics.world);
+//const cannonDebugRenderer = new CannonDebugRenderer(terrainGroup, physics.world);
 
 // Setup and execute the game loop
 const clock = new THREE.Clock(true);

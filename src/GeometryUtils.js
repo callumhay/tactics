@@ -1,6 +1,4 @@
 import * as THREE from 'three';
-
-import MathUtils from './MathUtils';
 import { assert } from 'chai';
 
 const tempVec3 = new THREE.Vector3();
@@ -212,7 +210,7 @@ class GeometryUtils {
     
     const positionAttr = geometry.getAttribute('position'),
       normalAttr = geometry.getAttribute('normal'),
-      alphaAttr  = geometry.getAttribute('alpha'),
+      //alphaAttr  = geometry.getAttribute('alpha'),
       indexAttr = geometry.index;
 
     positionAttr.array.set(vertices,0);
