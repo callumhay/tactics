@@ -1,73 +1,62 @@
-﻿using System;
-using System.Linq;
-using System.Collections;
+﻿using System.Linq;
 using System.Collections.Generic;
 using UnityEngine;
 
-public class CubeCell {
-  public Vector3[] vertices = new Vector3[8];
-  public float[] isoVals = new float[8];
-}
-
-public class PolygonizeResult {
-  public List<Vector3> vertices = new List<Vector3>();
-  public List<int[]> faces = new List<int[]>();
-}
-
-
 public class MarchingCubes {
-  public float isoValCutoff = 0.5f;
+  public static float isoValCutoff = 0.5f;
+  public static Vector3Int[] corners = new Vector3Int[]{
+    new Vector3Int(0, 0, 0), new Vector3Int(1, 0, 0), 
+    new Vector3Int(1, 0, 1), new Vector3Int(0, 0, 1), 
+    new Vector3Int(0, 1, 0), new Vector3Int(1, 1, 0), 
+    new Vector3Int(1, 1, 1), new Vector3Int(0, 1, 1)
+  };
 
-  public PolygonizeResult polygonizeCell(in CubeCell cell) {
-    var result = new PolygonizeResult();
+  public static void polygonize(
+    in TerrainGridNode[] cubeNodes, ref List<int> triangles, ref List<Vector3> vertices
+  ) {
 
     // Determine the index into the edge table which tells us which vertices are inside of the surface
     // For nodes, a node is inside a surface if it exists (otherwise it would be null)
-    var cubeindex = calcCubeIndex(cell);
+    var cubeindex = calcCubeIndex(cubeNodes);
     var edgeLookup = edgeTable[cubeindex];
-    if (edgeLookup == 0) { return result; } // Early out: Cube is entirely in/out of the surface
+    if (edgeLookup == 0) { return; } // Early out: Cube is entirely in/out of the surface
     
     // Find the vertices where the surface intersects the cube
-    var vertices = calcEdgeLookupVertices(cell, edgeLookup);
+    var cubeVertices = calcEdgeLookupVertices(cubeNodes, edgeLookup);
     var triLookup = triTable[cubeindex];
     
     // Build the triangles
     for (var i = 0; triLookup[i] != -1; i += 3) {
-      var a = vertices[triLookup[i]]; 
-      var b = vertices[triLookup[i+1]];
-      var c = vertices[triLookup[i+2]];
+      var a = cubeVertices[triLookup[i]]; 
+      var b = cubeVertices[triLookup[i+1]];
+      var c = cubeVertices[triLookup[i+2]];
       // Ignore triangles that are co-planar or underneath the ground
       if (a.y <= Mathf.Epsilon || b.y <= Mathf.Epsilon || c.y <= Mathf.Epsilon) {
         continue;
       }
 
-      var currLen = result.vertices.Count();
-      var currFace = new int[3]{currLen, currLen+1, currLen+2};
-      result.vertices.Add(a);
-      result.vertices.Add(b);
-      result.vertices.Add(c);
-      result.faces.Add(currFace);
+      var currLen = vertices.Count();
+      triangles.Add(currLen); triangles.Add(currLen+1); triangles.Add(currLen+2); 
+      vertices.Add(a); vertices.Add(b); vertices.Add(c);
     }
-
-    return result;
   }
 
-  private Vector3 interpolateVertex(in CubeCell cell, int idx1, int idx2) {
+  private static Vector3 interpolateVertex(in TerrainGridNode[] cubeNodes, int idx1, int idx2) {
     var i1 = idx1; var i2 = idx2;
-    if (positionLessThan(cell.vertices[i2], cell.vertices[i1])) {
+    if (positionLessThan(cubeNodes[i2].position, cubeNodes[i1].position)) {
       i1 = idx2; i2 = idx1;
     }
 
-    var p1 = cell.vertices[i1]; var iv1 = cell.isoVals[i1];
-    var p2 = cell.vertices[i2]; var iv2 = cell.isoVals[i2];
+    ref var p1 = ref cubeNodes[i1].position; var iv1 = cubeNodes[i1].isoVal > 0 ? 1 : 0;
+    ref var p2 = ref cubeNodes[i2].position; var iv2 = cubeNodes[i2].isoVal > 0 ? 1 : 0;
     var point = new Vector3(p1.x, p1.y, p1.z);
-    if (Math.Abs(iv1-iv2) > 1e-6) {
-      point += (p2-p1) / (isoValCutoff-iv1) * (iv2-iv1);
+    if (Mathf.Abs(iv1-iv2) > 1e-6f) {
+      point += ((p2-p1) / (iv2-iv1)) * (isoValCutoff-iv1);
     }
     return point;
   }
 
-  private bool positionLessThan(in Vector3 left, in Vector3 right) {
+  private static bool positionLessThan(in Vector3 left, in Vector3 right) {
     if (left.x < right.x) { return true; }
     else if (left.x > right.x) { return false; }
     if (left.y < right.y) { return true; }
@@ -76,75 +65,37 @@ public class MarchingCubes {
     return false;
   }
 
-  private int calcCubeIndex(in CubeCell cell) {
+  private static int calcCubeIndex(in TerrainGridNode[] cubeNodes) {
     int cubeindex = 0;
-    if (cell.isoVals[0] != 0.0f) { cubeindex |= 1;  }
-    if (cell.isoVals[1] != 0.0f) { cubeindex |= 2;  }
-    if (cell.isoVals[2] != 0.0f) { cubeindex |= 4;  }
-    if (cell.isoVals[3] != 0.0f) { cubeindex |= 8;  }
-    if (cell.isoVals[4] != 0.0f) { cubeindex |= 16; }
-    if (cell.isoVals[5] != 0.0f) { cubeindex |= 32; }
-    if (cell.isoVals[6] != 0.0f) { cubeindex |= 64; }
-    if (cell.isoVals[7] != 0.0f) { cubeindex |= 128;}
+    if (cubeNodes[0].isoVal >= isoValCutoff) { cubeindex |= 1;  }
+    if (cubeNodes[1].isoVal >= isoValCutoff) { cubeindex |= 2;  }
+    if (cubeNodes[2].isoVal >= isoValCutoff) { cubeindex |= 4;  }
+    if (cubeNodes[3].isoVal >= isoValCutoff) { cubeindex |= 8;  }
+    if (cubeNodes[4].isoVal >= isoValCutoff) { cubeindex |= 16; }
+    if (cubeNodes[5].isoVal >= isoValCutoff) { cubeindex |= 32; }
+    if (cubeNodes[6].isoVal >= isoValCutoff) { cubeindex |= 64; }
+    if (cubeNodes[7].isoVal >= isoValCutoff) { cubeindex |= 128;}
     return cubeindex;
   }
 
-  private Vector3[] calcEdgeLookupVertices(in CubeCell cell, int edgeLookup) {
+  private static Vector3[] calcEdgeLookupVertices(in TerrainGridNode[] cubeNodes, int edgeLookup) {
     // Find the vertices where the surface intersects the cube
-    //var materials    = cell.map(n => n.node ? n.node.material : null);
-    //var materialList = Enumerable.Repeat(null, 12);
     Vector3[] vertexList = new Vector3[12];
-    if ((edgeLookup & 1) != 0) {
-      vertexList[0] = interpolateVertex(cell, 0, 1); 
-      //materialList[0] = materials[0] || materials[1];
-    }
-    if ((edgeLookup & 2) != 0) {
-      vertexList[1] = interpolateVertex(cell, 1, 2);
-      //materialList[1] = materials[1] || materials[2];
-    }
-    if ((edgeLookup & 4) != 0) {
-      vertexList[2] = interpolateVertex(cell, 2, 3);
-      //materialList[2] = materials[2] || materials[3];
-    }
-    if ((edgeLookup & 8) != 0) {
-      vertexList[3]  = interpolateVertex(cell, 3, 0);
-      //materialList[3] = materials[3] || materials[0];
-    }
-    if ((edgeLookup & 16) != 0) {
-      vertexList[4] = interpolateVertex(cell, 4, 5);
-      //materialList[4] = materials[4] || materials[5];
-    }
-    if ((edgeLookup & 32) != 0) {
-      vertexList[5] = interpolateVertex(cell, 5, 6);
-      //materialList[5] = materials[5] || materials[6];
-    }
-    if ((edgeLookup & 64) != 0) {
-      vertexList[6] = interpolateVertex(cell, 6, 7);
-      //materialList[6] = materials[6] || materials[7];
-    }
-    if ((edgeLookup & 128) != 0) {
-      vertexList[7] = interpolateVertex(cell, 7, 4);
-      //materialList[7] = materials[7] || materials[4];
-    }
-    if ((edgeLookup & 256) != 0) {
-      vertexList[8] = interpolateVertex(cell, 0, 4);
-      //materialList[8] = materials[0] || materials[4];
-    }
-    if ((edgeLookup & 512) != 0) {
-      vertexList[9] = interpolateVertex(cell, 1, 5);
-      //materialList[9] = materials[1] || materials[5];
-    }
-    if ((edgeLookup & 1024) != 0) {
-      vertexList[10] = interpolateVertex(cell, 2, 6);
-      //materialList[10] = materials[2] || materials[6];
-    }
-    if ((edgeLookup & 2048) != 0) {
-      vertexList[11] = interpolateVertex(cell, 3, 7);
-      //materialList[11] = materials[3] || materials[7];
-    }
-    return vertexList;//{vertexList, materialList};
+    if ((edgeLookup & 1) != 0) { vertexList[0] = interpolateVertex(cubeNodes, 0, 1); }
+    if ((edgeLookup & 2) != 0) { vertexList[1] = interpolateVertex(cubeNodes, 1, 2); }
+    if ((edgeLookup & 4) != 0) { vertexList[2] = interpolateVertex(cubeNodes, 2, 3); }
+    if ((edgeLookup & 8) != 0) { vertexList[3]  = interpolateVertex(cubeNodes, 3, 0); }
+    if ((edgeLookup & 16) != 0) { vertexList[4] = interpolateVertex(cubeNodes, 4, 5); }
+    if ((edgeLookup & 32) != 0) { vertexList[5] = interpolateVertex(cubeNodes, 5, 6); }
+    if ((edgeLookup & 64) != 0) { vertexList[6] = interpolateVertex(cubeNodes, 6, 7); }
+    if ((edgeLookup & 128) != 0) { vertexList[7] = interpolateVertex(cubeNodes, 7, 4); }
+    if ((edgeLookup & 256) != 0) { vertexList[8] = interpolateVertex(cubeNodes, 0, 4); }
+    if ((edgeLookup & 512) != 0) { vertexList[9] = interpolateVertex(cubeNodes, 1, 5); }
+    if ((edgeLookup & 1024) != 0) { vertexList[10] = interpolateVertex(cubeNodes, 2, 6); }
+    if ((edgeLookup & 2048) != 0) { vertexList[11] = interpolateVertex(cubeNodes, 3, 7); }
+    return vertexList;
   }
- private static int[] edgeTable = new int[]{
+  private static int[] edgeTable = new int[]{
     0x0  , 0x109, 0x203, 0x30a, 0x406, 0x50f, 0x605, 0x70c,
     0x80c, 0x905, 0xa0f, 0xb06, 0xc0a, 0xd03, 0xe09, 0xf00,
     0x190, 0x99 , 0x393, 0x29a, 0x596, 0x49f, 0x795, 0x69c,

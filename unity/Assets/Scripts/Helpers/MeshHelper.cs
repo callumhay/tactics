@@ -1,4 +1,6 @@
-﻿using UnityEngine;
+﻿using System.Collections.Generic;
+using System.Linq;
+using UnityEngine;
 
 public static class MeshHelper {
   public static void BuildCubeData(Vector3 pos, Vector3 size, out int[] tris, out Vector3[] vertices) {
@@ -49,4 +51,144 @@ public static class MeshHelper {
       new Vector3 (xSize, 0, 0),
     };
   }
+
+  private class FaceEntry {
+    public int[] face;
+    public int index;
+  }
+
+  private class VertexEntry {
+    public Vector3 vertex;
+    public List<Vector3> normals = new List<Vector3>();
+    public List<FaceEntry> faces = new List<FaceEntry>();
+  };
+
+  private class NormalGroup {
+    public List<int> normalIndices = new List<int>();
+    public Vector3 avgNormal = new Vector3(0,0,0);
+  }
+
+  public static void RecalculateNormals(this Mesh mesh, float smoothingAngle, float tolerance) {
+    var decimalShift = Mathf.Log10(1.0f / tolerance);
+    var shiftMultiplier = Mathf.Pow(10, decimalShift);
+
+    string makeValueHash(float value) {
+      return (value * shiftMultiplier).ToString();
+    }
+    string makeVertexHash(in Vector3 vertex) {
+      return makeValueHash(vertex.x) + "," + makeValueHash(vertex.y) + "," + makeValueHash(vertex.z);
+    }
+
+    var vertices = mesh.vertices;
+    var vertexMaps = new Dictionary<string, VertexEntry>[mesh.subMeshCount]; // Mappings for each submesh
+
+    for (var subMeshIndex = 0; subMeshIndex < mesh.subMeshCount; subMeshIndex++) {
+      var vertexMap = new Dictionary<string, VertexEntry>();
+      vertexMaps[subMeshIndex] = vertexMap;
+
+      var triangles = mesh.GetTriangles(subMeshIndex);
+      for (var i = 0; i < triangles.Length; i += 3) {
+        var triIndices  = new int[3]{triangles[i], triangles[i+1], triangles[i+2]};
+        var triVertices = new Vector3[3]{vertices[triIndices[0]], vertices[triIndices[1]], vertices[triIndices[2]]};
+        var triNormal   = Vector3.Cross(triVertices[1] - triVertices[0], triVertices[2] - triVertices[0]).normalized;
+        int[] triFace = new int[3]{0,0,0};
+        for (var j = 0; j < 3; j++) {
+          var hash = makeVertexHash(triVertices[j]);
+          VertexEntry vEntry;
+          if (!vertexMap.TryGetValue(hash, out vEntry)) {
+            vEntry = new VertexEntry{vertex = triVertices[j]};
+            vertexMap.Add(hash, vEntry);
+          }
+          vEntry.normals.Add(triNormal);
+          vEntry.faces.Add(new FaceEntry(){face = triFace, index=j});
+        }
+      }
+    }
+
+    var finalVertices = new List<Vector3>();
+    var finalNormals  = new List<Vector3>();
+
+    foreach (var vertexMap in vertexMaps) {
+      foreach (var vertexEntry in vertexMap.Values) {
+
+        // Put each normal into its own  group
+        var groupedNormals = new List<NormalGroup>();
+        for (int i = 0; i < vertexEntry.normals.Count; i++) {
+          var grp = new NormalGroup();
+          grp.normalIndices.Add(i);
+          grp.avgNormal = vertexEntry.normals[i];
+          groupedNormals.Add(grp);
+        }
+
+        // Consolidate all the grouped normals based on their comparative angles
+        while (true) {
+          // Compare each group's normal with each other to see if they can be combined
+          int mergeGroup1 = -1; int mergeGroup2 = -1;
+          for (int i = 0; i < groupedNormals.Count; i++) {
+            
+            var iNorm = groupedNormals[i].avgNormal;
+            float smallestAngle = float.MaxValue;
+            mergeGroup2 = -1;
+
+            for (int j = i+1; j < groupedNormals.Count; j++) {
+              var jNorm = groupedNormals[j].avgNormal;
+              var angle = Mathf.Rad2Deg*iNorm.angleTo(jNorm);
+              if (angle <= smoothingAngle && angle < smallestAngle) {
+                smallestAngle = angle;
+                mergeGroup2 = j;
+              }
+            }
+            if (mergeGroup2 != -1) {
+              mergeGroup1 = i;
+              break;
+            }
+          }
+          if (mergeGroup1 != -1) {
+            // Join the two groups together and continue
+            var g1 = groupedNormals[mergeGroup1];
+            var g2 = groupedNormals[mergeGroup2];
+            groupedNormals.RemoveAt(mergeGroup2);
+            for (int i = 0; i < g2.normalIndices.Count; i++) {
+              g1.normalIndices.Add(g2.normalIndices[i]);
+            }
+            g1.avgNormal += g2.avgNormal;
+            g1.avgNormal.Normalize();
+          } 
+          else {
+            break;
+          }
+        }
+
+        // Go through each of the grouped normals, average each group and insert them as duplicates of the vertices
+        for (int i = 0; i < groupedNormals.Count; i++) {
+          var currNormalGrp = groupedNormals[i];
+          for (int j = 0; j < currNormalGrp.normalIndices.Count; j++) {
+            var currIndex = currNormalGrp.normalIndices[j];
+            foreach (var faceEntry in vertexEntry.faces) {
+              faceEntry.face[faceEntry.index] = finalVertices.Count;
+            }
+            finalVertices.Add(vertexEntry.vertex);
+            finalNormals.Add(currNormalGrp.avgNormal);
+          }
+        }
+      }
+    }
+
+    mesh.Clear();
+    mesh.vertices = finalVertices.ToArray();
+    mesh.normals  = finalNormals.ToArray();
+    for (int i = 0; i < vertexMaps.GetLength(0); i++) {
+      var vertexMap = vertexMaps[i];
+      var subMeshTris = new List<int>();
+      foreach (var vertexEntry in vertexMap.Values) {
+        foreach (var faceEntry in vertexEntry.faces) {
+          subMeshTris.Add(faceEntry.face[0]);
+          subMeshTris.Add(faceEntry.face[1]);
+          subMeshTris.Add(faceEntry.face[2]);
+        }
+      }
+      mesh.SetTriangles(subMeshTris.ToArray(), i);
+    }
+  }
+
 }

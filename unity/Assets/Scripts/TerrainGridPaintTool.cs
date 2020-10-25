@@ -25,44 +25,29 @@ public class TerrainGridTool : EditorTool {
   private Vector3 lastEditPt = new Vector3();
 
   public override void OnToolGUI(EditorWindow window) {
-    if (!SceneView.sceneViews.Contains(window)) { return; }
     // Take control of the mouse so that we can properly paint - this MUST be called first!
     HandleUtility.AddDefaultControl(GUIUtility.GetControlID(FocusType.Passive));
 
     var terrainGrid = target as TerrainGrid;
-    if (target == null) { return; }
+    if (target == null) { editPtActive = false; return; }
 
     var settingsWindow = EditorWindow.GetWindow<TerrainGridToolWindow>();
-    if (settingsWindow == null) { return; }
+    if (settingsWindow == null) { editPtActive = false; return; }
 
     var e = Event.current;
-    if (!e.isMouse) { return; }
-
     var wsRay = HandleUtility.GUIPointToWorldRay(e.mousePosition);
-    Vector3 editPt;
-    if (terrainGrid.intersectEditorRay(wsRay, out editPt)) {
+    if (terrainGrid.intersectEditorRay(wsRay, out lastEditPt)) {
       editPtActive = true;
-      lastEditPt = editPt;
     }
     else {
       editPtActive = false;
     }
 
     if (editPtActive) {
-      
-      switch (e.type) {
-        case EventType.MouseDown:
-          mouseDownButton = e.button;
-          break;
-        case EventType.MouseUp:
-          mouseDownButton = NO_MOUSE_BUTTON;
-          break;
-        default:
-          break;
-      }
-      if (mouseDownButton != NO_MOUSE_BUTTON) {
+      if (e.type == EventType.MouseDown) {
+        mouseDownButton = e.button;
         // Grab all the nodes inside the brush
-        List<TerrainGridNode> nodes = settingsWindow.getAffectedNodesAtPoint(editPt, terrainGrid);
+        List<TerrainGridNode> nodes = settingsWindow.getAffectedNodesAtPoint(lastEditPt, terrainGrid);
         if (nodes.Count == 0) { return; }
 
         EditorGUI.BeginChangeCheck();
@@ -82,6 +67,9 @@ public class TerrainGridTool : EditorTool {
         }
         if (EditorGUI.EndChangeCheck()) {}
       }
+      else {
+        mouseDownButton = NO_MOUSE_BUTTON;
+      }
     }
   }
 
@@ -97,32 +85,37 @@ public class TerrainGridTool : EditorTool {
   void onSceneGUI(SceneView sceneView) {
     var terrainGrid = target as TerrainGrid;
     if (target == null) { return; }
-
     var settingsWindow = EditorWindow.GetWindow<TerrainGridToolWindow>();
     if (settingsWindow == null) { return; }
 
-    //Handles.BeginGUI();
     if (editPtActive) {
-      // Draw a sphere in the painting area
-      Handles.color = new Color(1,0,0,0.25f);
+      var rot = new Quaternion(0,0,0,1);
+
+      // Draw the brush shape
+      Handles.color = new Color(0.0f, 0.8f, 1.0f, 0.25f);
       switch (settingsWindow.brushType) {
         case TerrainGridToolWindow.BrushType.Sphere:
-          Handles.SphereHandleCap(0, lastEditPt, new Quaternion(0,0,0,1), settingsWindow.brushSize, EventType.Repaint);
+          Handles.SphereHandleCap(GUIUtility.GetControlID(FocusType.Passive), lastEditPt, rot, settingsWindow.brushSize, EventType.Repaint);
           break;
         case TerrainGridToolWindow.BrushType.Cube:
-          Handles.CubeHandleCap(0, lastEditPt, new Quaternion(0,0,0,1), settingsWindow.brushSize, EventType.Repaint);
+          Handles.CubeHandleCap(GUIUtility.GetControlID(FocusType.Passive), lastEditPt, rot, settingsWindow.brushSize, EventType.Repaint);
           break;
         default:
           return;
       }
 
-      
-      
-      // Draw all the nodes that the sphere is colliding with / affecting
+      // Draw all the nodes that the tool is colliding with / affecting
+      List<TerrainGridNode> nodes = settingsWindow.getAffectedNodesAtPoint(lastEditPt, terrainGrid);
+      foreach (var node in nodes) {
+        var currColour = node.editorUnselectedColour();
+        currColour.a = 0.25f;
+        Handles.color = currColour;
+        Handles.CubeHandleCap(GUIUtility.GetControlID(FocusType.Passive), node.position, rot, terrainGrid.halfUnitsPerNode(), EventType.Repaint);
+      }
 
       sceneView.Repaint();
     }
-    //Handles.EndGUI();
+    
   }
   private void activeToolChanged() {
     if (!EditorTools.IsActiveTool(this)) { return; }

@@ -6,11 +6,19 @@ using UnityEngine;
 public class TerrainGrid : MonoBehaviour {
 
   [Range(1,32)]
-  public int xSize = 2, ySize = 2, zSize = 2;
+  public int xSize = 10, ySize = 10, zSize = 10;
   [Range(2,16)]
   public int nodesPerUnit = 4;
 
-  private TerrainGridNode[,,] nodes;
+  //[SerializeField]
+  private TerrainGridNode[,,] nodes; // Does not include the outer "ghost" nodes with zeroed isovalues
+
+  // Mesh data - this is used in the editor but not in the game... TODO: Figure this stuff out
+  private List<Vector3> vertices = new List<Vector3>();
+  private List<int> triangles = new List<int>();
+  private MeshFilter meshFilter;
+
+  //private Dictionary<TerrainGridNode, 
 
   public int numNodesX() { return xSize*nodesPerUnit; }
   public int numNodesY() { return ySize*nodesPerUnit; }
@@ -71,10 +79,8 @@ public class TerrainGrid : MonoBehaviour {
     var lsCenter = center - transform.position; // Get the center in localspace
 
     // Narrow the search down to the nodes inside the sphere's bounding box
-    var diameter = 2*radius;
-    var nodesInBox = GetNodesInsideBox(new Bounds(
-      lsCenter, new Vector3(diameter, diameter, diameter)
-    ));
+    var dia = 2*radius;
+    var nodesInBox = GetNodesInsideBox(new Bounds(lsCenter, new Vector3(dia, dia, dia)));
 
     // Go through the list and only take the nodes inside the sphere
     var sqrRadius = radius*radius;
@@ -93,53 +99,81 @@ public class TerrainGrid : MonoBehaviour {
     }
     #if UNITY_EDITOR
     else {
+      meshFilter = GetComponent<MeshFilter>();
       generateNodes();
+      regenerateMesh();
       //generateGizmoMesh();
     }
     #endif
   }
 
   private void generateNodes() {
-    
-    var nodeUnits = unitsPerNode();
-    var halfNodeUnits = halfUnitsPerNode();
+
     var numNodesX = this.numNodesX();
     var numNodesY = this.numNodesY();
     var numNodesZ = this.numNodesZ();
 
-    //Debug.Log("Generating Nodes: [" + numNodesX + "," + numNodesY + "," + numNodesZ + "]");
+    // Don't rebuild if we already have an array that's suitable!
+    if (nodes != null && nodes.GetLength(0) == numNodesX && 
+        nodes.GetLength(1) == numNodesY && nodes.GetLength(2) == numNodesZ) {
+      return;
+    }
 
+    var nodeUnits = unitsPerNode();
+    var halfNodeUnits = halfUnitsPerNode();
     nodes = new TerrainGridNode[numNodesX,numNodesY,numNodesZ];
+
     for (int x = 0; x < numNodesX; x++) {
       var xPos = halfNodeUnits + x*nodeUnits;
       for (int y = 0; y < numNodesY; y++) {
         var yPos = y*nodeUnits;
         for (int z = 0; z < numNodesZ; z++) {
-          nodes[x,y,z] = new TerrainGridNode(
-            new Vector3(xPos, yPos, halfNodeUnits + z*nodeUnits), 0.0f);
+          nodes[x,y,z] = new TerrainGridNode(new Vector3(xPos, yPos, halfNodeUnits + z*nodeUnits), 0.0f);
         }
       }
     }
   }
 
+  private void clearMeshData() {
+    vertices.Clear();
+    triangles.Clear();
+  }
+  private void regenerateMesh() {
+    this.clearMeshData();
+
+    var numNodesX = this.numNodesX();
+    var numNodesY = this.numNodesY();
+    var numNodesZ = this.numNodesZ();
+
+    // Start with the interior marching cube cases first
+    for (int x = 0; x < numNodesX-1; x++) {
+      for (int y = 0; y < numNodesY-1; y++) {
+        for (int z = 0; z < numNodesZ-1; z++) {
+          var cubeNodes = new TerrainGridNode[8];
+          for (int i = 0; i < 8; i++) {
+            var corner = new Vector3Int(x,y,z) + MarchingCubes.corners[i];
+            cubeNodes[i] = nodes[corner.x, corner.y, corner.z];
+          }
+          MarchingCubes.polygonize(cubeNodes, ref triangles, ref vertices);
+        }
+      }
+    }
+
+    // Now deal with the borders / ghost cubes (to seal off the edges of the terrain)
+    // TODO
+
+    var mesh = new Mesh();
+    mesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
+    mesh.vertices = vertices.ToArray();
+    mesh.triangles = triangles.ToArray();
+    mesh.RecalculateNormals(55.0f, 1e-4f);
+    meshFilter.sharedMesh = mesh;
+  }
+
   // Editor-Only Stuff ----------------------------------------------
   #if UNITY_EDITOR
-  //private Mesh gizmoMesh = null;
-  private static float editorAlpha = 0.5f;
-  /*
-  private void generateGizmoMesh() {
-    if (gizmoMesh == null) { gizmoMesh = new Mesh(); }
-    gizmoMesh.Clear();
 
-    int[] triangles = null;
-    Vector3[] vertices = null;
-    MeshHelper.BuildCubeData(new Vector3(0,0,0), new Vector3(xSize,ySize,zSize), out triangles, out vertices);
-    //gizmoMesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
-    gizmoMesh.vertices = vertices;
-    gizmoMesh.triangles = triangles;
-    gizmoMesh.RecalculateNormals();
-  }
-  */
+  private static float editorAlpha = 0.5f;
 
   void OnValidate() {
     generateNodes();
@@ -157,7 +191,7 @@ public class TerrainGrid : MonoBehaviour {
     foreach (var node in nodes) {
       node.isoVal = Mathf.Clamp(node.isoVal + isoVal, 0, 1);
     }
-    //updateMarchingCubes(nodes);
+    regenerateMesh();
   }
 
   // Intersect the given ray with this grid, returns the closest relevant edit point
@@ -249,14 +283,7 @@ public class TerrainGrid : MonoBehaviour {
     if (currVoxel.z > 0 && currVoxel.z < this.nodes.GetLength(2) && ray.direction.z < 0) { diff.z--; negRay = true; }
     if (negRay) { currVoxel += diff; }
 
-    //Debug.Log(currVoxel);
-  /*
-  currVoxel.x > 0 && currVoxel.x < this.nodes.GetLength(0) &&
-           currVoxel.y > 0 && currVoxel.y < this.nodes.GetLength(1) &&
-           currVoxel.z > 0 && currVoxel.z < this.nodes.GetLength(2) &&
-           */
-
-    while (currVoxel != lastVoxel && this.nodes[currVoxel.x,currVoxel.y,currVoxel.z].isoVal < Mathf.Epsilon) {
+    while (currVoxel != lastVoxel && this.nodes[currVoxel.x,currVoxel.y,currVoxel.z].isoVal < 1) {
       //Debug.Log(currVoxel);
       var prevVoxel = currVoxel;
       if (tMax.x < tMax.y) {
@@ -295,8 +322,6 @@ public class TerrainGrid : MonoBehaviour {
       (nodeSize*currVoxel.z) + nodeHalfSize
     );
     nodeCenter += transform.position; // Back to worldspace
-
-
     editPt = nodeCenter;
     /*
     // Find where the ray intersects with the given node
@@ -315,5 +340,22 @@ public class TerrainGrid : MonoBehaviour {
 
     return true;
   }
+
+  /*
+  //private Mesh gizmoMesh = null;
+  private void generateGizmoMesh() {
+    if (gizmoMesh == null) { gizmoMesh = new Mesh(); }
+    gizmoMesh.Clear();
+
+    int[] triangles = null;
+    Vector3[] vertices = null;
+    MeshHelper.BuildCubeData(new Vector3(0,0,0), new Vector3(xSize,ySize,zSize), out triangles, out vertices);
+    //gizmoMesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
+    gizmoMesh.vertices = vertices;
+    gizmoMesh.triangles = triangles;
+    gizmoMesh.RecalculateNormals();
+  }
+  */
+
   #endif // UNITY_EDITOR
 }

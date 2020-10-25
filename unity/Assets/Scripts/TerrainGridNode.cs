@@ -8,7 +8,7 @@ public class TerrainGridNode {
     position = pos;
     isoVal = iso;
   }
-  public Color editorUnselectedColour(float alpha=0.5f) {
+  public Color editorUnselectedColour(float alpha=0.0f) {
     return new Color(isoVal, isoVal, isoVal, Mathf.Clamp(alpha+isoVal, 0, 1));
   }
 }
