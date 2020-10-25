@@ -13,6 +13,7 @@ public class TerrainGrid : MonoBehaviour {
   //[SerializeField]
   private TerrainGridNode[,,] nodes; // Does not include the outer "ghost" nodes with zeroed isovalues
 
+
   // Mesh data - this is used in the editor but not in the game... TODO: Figure this stuff out
   private List<Vector3> vertices = new List<Vector3>();
   private List<int> triangles = new List<int>();
@@ -28,9 +29,8 @@ public class TerrainGrid : MonoBehaviour {
   public float unitsPerNode() { return (1.0f / nodesPerUnit); }
   public float halfUnitsPerNode() { return (0.5f * unitsPerNode()); }
 
-  public int unitsToNodeIndex(float unitVal) {
-    return (int)Mathf.Floor(unitVal * nodesPerUnit);
-  }
+  public int unitsToNodeIndex(float unitVal) { return (int)Mathf.Floor(unitVal * nodesPerUnit); }
+  public float nodeIndexToUnits(int idx) { return idx*unitsPerNode() + halfUnitsPerNode(); }
 
   // Get the worldspace bounds of the grid
   public Bounds wsBounds() { 
@@ -124,14 +124,24 @@ public class TerrainGrid : MonoBehaviour {
     nodes = new TerrainGridNode[numNodesX,numNodesY,numNodesZ];
 
     for (int x = 0; x < numNodesX; x++) {
-      var xPos = halfNodeUnits + x*nodeUnits;
+      var xPos = nodeIndexToUnits(x);
       for (int y = 0; y < numNodesY; y++) {
-        var yPos = y*nodeUnits;
+        var yPos = nodeIndexToUnits(y);
         for (int z = 0; z < numNodesZ; z++) {
-          nodes[x,y,z] = new TerrainGridNode(new Vector3(xPos, yPos, halfNodeUnits + z*nodeUnits), 0.0f);
+          nodes[x,y,z] = new TerrainGridNode(new Vector3(xPos, yPos, nodeIndexToUnits(z)), 0.0f);
         }
       }
     }
+  }
+
+  private TerrainGridNode GetNode(int x, int y, int z) {
+    // If the index is outside of the node grid then we're dealing with a "ghost" node
+    if (x < 0 || x > this.nodes.GetLength(0)-1 ||
+        y < 0 || y > this.nodes.GetLength(1)-1 ||
+        z < 0 || z > this.nodes.GetLength(2)-1) {
+      return new TerrainGridNode(new Vector3(nodeIndexToUnits(x), nodeIndexToUnits(y), nodeIndexToUnits(z)), 0);
+    }
+    return nodes[x,y,z];
   }
 
   private void clearMeshData() {
@@ -146,21 +156,18 @@ public class TerrainGrid : MonoBehaviour {
     var numNodesZ = this.numNodesZ();
 
     // Start with the interior marching cube cases first
-    for (int x = 0; x < numNodesX-1; x++) {
-      for (int y = 0; y < numNodesY-1; y++) {
-        for (int z = 0; z < numNodesZ-1; z++) {
+    for (int x = -1; x < numNodesX; x++) {
+      for (int y = -1; y < numNodesY; y++) {
+        for (int z = -1; z < numNodesZ; z++) {
           var cubeNodes = new TerrainGridNode[8];
           for (int i = 0; i < 8; i++) {
             var corner = new Vector3Int(x,y,z) + MarchingCubes.corners[i];
-            cubeNodes[i] = nodes[corner.x, corner.y, corner.z];
+            cubeNodes[i] = GetNode(corner.x, corner.y, corner.z);
           }
           MarchingCubes.polygonize(cubeNodes, ref triangles, ref vertices);
         }
       }
     }
-
-    // Now deal with the borders / ghost cubes (to seal off the edges of the terrain)
-    // TODO
 
     var mesh = new Mesh();
     mesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;

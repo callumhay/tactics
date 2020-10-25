@@ -30,11 +30,6 @@ public class MarchingCubes {
       var a = cubeVertices[triLookup[i]]; 
       var b = cubeVertices[triLookup[i+1]];
       var c = cubeVertices[triLookup[i+2]];
-      // Ignore triangles that are co-planar or underneath the ground
-      if (a.y <= Mathf.Epsilon || b.y <= Mathf.Epsilon || c.y <= Mathf.Epsilon) {
-        continue;
-      }
-
       var currLen = vertices.Count();
       triangles.Add(currLen); triangles.Add(currLen+1); triangles.Add(currLen+2); 
       vertices.Add(a); vertices.Add(b); vertices.Add(c);
