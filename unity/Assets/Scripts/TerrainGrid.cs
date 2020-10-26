@@ -1,10 +1,9 @@
 ﻿using System.Collections.Generic;
 using UnityEngine;
+using UnityEditor;
 
-[RequireComponent(typeof(MeshFilter), typeof(MeshRenderer))]
 [ExecuteAlways]
 public class TerrainGrid : MonoBehaviour {
-
   [Range(1,32)]
   public int xSize = 10, ySize = 10, zSize = 10;
   [Range(2,16)]
@@ -13,24 +12,30 @@ public class TerrainGrid : MonoBehaviour {
   //[SerializeField]
   private TerrainGridNode[,,] nodes; // Does not include the outer "ghost" nodes with zeroed isovalues
 
+  private Dictionary<Vector3Int, TerrainColumn> terrainColumns = new Dictionary<Vector3Int, TerrainColumn>();
 
-  // Mesh data - this is used in the editor but not in the game... TODO: Figure this stuff out
-  private List<Vector3> vertices = new List<Vector3>();
-  private List<int> triangles = new List<int>();
-  private MeshFilter meshFilter;
-
-  //private Dictionary<TerrainGridNode, 
-
-  public int numNodesX() { return xSize*nodesPerUnit; }
-  public int numNodesY() { return ySize*nodesPerUnit; }
-  public int numNodesZ() { return zSize*nodesPerUnit; }
+  private int numNodesX() { return (int)(xSize*TerrainColumn.size*nodesPerUnit); }
+  private int numNodesY() { return (int)(ySize*TerrainColumn.size*nodesPerUnit); }
+  private int numNodesZ() { return (int)(zSize*TerrainColumn.size*nodesPerUnit); }
   public int numNodes()  { return numNodesX()*numNodesY()*numNodesZ(); }
 
   public float unitsPerNode() { return (1.0f / nodesPerUnit); }
   public float halfUnitsPerNode() { return (0.5f * unitsPerNode()); }
+  public Vector3 unitsPerNodeVec3() { var u = unitsPerNode(); return new Vector3(u,u,u); }
+  public Vector3 halfUnitsPerNodeVec3() { var v = unitsPerNodeVec3(); return 0.5f*v; }
 
   public int unitsToNodeIndex(float unitVal) { return (int)Mathf.Floor(unitVal * nodesPerUnit); }
   public float nodeIndexToUnits(int idx) { return idx*unitsPerNode() + halfUnitsPerNode(); }
+  public Vector3 nodeIndexToUnitsVec3(int x, int y, int z) { return nodeIndexToUnitsVec3(new Vector3Int(x,y,z)); }
+  public Vector3 nodeIndexToUnitsVec3(in Vector3Int nodeIdx) {
+    var nodeUnitsVec = unitsPerNodeVec3(); return Vector3.Scale(nodeIdx, nodeUnitsVec) + 0.5f*nodeUnitsVec; 
+  }
+
+  public int nodesPerTerrainColumnX() { return nodesPerUnit * TerrainColumn.size; }
+  public int nodesPerTerrainColumnZ() { return nodesPerTerrainColumnX(); }
+  public Vector3Int nodeIndexToTerrainColumnIndex(in Vector3Int nodeIdx) {
+    return new Vector3Int(nodeIdx.x/nodesPerTerrainColumnX(), 0, nodeIdx.z/nodesPerTerrainColumnZ());
+  }
 
   // Get the worldspace bounds of the grid
   public Bounds wsBounds() { 
@@ -93,16 +98,30 @@ public class TerrainGrid : MonoBehaviour {
     return result;
   }
 
+  public Vector3Int terrainColumnNodeIndex(in TerrainColumn terrainCol, in Vector3Int localIdx) {
+    return new Vector3Int(terrainCol.index.x * nodesPerTerrainColumnX(), 0, terrainCol.index.z * nodesPerTerrainColumnZ()) + localIdx;
+  }
+
+  public TerrainGridNode getNode(in Vector3Int nodeIdx) {
+    // If the index is outside of the node grid then we're dealing with a "ghost" node
+    if (nodeIdx.x < 0 || nodeIdx.x > this.nodes.GetLength(0)-1 ||
+        nodeIdx.y < 0 || nodeIdx.y > this.nodes.GetLength(1)-1 ||
+        nodeIdx.z < 0 || nodeIdx.z > this.nodes.GetLength(2)-1) {
+      var gridSpacePos = nodeIndexToUnitsVec3(nodeIdx);
+      return new TerrainGridNode(gridSpacePos, new Vector3Int(-1,-1,-1), 0);
+    }
+    return nodes[nodeIdx.x,nodeIdx.y,nodeIdx.z];
+  }
+
   void Start() {
     if (Application.IsPlaying(gameObject)) {
 
     }
     #if UNITY_EDITOR
-    else {
-      meshFilter = GetComponent<MeshFilter>();
+    else {      
       generateNodes();
-      regenerateMesh();
-      //generateGizmoMesh();
+      buildTerrainColumns();
+      regenerateMeshes();
     }
     #endif
   }
@@ -119,62 +138,51 @@ public class TerrainGrid : MonoBehaviour {
       return;
     }
 
-    var nodeUnits = unitsPerNode();
-    var halfNodeUnits = halfUnitsPerNode();
     nodes = new TerrainGridNode[numNodesX,numNodesY,numNodesZ];
-
     for (int x = 0; x < numNodesX; x++) {
+      var xTCIdx = Mathf.FloorToInt(x/nodesPerTerrainColumnX());
       var xPos = nodeIndexToUnits(x);
+
       for (int y = 0; y < numNodesY; y++) {
         var yPos = nodeIndexToUnits(y);
         for (int z = 0; z < numNodesZ; z++) {
-          nodes[x,y,z] = new TerrainGridNode(new Vector3(xPos, yPos, nodeIndexToUnits(z)), 0.0f);
+          var zTCIdx = Mathf.FloorToInt(z/nodesPerTerrainColumnZ());
+          var zPos = nodeIndexToUnits(z);
+          var unitPos = new Vector3(xPos, yPos, zPos);
+          var terrainColIdx = new Vector3Int(xTCIdx, 0, zTCIdx);
+          nodes[x,y,z] = new TerrainGridNode(unitPos, terrainColIdx, 0.0f);
         }
       }
     }
   }
 
-  private TerrainGridNode GetNode(int x, int y, int z) {
-    // If the index is outside of the node grid then we're dealing with a "ghost" node
-    if (x < 0 || x > this.nodes.GetLength(0)-1 ||
-        y < 0 || y > this.nodes.GetLength(1)-1 ||
-        z < 0 || z > this.nodes.GetLength(2)-1) {
-      return new TerrainGridNode(new Vector3(nodeIndexToUnits(x), nodeIndexToUnits(y), nodeIndexToUnits(z)), 0);
-    }
-    return nodes[x,y,z];
-  }
+  private void buildTerrainColumns() {
+    terrainColumns.Clear();
 
-  private void clearMeshData() {
-    vertices.Clear();
-    triangles.Clear();
-  }
-  private void regenerateMesh() {
-    this.clearMeshData();
-
-    var numNodesX = this.numNodesX();
-    var numNodesY = this.numNodesY();
-    var numNodesZ = this.numNodesZ();
-
-    // Start with the interior marching cube cases first
-    for (int x = -1; x < numNodesX; x++) {
-      for (int y = -1; y < numNodesY; y++) {
-        for (int z = -1; z < numNodesZ; z++) {
-          var cubeNodes = new TerrainGridNode[8];
-          for (int i = 0; i < 8; i++) {
-            var corner = new Vector3Int(x,y,z) + MarchingCubes.corners[i];
-            cubeNodes[i] = GetNode(corner.x, corner.y, corner.z);
-          }
-          MarchingCubes.polygonize(cubeNodes, ref triangles, ref vertices);
-        }
+    for (int x = 0; x < xSize; x++) {
+      for (int z = 0; z < zSize; z++) {
+        var currIdx = new Vector3Int(x,0,z);
+        var terrainCol = new TerrainColumn(currIdx, this);
+        terrainColumns.Add(currIdx, terrainCol);
       }
     }
+  }
 
-    var mesh = new Mesh();
-    mesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
-    mesh.vertices = vertices.ToArray();
-    mesh.triangles = triangles.ToArray();
-    mesh.RecalculateNormals(55.0f, 1e-4f);
-    meshFilter.sharedMesh = mesh;
+  private void regenerateMeshes() {
+    foreach (var terrainCol in terrainColumns.Values) {
+      terrainCol.regenerateMesh();
+    } 
+  }
+  private void regenerateMeshesForNodes(in ICollection<TerrainGridNode> nodes) {
+    var terrainCols = new HashSet<TerrainColumn>();
+    
+    foreach (var node in nodes) {
+      //Debug.Log(node.terrainColumnIndex);
+      terrainCols.Add(terrainColumns[node.terrainColumnIndex]);
+    }
+    foreach (var terrainCol in terrainCols) {
+      terrainCol.regenerateMesh();
+    }
   }
 
   // Editor-Only Stuff ----------------------------------------------
@@ -183,8 +191,14 @@ public class TerrainGrid : MonoBehaviour {
   private static float editorAlpha = 0.5f;
 
   void OnValidate() {
+    EditorApplication.delayCall += delayedUpdate;
+  }
+
+  void delayedUpdate() {
+    if (gameObject == null) { return; }
     generateNodes();
-    //generateGizmoMesh();
+    buildTerrainColumns();
+    regenerateMeshes();
   }
 
   void OnDrawGizmos() {
@@ -195,10 +209,14 @@ public class TerrainGrid : MonoBehaviour {
   }
 
   public void addIsoValuesToNodes(float isoVal, in List<TerrainGridNode> nodes) {
+    var changedNodes = new HashSet<TerrainGridNode>();
     foreach (var node in nodes) {
+      var prevIsoVal = node.isoVal;
       node.isoVal = Mathf.Clamp(node.isoVal + isoVal, 0, 1);
+      if (node.isoVal != prevIsoVal) { changedNodes.Add(node); }
     }
-    regenerateMesh();
+    // Only regenerate the necessary TerrainColumns for the changed nodes
+    regenerateMeshesForNodes(changedNodes);
   }
 
   // Intersect the given ray with this grid, returns the closest relevant edit point
@@ -347,22 +365,6 @@ public class TerrainGrid : MonoBehaviour {
 
     return true;
   }
-
-  /*
-  //private Mesh gizmoMesh = null;
-  private void generateGizmoMesh() {
-    if (gizmoMesh == null) { gizmoMesh = new Mesh(); }
-    gizmoMesh.Clear();
-
-    int[] triangles = null;
-    Vector3[] vertices = null;
-    MeshHelper.BuildCubeData(new Vector3(0,0,0), new Vector3(xSize,ySize,zSize), out triangles, out vertices);
-    //gizmoMesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
-    gizmoMesh.vertices = vertices;
-    gizmoMesh.triangles = triangles;
-    gizmoMesh.RecalculateNormals();
-  }
-  */
 
   #endif // UNITY_EDITOR
 }
