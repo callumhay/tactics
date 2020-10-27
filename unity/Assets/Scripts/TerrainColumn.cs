@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using UnityEngine;
+using UnityEditor;
 
 public class TerrainColumn {
 
@@ -30,12 +31,17 @@ public class TerrainColumn {
     meshFilter   = gameObj.AddComponent<MeshFilter>();
     meshCollider = gameObj.AddComponent<MeshCollider>();
     meshRenderer = gameObj.AddComponent<MeshRenderer>();
-    meshRenderer.sharedMaterial = Resources.Load<Material>("Materials/TerrainMat");
+    meshRenderer.material = Resources.Load<Material>("Materials/TerrainMat");
   }
 
   private int numNodesX() { return TerrainColumn.size*terrainGrid.nodesPerUnit; }
   private int numNodesY() { return terrainGrid.ySize*terrainGrid.nodesPerUnit;  }
   private int numNodesZ() { return TerrainColumn.size*terrainGrid.nodesPerUnit; }
+
+  public void clear() {
+    clearMeshData();
+    GameObject.Destroy(gameObj);
+  }
 
   private void clearMeshData() {
     vertices.Clear();
@@ -74,14 +80,16 @@ public class TerrainColumn {
       }
     }
 
-    var mesh = new Mesh();
+    var mesh = (meshFilter.sharedMesh == null) ? new Mesh() : meshFilter.sharedMesh;
+    mesh.Clear();
     mesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
     mesh.vertices = vertices.ToArray();
     mesh.triangles = triangles.ToArray();
     mesh.RecalculateNormals(55.0f, 1e-4f);
-
-    meshFilter.mesh = mesh;
-    meshCollider.sharedMesh = mesh;
+    if (mesh != meshFilter.sharedMesh) {
+      meshFilter.sharedMesh = mesh;
+      meshCollider.sharedMesh = mesh;
+    }
   }
 
 }

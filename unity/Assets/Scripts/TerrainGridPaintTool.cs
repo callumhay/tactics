@@ -44,7 +44,7 @@ public class TerrainGridTool : EditorTool {
     }
 
     if (editPtActive) {
-      if (e.type == EventType.MouseDown) {
+      if (e.type == EventType.MouseDown && e.modifiers == EventModifiers.None) {
         mouseDownButton = e.button;
         // Grab all the nodes inside the brush
         List<TerrainGridNode> nodes = settingsWindow.getAffectedNodesAtPoint(lastEditPt, terrainGrid);
@@ -85,12 +85,12 @@ public class TerrainGridTool : EditorTool {
   void onSceneGUI(SceneView sceneView) {
     var terrainGrid = target as TerrainGrid;
     if (target == null) { return; }
+
     var settingsWindow = EditorWindow.GetWindow<TerrainGridToolWindow>();
     if (settingsWindow == null) { return; }
 
     if (editPtActive) {
       var rot = new Quaternion(0,0,0,1);
-
       // Draw the brush shape
       Handles.color = new Color(0.0f, 0.8f, 1.0f, 0.25f);
       switch (settingsWindow.brushType) {

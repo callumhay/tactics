@@ -138,32 +138,50 @@ public class TerrainGrid : MonoBehaviour {
       return;
     }
 
-    nodes = new TerrainGridNode[numNodesX,numNodesY,numNodesZ];
+    // We use a temporary array to preserve any existing nodes that are still in the grid
+    var tempNodes = new TerrainGridNode[numNodesX,numNodesY,numNodesZ];
     for (int x = 0; x < numNodesX; x++) {
       var xTCIdx = Mathf.FloorToInt(x/nodesPerTerrainColumnX());
       var xPos = nodeIndexToUnits(x);
-
       for (int y = 0; y < numNodesY; y++) {
         var yPos = nodeIndexToUnits(y);
         for (int z = 0; z < numNodesZ; z++) {
-          var zTCIdx = Mathf.FloorToInt(z/nodesPerTerrainColumnZ());
-          var zPos = nodeIndexToUnits(z);
-          var unitPos = new Vector3(xPos, yPos, zPos);
-          var terrainColIdx = new Vector3Int(xTCIdx, 0, zTCIdx);
-          nodes[x,y,z] = new TerrainGridNode(unitPos, terrainColIdx, 0.0f);
+          if (nodes != null && x < nodes.GetLength(0) && y < nodes.GetLength(1) && z < nodes.GetLength(2)) {
+            tempNodes[x,y,z] = nodes[x,y,z];
+          }
+          else {
+            var zTCIdx = Mathf.FloorToInt(z/nodesPerTerrainColumnZ());
+            var zPos = nodeIndexToUnits(z);
+            var unitPos = new Vector3(xPos, yPos, zPos);
+            var terrainColIdx = new Vector3Int(xTCIdx, 0, zTCIdx);
+            tempNodes[x,y,z] = new TerrainGridNode(unitPos, terrainColIdx, 0.0f);
+          }
         }
       }
     }
+    nodes = tempNodes;
   }
 
   private void buildTerrainColumns() {
-    terrainColumns.Clear();
+    var keysToRemove = new List<Vector3Int>();
+    foreach (var entry in terrainColumns) {
+      var idx = entry.Key;
+      if (idx.x >= xSize || idx.y >= ySize || idx.z >= zSize) {
+        keysToRemove.Add(idx);
+      }
+    }
+    foreach (var key in keysToRemove) {
+      terrainColumns[key].clear();
+      terrainColumns.Remove(key);
+    }
 
     for (int x = 0; x < xSize; x++) {
       for (int z = 0; z < zSize; z++) {
         var currIdx = new Vector3Int(x,0,z);
-        var terrainCol = new TerrainColumn(currIdx, this);
-        terrainColumns.Add(currIdx, terrainCol);
+        if (!terrainColumns.ContainsKey(currIdx)) {
+          var terrainCol = new TerrainColumn(currIdx, this);
+          terrainColumns.Add(currIdx, terrainCol);
+        }
       }
     }
   }
@@ -191,11 +209,9 @@ public class TerrainGrid : MonoBehaviour {
   private static float editorAlpha = 0.5f;
 
   void OnValidate() {
-    EditorApplication.delayCall += delayedUpdate;
+    Invoke("delayedOnValidate", 0);
   }
-
-  void delayedUpdate() {
-    if (gameObject == null) { return; }
+  void delayedOnValidate() {
     generateNodes();
     buildTerrainColumns();
     regenerateMeshes();
