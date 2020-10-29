@@ -3,7 +3,7 @@ using System.Linq;
 using UnityEngine;
 
 public static class MeshHelper {
-  public static void BuildCubeData(Vector3 pos, Vector3 size, out int[] tris, out Vector3[] vertices) {
+  public static void BuildCubeData(in Vector3 pos, in Vector3 size, out int[] tris, out Vector3[] vertices) {
     tris = new int[3*12]{
       0, 2, 1, //face front
       0, 3, 2,

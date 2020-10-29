@@ -523,7 +523,7 @@ class TerrainLattice extends Lattice {
       
       // If the set of grounded nodes is empty then *every* affected node is ungrounded
       if (allAffectedGroundNodes.count === 0) {
-        for (const node of allAffectedGroundNodes) {
+        for (const node of allAffectedNodes) {
           node.grounded = false;
         }
         return;
@@ -589,7 +589,6 @@ class TerrainLattice extends Lattice {
 
     const depthFirstSearch = (node, islandNum, islandNodes) => {
       const neighbours = this.getNeighboursForNode(node).filter(n => n !== null);
-      
       /*
       // If there are too few neighbours, then the node is stranded and it should be removed.
       if (neighbours.length <= 1) {

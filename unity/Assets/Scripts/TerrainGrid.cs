@@ -1,18 +1,22 @@
 ﻿using System.Collections.Generic;
 using UnityEngine;
-using UnityEditor;
 
 [ExecuteAlways]
-public class TerrainGrid : MonoBehaviour {
+public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver {
+  //private static TerrainGrid _instance;
+  //public static TerrainGrid instance { get { return _instance; } }
+
   [Range(1,32)]
   public int xSize = 10, ySize = 10, zSize = 10;
   [Range(2,16)]
   public int nodesPerUnit = 4;
 
-  //[SerializeField]
-  private TerrainGridNode[,,] nodes; // Does not include the outer "ghost" nodes with zeroed isovalues
+  [HideInInspector][SerializeField] private TerrainGridNode[] _serializedNodes;
 
-  private Dictionary<Vector3Int, TerrainColumn> terrainColumns = new Dictionary<Vector3Int, TerrainColumn>();
+
+  // Live data used in the editor and in-game
+  private TerrainGridNode[,,] nodes; // Does not include the outer "ghost" nodes with zeroed isovalues
+  private Dictionary<Vector3Int, TerrainColumn> terrainColumns;
 
   private int numNodesX() { return (int)(xSize*TerrainColumn.size*nodesPerUnit); }
   private int numNodesY() { return (int)(ySize*TerrainColumn.size*nodesPerUnit); }
@@ -66,8 +70,45 @@ public class TerrainGrid : MonoBehaviour {
       zEndIdx   = Mathf.Clamp(unitsToNodeIndex(max.z), 0, nodes.GetLength(2)-1)
     };
   }
+  private IndexRange getIndexRangeForTerrainColumn(in TerrainColumn terrainCol) {
+    var numNodesPerUnitMinusOne = nodesPerUnit-1;
+    var nodeXIdxStart = unitsToNodeIndex(terrainCol.index.x * TerrainColumn.size);
+    var nodeZIdxStart = unitsToNodeIndex(terrainCol.index.z * TerrainColumn.size);
+    return new IndexRange {
+      xStartIdx = nodeXIdxStart,
+      xEndIdx   = nodeXIdxStart + numNodesPerUnitMinusOne,
+      yStartIdx = 0,
+      yEndIdx   = nodesPerUnit * TerrainColumn.size * ySize - 1,
+      zStartIdx = nodeZIdxStart,
+      zEndIdx   = nodeZIdxStart + numNodesPerUnitMinusOne
+    };
+  }
 
-  public List<TerrainGridNode> GetNodesInsideBox(in Bounds box) {
+  public void enqueueNodesInTerrainColumn(in TerrainColumn terrainCol, ref Queue<TerrainGridNode> tcNodes) {
+    var tcIndices = getIndexRangeForTerrainColumn(terrainCol);
+    for (var x = tcIndices.xStartIdx; x <= tcIndices.xEndIdx; x++) {
+      for (var y = tcIndices.yStartIdx; y <= tcIndices.yEndIdx; y++) {
+        for (var z = tcIndices.zStartIdx; z < tcIndices.zEndIdx; z++) {
+          tcNodes.Enqueue(nodes[x,y,z]);
+        }
+      }
+    }
+  }
+
+  public List<TerrainGridNode> getNeighboursForNode(in TerrainGridNode node) {
+    var neighbours = new List<TerrainGridNode>();
+    var idx = node.gridIndex;
+    // There are 6 potential neighbours...
+    if (idx.x > 0) { neighbours.Add(nodes[idx.x-1,idx.y,idx.z]); }
+    if (idx.x < nodes.GetLength(0)-1) { neighbours.Add(nodes[idx.x+1,idx.y,idx.z]); }
+    if (idx.y > 0) { neighbours.Add(nodes[idx.x,idx.y-1,idx.z]); }
+    if (idx.y < nodes.GetLength(1)-1) { neighbours.Add(nodes[idx.x,idx.y+1,idx.z]); }
+    if (idx.z > 0) { neighbours.Add(nodes[idx.x,idx.y,idx.z-1]); }
+    if (idx.z < nodes.GetLength(2)-1) { neighbours.Add(nodes[idx.x,idx.y,idx.z+1]); }
+    return neighbours;
+  }
+
+  public List<TerrainGridNode> getNodesInsideBox(in Bounds box) {
     var result = new List<TerrainGridNode>();
     var indices = getIndexRangeForBox(box);
     for (int x = indices.xStartIdx; x <= indices.xEndIdx; x++) {
@@ -80,12 +121,12 @@ public class TerrainGrid : MonoBehaviour {
     return result;
   }  
 
-  public List<TerrainGridNode> GetNodesInsideSphere(in Vector3 center, float radius) {
+  public List<TerrainGridNode> getNodesInsideSphere(in Vector3 center, float radius) {
     var lsCenter = center - transform.position; // Get the center in localspace
 
     // Narrow the search down to the nodes inside the sphere's bounding box
     var dia = 2*radius;
-    var nodesInBox = GetNodesInsideBox(new Bounds(lsCenter, new Vector3(dia, dia, dia)));
+    var nodesInBox = getNodesInsideBox(new Bounds(lsCenter, new Vector3(dia, dia, dia)));
 
     // Go through the list and only take the nodes inside the sphere
     var sqrRadius = radius*radius;
@@ -99,7 +140,10 @@ public class TerrainGrid : MonoBehaviour {
   }
 
   public Vector3Int terrainColumnNodeIndex(in TerrainColumn terrainCol, in Vector3Int localIdx) {
-    return new Vector3Int(terrainCol.index.x * nodesPerTerrainColumnX(), 0, terrainCol.index.z * nodesPerTerrainColumnZ()) + localIdx;
+    return new Vector3Int(
+      terrainCol.index.x * nodesPerTerrainColumnX(), 0, 
+      terrainCol.index.z * nodesPerTerrainColumnZ()
+    ) + localIdx;
   }
 
   public TerrainGridNode getNode(in Vector3Int nodeIdx) {
@@ -108,17 +152,71 @@ public class TerrainGrid : MonoBehaviour {
         nodeIdx.y < 0 || nodeIdx.y > this.nodes.GetLength(1)-1 ||
         nodeIdx.z < 0 || nodeIdx.z > this.nodes.GetLength(2)-1) {
       var gridSpacePos = nodeIndexToUnitsVec3(nodeIdx);
-      return new TerrainGridNode(gridSpacePos, new Vector3Int(-1,-1,-1), 0);
+      return new TerrainGridNode(gridSpacePos, nodeIdx, new Vector3Int(-1,-1,-1), 0);
     }
     return nodes[nodeIdx.x,nodeIdx.y,nodeIdx.z];
   }
 
-  void Start() {
-    if (Application.IsPlaying(gameObject)) {
+  public void OnBeforeSerialize() {
+    if (nodes != null) {
+      _serializedNodes = new TerrainGridNode[this.numNodes()];
+      var numNodesX = this.numNodesX();
+      var numNodesY = this.numNodesY();
+      for (int x = 0; x < nodes.GetLength(0); x++) {
+        for (int y = 0; y < nodes.GetLength(1); y++) {
+          for (int z = 0; z < nodes.GetLength(2); z++) {
+            _serializedNodes[z + (y*numNodesX) + (x*numNodesX*numNodesY)] = nodes[x,y,z];
+          }
+        }
+      }
+    }
+  }
+  public void OnAfterDeserialize() {
+    if (_serializedNodes != null) {
+      var numNodesX = this.numNodesX();
+      var numNodesY = this.numNodesY();
+      var numNodesZ = this.numNodesZ();
+      nodes = new TerrainGridNode[numNodesX,numNodesY,numNodesZ];
+      for (int x = 0; x < numNodesX; x++) {
+        for (int y = 0; y < numNodesY; y++) {
+          for (int z = 0; z < numNodesZ; z++) {
+            nodes[x,y,z] = _serializedNodes[z + (y*numNodesX) + (x*numNodesX*numNodesY)];
+          }
+        }
+      }
+    }
+    _serializedNodes = null;
+  }
 
+  public void Awake() {
+    /* 
+    if (_instance == null) {
+      if (Application.IsPlaying(gameObject)) { DontDestroyOnLoad(gameObject); }
+       _instance = this;
+      generateNodes();
+      buildTerrainColumns();
+      regenerateMeshes();
+    }
+    else if (_instance != this) {
+      Debug.LogWarning("More than one instance of World found, removing duplicate.");
+      GameObject.DestroyImmediate(this.gameObject);
+      return;
+    }
+    */
+
+
+    if (Application.IsPlaying(gameObject)) {
+      buildTerrainColumns();
+      terrainPhysicsCleanup();
+    }
+  }
+
+  void Start() {
+
+    if (Application.IsPlaying(gameObject)) {
     }
     #if UNITY_EDITOR
-    else {      
+    else {
       generateNodes();
       buildTerrainColumns();
       regenerateMeshes();
@@ -127,7 +225,6 @@ public class TerrainGrid : MonoBehaviour {
   }
 
   private void generateNodes() {
-
     var numNodesX = this.numNodesX();
     var numNodesY = this.numNodesY();
     var numNodesZ = this.numNodesZ();
@@ -153,16 +250,20 @@ public class TerrainGrid : MonoBehaviour {
             var zTCIdx = Mathf.FloorToInt(z/nodesPerTerrainColumnZ());
             var zPos = nodeIndexToUnits(z);
             var unitPos = new Vector3(xPos, yPos, zPos);
-            var terrainColIdx = new Vector3Int(xTCIdx, 0, zTCIdx);
-            tempNodes[x,y,z] = new TerrainGridNode(unitPos, terrainColIdx, 0.0f);
+            var gridIdx = new Vector3Int(x,y,z);
+            var colIdx  = new Vector3Int(xTCIdx, 0, zTCIdx);
+            tempNodes[x,y,z] = new TerrainGridNode(unitPos, gridIdx, colIdx, 0.0f);
           }
         }
       }
     }
     nodes = tempNodes;
   }
-
   private void buildTerrainColumns() {
+    if (terrainColumns == null) { 
+      terrainColumns = new Dictionary<Vector3Int, TerrainColumn>();
+    }
+
     var keysToRemove = new List<Vector3Int>();
     foreach (var entry in terrainColumns) {
       var idx = entry.Key;
@@ -180,6 +281,7 @@ public class TerrainGrid : MonoBehaviour {
         var currIdx = new Vector3Int(x,0,z);
         if (!terrainColumns.ContainsKey(currIdx)) {
           var terrainCol = new TerrainColumn(currIdx, this);
+          terrainCol.gameObj.transform.SetParent(transform);
           terrainColumns.Add(currIdx, terrainCol);
         }
       }
@@ -196,11 +298,35 @@ public class TerrainGrid : MonoBehaviour {
     
     foreach (var node in nodes) {
       //Debug.Log(node.terrainColumnIndex);
-      terrainCols.Add(terrainColumns[node.terrainColumnIndex]);
+      terrainCols.Add(terrainColumns[node.columnIndex]);
     }
     foreach (var terrainCol in terrainCols) {
       terrainCol.regenerateMesh();
     }
+  }
+
+  public HashSet<TerrainColumn> terrainPhysicsCleanup() {
+    return terrainPhysicsCleanup(new List<TerrainColumn>());
+  }
+  public HashSet<TerrainColumn> terrainPhysicsCleanup(in IEnumerable<TerrainColumn> affectedTCs) {
+    TerrainNodeTraverser.updateGroundedNodes(this, affectedTCs);
+    var islands = TerrainNodeTraverser.traverseNodeIslands(this);
+    Debug.Log("Found " + islands.Count + " node islands.");
+
+    var resultTCs = new HashSet<TerrainColumn>();
+    foreach (var islandNodeSet in islands) {
+      // TODO: Build debris for each island
+      //Debug.Log("Debris island found, size: " + islandNodeSet.Count);
+      //World.instance.addDebris(new TerrainDebris(islandNodeSet));
+
+      foreach (var node in islandNodeSet) {
+        resultTCs.Add(terrainColumns[node.columnIndex]);
+        // The nodes should no longer have terrain in them
+        node.isoVal = 0;
+      }
+    }
+
+    return resultTCs;
   }
 
   // Editor-Only Stuff ----------------------------------------------

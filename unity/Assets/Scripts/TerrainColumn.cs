@@ -1,55 +1,52 @@
 ﻿using System.Collections.Generic;
 using UnityEngine;
-using UnityEditor;
 
 public class TerrainColumn {
-
   public static int size = 1;
 
+  public TerrainGrid terrainGrid;
+  public Vector3Int index { get; private set; } // Index within the TerrainGrid
+
+  // GameObject and Mesh data
   public GameObject gameObj;
-
-  public Vector3Int index { get; private set; } // Index within the whole TerrainGrid
-  private TerrainGrid terrainGrid;   // TerrainGrid that holds this column
-
-  // Mesh data - this is used in the editor but not in the game... TODO: Figure this stuff out
-  private List<Vector3> vertices = new List<Vector3>();
-  private List<int> triangles = new List<int>();
   private MeshFilter meshFilter;
   private MeshCollider meshCollider;
   private MeshRenderer meshRenderer;
 
-  public TerrainColumn(in Vector3Int _index, TerrainGrid _terrainGrid) {
+  public TerrainColumn(in Vector3Int _index, in TerrainGrid _terrainGrid) {
     index = _index;
     terrainGrid = _terrainGrid;
-
-    gameObj = new GameObject();
-    gameObj.name = string.Format("Terrain Column ({0},{1})", _index.x, _index.z);
+    var name = string.Format("Terrain Column ({0},{1})", _index.x, _index.z);
+    var existingGameObj = GameObject.Find(name);
+    if (existingGameObj != null) {
+      gameObj = existingGameObj;
+      meshFilter = gameObj.GetComponent<MeshFilter>();
+      meshCollider = gameObj.GetComponent<MeshCollider>();
+      meshRenderer = gameObj.GetComponent<MeshRenderer>();
+    }
+    else {
+      gameObj = new GameObject();
+      gameObj.name = name;
+      gameObj.tag = "Terrain";
+      meshFilter   = gameObj.AddComponent<MeshFilter>();
+      meshCollider = gameObj.AddComponent<MeshCollider>();
+      meshRenderer = gameObj.AddComponent<MeshRenderer>();
+      meshRenderer.sharedMaterial = Resources.Load<Material>("Materials/TerrainMat");
+    }
     gameObj.transform.position = TerrainColumn.size * (Vector3)_index;
-    gameObj.transform.SetParent(_terrainGrid.transform);
-    gameObj.tag = "Terrain";
-
-    meshFilter   = gameObj.AddComponent<MeshFilter>();
-    meshCollider = gameObj.AddComponent<MeshCollider>();
-    meshRenderer = gameObj.AddComponent<MeshRenderer>();
-    meshRenderer.material = Resources.Load<Material>("Materials/TerrainMat");
   }
 
-  private int numNodesX() { return TerrainColumn.size*terrainGrid.nodesPerUnit; }
-  private int numNodesY() { return terrainGrid.ySize*terrainGrid.nodesPerUnit;  }
-  private int numNodesZ() { return TerrainColumn.size*terrainGrid.nodesPerUnit; }
+  private int numNodesX() { return TerrainColumn.size * terrainGrid.nodesPerUnit; }
+  private int numNodesY() { return terrainGrid.ySize * terrainGrid.nodesPerUnit; }
+  private int numNodesZ() { return TerrainColumn.size * terrainGrid.nodesPerUnit; }
 
   public void clear() {
-    clearMeshData();
-    GameObject.Destroy(gameObj);
-  }
-
-  private void clearMeshData() {
-    vertices.Clear();
-    triangles.Clear();
+    GameObject.DestroyImmediate(gameObj);
   }
 
   public void regenerateMesh() {
-    clearMeshData();
+   var vertices = new List<Vector3>();
+   var triangles = new List<int>();
 
     var _numNodesX = numNodesX();
     var _numNodesY = numNodesY();
@@ -80,16 +77,14 @@ public class TerrainColumn {
       }
     }
 
-    var mesh = (meshFilter.sharedMesh == null) ? new Mesh() : meshFilter.sharedMesh;
-    mesh.Clear();
+    var mesh = new Mesh();
     mesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
     mesh.vertices = vertices.ToArray();
     mesh.triangles = triangles.ToArray();
     mesh.RecalculateNormals(55.0f, 1e-4f);
-    if (mesh != meshFilter.sharedMesh) {
-      meshFilter.sharedMesh = mesh;
-      meshCollider.sharedMesh = mesh;
-    }
+    mesh.RecalculateBounds();
+    meshFilter.sharedMesh = mesh;
+    meshCollider.sharedMesh = mesh;
   }
 
 }
