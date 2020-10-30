@@ -46,12 +46,11 @@ public class MarchingCubes {
     if (positionLessThan(corners[i2].position, corners[i1].position)) {
       i1 = idx2; i2 = idx1;
     }
-
-    ref var p1 = ref corners[i1].position; var iv1 = corners[i1].isoVal > 0 ? 1 : 0;
-    ref var p2 = ref corners[i2].position; var iv2 = corners[i2].isoVal > 0 ? 1 : 0;
+    var p1 = corners[i1].position; var iv1 = corners[i1].isoVal;
+    var p2 = corners[i2].position; var iv2 = corners[i2].isoVal;
     var point = new Vector3(p1.x, p1.y, p1.z);
-    if (Mathf.Abs(iv1-iv2) > 1e-6f) {
-      point += ((p2-p1) / (iv2-iv1)) * (isoValCutoff-iv1);
+    if (Mathf.Abs(iv2-iv1) > 1e-6f) {
+      point += (p2-p1) * ((isoValCutoff-iv1) / (iv2-iv1));
     }
     return point;
   }

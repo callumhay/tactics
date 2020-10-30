@@ -73,7 +73,7 @@ public class TerrainGridToolWindow : EditorWindow {
   public void paintNodes(in List<TerrainGridNode> nodes, in TerrainGrid terrainGrid) {
     switch (paintType) {
       case PaintType.IsoValues:
-        terrainGrid?.addIsoValuesToNodes(1, nodes);
+        terrainGrid?.addIsoValuesToNodes(1f, nodes);
         break;
       default:
         break;

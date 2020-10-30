@@ -1,11 +1,12 @@
 ﻿using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 [Serializable]
 public class TerrainGridNode {
   public Vector3 position;
   public Vector3Int gridIndex;
-  public Vector3Int columnIndex;
+  public List<Vector3Int> columnIndices = new List<Vector3Int>();
   public float isoVal;
 
   private bool _isTraversalGrounded = false; // Used during terrain traversal to flag whether this is grounded or not
@@ -14,10 +15,9 @@ public class TerrainGridNode {
     set { _isTraversalGrounded = value || isDefinitelyGrounded(); }
   }
 
-  public TerrainGridNode(in Vector3 gridSpacePos, in Vector3Int gridIdx, in Vector3Int colIdx, float iso=0.0f) {
+  public TerrainGridNode(in Vector3 gridSpacePos, in Vector3Int gridIdx, float iso=0.0f) {
     position = gridSpacePos;
     gridIndex = gridIdx;
-    columnIndex = colIdx;
     isoVal = iso;
   }
   

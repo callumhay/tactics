@@ -1,44 +1,35 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 [ExecuteAlways]
 public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver {
-  //private static TerrainGrid _instance;
-  //public static TerrainGrid instance { get { return _instance; } }
+  public static int nodesPerUnit = 5;
 
   [Range(1,32)]
   public int xSize = 10, ySize = 10, zSize = 10;
-  [Range(2,16)]
-  public int nodesPerUnit = 4;
-
-  [HideInInspector][SerializeField] private TerrainGridNode[] _serializedNodes;
-
+  [HideInInspector][SerializeField]
+  private TerrainGridNode[] _serializedNodes; // Used to save nodes (NOTE: Unity doesn't save multidim arrays!)
 
   // Live data used in the editor and in-game
   private TerrainGridNode[,,] nodes; // Does not include the outer "ghost" nodes with zeroed isovalues
   private Dictionary<Vector3Int, TerrainColumn> terrainColumns;
 
-  private int numNodesX() { return (int)(xSize*TerrainColumn.size*nodesPerUnit); }
-  private int numNodesY() { return (int)(ySize*TerrainColumn.size*nodesPerUnit); }
-  private int numNodesZ() { return (int)(zSize*TerrainColumn.size*nodesPerUnit); }
+  private int numNodesX() { return (int)(xSize*TerrainColumn.size*TerrainGrid.nodesPerUnit)+1-xSize; }
+  private int numNodesY() { return (int)(ySize*TerrainColumn.size*TerrainGrid.nodesPerUnit)+1-ySize; }
+  private int numNodesZ() { return (int)(zSize*TerrainColumn.size*TerrainGrid.nodesPerUnit)+1-zSize; }
   public int numNodes()  { return numNodesX()*numNodesY()*numNodesZ(); }
 
-  public float unitsPerNode() { return (1.0f / nodesPerUnit); }
+  public float unitsPerNode() { return (((float)TerrainColumn.size) / ((float)TerrainGrid.nodesPerUnit-1)); }
   public float halfUnitsPerNode() { return (0.5f * unitsPerNode()); }
   public Vector3 unitsPerNodeVec3() { var u = unitsPerNode(); return new Vector3(u,u,u); }
   public Vector3 halfUnitsPerNodeVec3() { var v = unitsPerNodeVec3(); return 0.5f*v; }
 
-  public int unitsToNodeIndex(float unitVal) { return (int)Mathf.Floor(unitVal * nodesPerUnit); }
-  public float nodeIndexToUnits(int idx) { return idx*unitsPerNode() + halfUnitsPerNode(); }
+  public int unitsToNodeIndex(float unitVal) { return Mathf.FloorToInt(unitVal / unitsPerNode()); }
+  public float nodeIndexToUnits(int idx) { return idx*unitsPerNode(); }
   public Vector3 nodeIndexToUnitsVec3(int x, int y, int z) { return nodeIndexToUnitsVec3(new Vector3Int(x,y,z)); }
   public Vector3 nodeIndexToUnitsVec3(in Vector3Int nodeIdx) {
-    var nodeUnitsVec = unitsPerNodeVec3(); return Vector3.Scale(nodeIdx, nodeUnitsVec) + 0.5f*nodeUnitsVec; 
-  }
-
-  public int nodesPerTerrainColumnX() { return nodesPerUnit * TerrainColumn.size; }
-  public int nodesPerTerrainColumnZ() { return nodesPerTerrainColumnX(); }
-  public Vector3Int nodeIndexToTerrainColumnIndex(in Vector3Int nodeIdx) {
-    return new Vector3Int(nodeIdx.x/nodesPerTerrainColumnX(), 0, nodeIdx.z/nodesPerTerrainColumnZ());
+    var nodeUnitsVec = unitsPerNodeVec3(); return Vector3.Scale(nodeIdx, nodeUnitsVec); 
   }
 
   // Get the worldspace bounds of the grid
@@ -71,16 +62,16 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     };
   }
   private IndexRange getIndexRangeForTerrainColumn(in TerrainColumn terrainCol) {
-    var numNodesPerUnitMinusOne = nodesPerUnit-1;
-    var nodeXIdxStart = unitsToNodeIndex(terrainCol.index.x * TerrainColumn.size);
-    var nodeZIdxStart = unitsToNodeIndex(terrainCol.index.z * TerrainColumn.size);
+    var numNodesPerTCMinus1 = TerrainColumn.size*TerrainGrid.nodesPerUnit-1;
+    var nodeXIdxStart = terrainCol.index.x * numNodesPerTCMinus1;
+    var nodeZIdxStart = terrainCol.index.z * numNodesPerTCMinus1;
     return new IndexRange {
       xStartIdx = nodeXIdxStart,
-      xEndIdx   = nodeXIdxStart + numNodesPerUnitMinusOne,
+      xEndIdx   = nodeXIdxStart + numNodesPerTCMinus1,
       yStartIdx = 0,
-      yEndIdx   = nodesPerUnit * TerrainColumn.size * ySize - 1,
+      yEndIdx   = numNodesY() - 1,
       zStartIdx = nodeZIdxStart,
-      zEndIdx   = nodeZIdxStart + numNodesPerUnitMinusOne
+      zEndIdx   = nodeZIdxStart + numNodesPerTCMinus1
     };
   }
 
@@ -141,8 +132,8 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
 
   public Vector3Int terrainColumnNodeIndex(in TerrainColumn terrainCol, in Vector3Int localIdx) {
     return new Vector3Int(
-      terrainCol.index.x * nodesPerTerrainColumnX(), 0, 
-      terrainCol.index.z * nodesPerTerrainColumnZ()
+      terrainCol.index.x * (TerrainGrid.nodesPerUnit * TerrainColumn.size - 1), 0, 
+      terrainCol.index.z * (TerrainGrid.nodesPerUnit * TerrainColumn.size - 1)
     ) + localIdx;
   }
 
@@ -152,7 +143,9 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
         nodeIdx.y < 0 || nodeIdx.y > this.nodes.GetLength(1)-1 ||
         nodeIdx.z < 0 || nodeIdx.z > this.nodes.GetLength(2)-1) {
       var gridSpacePos = nodeIndexToUnitsVec3(nodeIdx);
-      return new TerrainGridNode(gridSpacePos, nodeIdx, new Vector3Int(-1,-1,-1), 0);
+      // NOTE: Since the node is outside the grid of TerrainColumns 
+      // we don't associate any with this "ghost" node
+      return new TerrainGridNode(gridSpacePos, nodeIdx, 0);
     }
     return nodes[nodeIdx.x,nodeIdx.y,nodeIdx.z];
   }
@@ -237,22 +230,58 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
 
     // We use a temporary array to preserve any existing nodes that are still in the grid
     var tempNodes = new TerrainGridNode[numNodesX,numNodesY,numNodesZ];
+    var tcXIndices = new List<int>();
+    var tcZIndices = new List<int>();
+    var tcIndices = new List<Vector3Int>();
+    var nodesPerTCMinus1 = TerrainColumn.size*TerrainGrid.nodesPerUnit - 1;
     for (int x = 0; x < numNodesX; x++) {
-      var xTCIdx = Mathf.FloorToInt(x/nodesPerTerrainColumnX());
       var xPos = nodeIndexToUnits(x);
-      for (int y = 0; y < numNodesY; y++) {
-        var yPos = nodeIndexToUnits(y);
-        for (int z = 0; z < numNodesZ; z++) {
+
+      // A node might be associated with more than one TerrainColumn, figure out
+      // all the indices that can be tied to the node
+      var currXTCIdx = Math.Max(0, Mathf.FloorToInt((x-1)/nodesPerTCMinus1));
+      tcXIndices.Clear();
+      tcXIndices.Add(currXTCIdx);
+      if (x % nodesPerTCMinus1 == 0 && x > 0 && currXTCIdx+1 < xSize) {
+        tcXIndices.Add(currXTCIdx+1);
+      }
+
+      for (int z = 0; z < numNodesZ; z++) {
+        var zPos = nodeIndexToUnits(z);
+
+        // We also gather potential TerrainColumn indices on the z-axis, this combined
+        // with the ones on the x-axis (see above) will make up all the potential associated TC indices
+        var currZTCIdx = Math.Max(0, Mathf.FloorToInt((z-1)/nodesPerTCMinus1));
+        tcZIndices.Clear();
+        tcZIndices.Add(currZTCIdx);
+        if (z % nodesPerTCMinus1 == 0 && z > 0 && currZTCIdx+1 < zSize) {
+          tcZIndices.Add(currZTCIdx+1);
+        }
+
+        // Based on all the TerrainColumn indices on the x and z axes we build the
+        // associated indicies for the nodes
+        tcIndices.Clear();
+        foreach (var tcXIndex in tcXIndices) {
+          foreach (var tcZIndex in tcZIndices) {
+            tcIndices.Add(new Vector3Int(tcXIndex, 0, tcZIndex));
+          }
+        }
+
+        for (int y = 0; y < numNodesY; y++) {
+          var yPos = nodeIndexToUnits(y);
+        
           if (nodes != null && x < nodes.GetLength(0) && y < nodes.GetLength(1) && z < nodes.GetLength(2)) {
             tempNodes[x,y,z] = nodes[x,y,z];
           }
           else {
-            var zTCIdx = Mathf.FloorToInt(z/nodesPerTerrainColumnZ());
-            var zPos = nodeIndexToUnits(z);
             var unitPos = new Vector3(xPos, yPos, zPos);
             var gridIdx = new Vector3Int(x,y,z);
-            var colIdx  = new Vector3Int(xTCIdx, 0, zTCIdx);
-            tempNodes[x,y,z] = new TerrainGridNode(unitPos, gridIdx, colIdx, 0.0f);
+            var node = new TerrainGridNode(unitPos, gridIdx, 0.0f);
+            // A grid node can have multiple associated TerrainColumns since they share nodes at the edges
+            foreach (var tcIndex in tcIndices) {
+              node.columnIndices.Add(tcIndex);
+            } 
+            tempNodes[x,y,z] = node;
           }
         }
       }
@@ -298,7 +327,7 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     
     foreach (var node in nodes) {
       //Debug.Log(node.terrainColumnIndex);
-      terrainCols.Add(terrainColumns[node.columnIndex]);
+      foreach (var tcIndex in node.columnIndices) { terrainCols.Add(terrainColumns[tcIndex]); }
     }
     foreach (var terrainCol in terrainCols) {
       terrainCol.regenerateMesh();
@@ -320,7 +349,7 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
       //World.instance.addDebris(new TerrainDebris(islandNodeSet));
 
       foreach (var node in islandNodeSet) {
-        resultTCs.Add(terrainColumns[node.columnIndex]);
+        foreach (var tcIndex in node.columnIndices) { resultTCs.Add(terrainColumns[tcIndex]); }
         // The nodes should no longer have terrain in them
         node.isoVal = 0;
       }
@@ -388,39 +417,35 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     var lsStartPt = wsStartPt - transform.position; // to local/grid space (NOTE: rotations and scaling do not affect the grid)
 
     // Use a ray pointing in the opposite direction to find the end point
-    var tempRay = new Ray(wsStartPt + (0.5f*halfUnitsPerNode())*ray.direction, -ray.direction);
+    var tempRay = new Ray(wsStartPt + 1e-4f*ray.direction, -ray.direction);
     float endDist = startDist;
     if (!gridBounds.IntersectRay(tempRay, out endDist)) {
       // This shouldn't happen, if it does then we just continue with the endDist equal to the startDist
       Debug.Log("No other boundary found? This shouldn't happen. Start Dist: " + startDist);
+      endDist = startDist;
     }
 
     var wsEndPt = tempRay.GetPoint(endDist);
     var lsEndPt = wsEndPt - transform.position;
-    //Debug.Log("Start Pt: " + wsStartPt + "; End Pt: " + wsEndPt);
 
-    var stepVec = new Vector3Int(
-      ray.direction.x >= 0 ? 1 : -1,
-      ray.direction.y >= 0 ? 1 : -1,
-      ray.direction.z >= 0 ? 1 : -1
+    var currVoxelIdx = new Vector3Int(
+      (int)Mathf.Clamp(unitsToNodeIndex(lsStartPt.x), 0, nodes.GetLength(0)-1),
+      (int)Mathf.Clamp(unitsToNodeIndex(lsStartPt.y), 0, nodes.GetLength(1)-1),
+      (int)Mathf.Clamp(unitsToNodeIndex(lsStartPt.z), 0, nodes.GetLength(2)-1)
     );
- 
-    var nodeSize = unitsPerNode();
-    var currVoxel = new Vector3Int(
-      (int)Mathf.Clamp(Mathf.Floor(lsStartPt.x/nodeSize), 0, nodes.GetLength(0)-1),
-      (int)Mathf.Clamp(Mathf.Floor(lsStartPt.y/nodeSize), 0, nodes.GetLength(1)-1),
-      (int)Mathf.Clamp(Mathf.Floor(lsStartPt.z/nodeSize), 0, nodes.GetLength(2)-1)
+    var lastVoxelIdx = new Vector3Int(
+      (int)Mathf.Clamp(unitsToNodeIndex(lsEndPt.x), 0, nodes.GetLength(0)-1),
+      (int)Mathf.Clamp(unitsToNodeIndex(lsEndPt.y), 0, nodes.GetLength(1)-1),
+      (int)Mathf.Clamp(unitsToNodeIndex(lsEndPt.z), 0, nodes.GetLength(2)-1)
     );
-    var lastVoxel = new Vector3Int(
-      (int)Mathf.Clamp(Mathf.Floor(lsEndPt.x/nodeSize), 0, nodes.GetLength(0)-1),
-      (int)Mathf.Clamp(Mathf.Floor(lsEndPt.y/nodeSize), 0, nodes.GetLength(1)-1),
-      (int)Mathf.Clamp(Mathf.Floor(lsEndPt.z/nodeSize), 0, nodes.GetLength(2)-1)
-    );
+
     // Distance along the ray to the next voxel border from the current position (tMax).
+    var nodeSize = unitsPerNode();
+    var stepVec = new Vector3Int(ray.direction.x >= 0 ? 1 : -1,ray.direction.y >= 0 ? 1 : -1,ray.direction.z >= 0 ? 1 : -1);
     var nextVoxelBoundary = new Vector3(
-      (currVoxel.x+stepVec.x) * nodeSize,
-      (currVoxel.y+stepVec.y) * nodeSize,
-      (currVoxel.z+stepVec.z) * nodeSize
+      (currVoxelIdx.x+stepVec.x) * nodeSize,
+      (currVoxelIdx.y+stepVec.y) * nodeSize,
+      (currVoxelIdx.z+stepVec.z) * nodeSize
     );
     
     var rayDirXIsZero = Mathf.Approximately(ray.direction.x, 0);
@@ -445,49 +470,44 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
 
     var diff = new Vector3Int(0,0,0);
     bool negRay = false;
-    if (currVoxel.x > 0 && currVoxel.x < this.nodes.GetLength(0) && ray.direction.x < 0) { diff.x--; negRay = true; }
-    if (currVoxel.y > 0 && currVoxel.y < this.nodes.GetLength(1) && ray.direction.y < 0) { diff.y--; negRay = true; }
-    if (currVoxel.z > 0 && currVoxel.z < this.nodes.GetLength(2) && ray.direction.z < 0) { diff.z--; negRay = true; }
-    if (negRay) { currVoxel += diff; }
+    if (currVoxelIdx.x > 0 && currVoxelIdx.x < this.nodes.GetLength(0) && ray.direction.x < 0) { diff.x--; negRay = true; }
+    if (currVoxelIdx.y > 0 && currVoxelIdx.y < this.nodes.GetLength(1) && ray.direction.y < 0) { diff.y--; negRay = true; }
+    if (currVoxelIdx.z > 0 && currVoxelIdx.z < this.nodes.GetLength(2) && ray.direction.z < 0) { diff.z--; negRay = true; }
+    if (negRay) { currVoxelIdx += diff; }
 
-    while (currVoxel != lastVoxel && this.nodes[currVoxel.x,currVoxel.y,currVoxel.z].isoVal < 1) {
+    while (currVoxelIdx != lastVoxelIdx && this.nodes[currVoxelIdx.x,currVoxelIdx.y,currVoxelIdx.z].isoVal < 1) {
       //Debug.Log(currVoxel);
-      var prevVoxel = currVoxel;
+      var prevVoxel = currVoxelIdx;
       if (tMax.x < tMax.y) {
         if (tMax.x < tMax.z) {
-          currVoxel.x += stepVec.x;
+          currVoxelIdx.x += stepVec.x;
           tMax.x += tDelta.x;
         }
         else {
-          currVoxel.z += stepVec.z;
+          currVoxelIdx.z += stepVec.z;
           tMax.z += tDelta.z;
         }
       }
       else {
         if (tMax.y < tMax.z) {
-          currVoxel.y += stepVec.y;
+          currVoxelIdx.y += stepVec.y;
           tMax.y += tDelta.y;
         }
         else {
-          currVoxel.z += stepVec.z;
+          currVoxelIdx.z += stepVec.z;
           tMax.z += tDelta.z;
         }
       }
-      if (currVoxel.x < 0 || currVoxel.x >= this.nodes.GetLength(0) ||
-          currVoxel.y < 0 || currVoxel.y >= this.nodes.GetLength(1) ||
-          currVoxel.z < 0 || currVoxel.z >= this.nodes.GetLength(2)) {
+      if (currVoxelIdx.x < 0 || currVoxelIdx.x >= this.nodes.GetLength(0) ||
+          currVoxelIdx.y < 0 || currVoxelIdx.y >= this.nodes.GetLength(1) ||
+          currVoxelIdx.z < 0 || currVoxelIdx.z >= this.nodes.GetLength(2)) {
 
-        currVoxel = prevVoxel;
+        currVoxelIdx = prevVoxel;
         break;
       }
     }
 
-    var nodeHalfSize = halfUnitsPerNode();
-    var nodeCenter = new Vector3(
-      (nodeSize*currVoxel.x) + nodeHalfSize,
-      (nodeSize*currVoxel.y) + nodeHalfSize,
-      (nodeSize*currVoxel.z) + nodeHalfSize
-    );
+    var nodeCenter = new Vector3((nodeSize*currVoxelIdx.x),(nodeSize*currVoxelIdx.y),(nodeSize*currVoxelIdx.z));
     nodeCenter += transform.position; // Back to worldspace
     editPt = nodeCenter;
     /*

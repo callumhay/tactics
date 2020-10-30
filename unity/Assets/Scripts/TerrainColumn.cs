@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 public class TerrainColumn {
@@ -36,9 +37,9 @@ public class TerrainColumn {
     gameObj.transform.position = TerrainColumn.size * (Vector3)_index;
   }
 
-  private int numNodesX() { return TerrainColumn.size * terrainGrid.nodesPerUnit; }
-  private int numNodesY() { return terrainGrid.ySize * terrainGrid.nodesPerUnit; }
-  private int numNodesZ() { return TerrainColumn.size * terrainGrid.nodesPerUnit; }
+  private int numNodesX() { return TerrainColumn.size * TerrainGrid.nodesPerUnit; }
+  private int numNodesY() { return terrainGrid.ySize  * TerrainGrid.nodesPerUnit; }
+  private int numNodesZ() { return TerrainColumn.size * TerrainGrid.nodesPerUnit; }
 
   public void clear() {
     GameObject.DestroyImmediate(gameObj);
@@ -65,7 +66,8 @@ public class TerrainColumn {
           
           var terrainIdx = terrainGrid.terrainColumnNodeIndex(this, localIdx); // "global" index within the whole terrain
           for (int i = 0; i < 8; i++) {
-            // Get the node at the current index in the grid (also gets empty "ghost" nodes at the edges)
+            // Get the node at the current index in the grid 
+            // (also gets empty "ghost" nodes at the edges)
             var cornerNode = terrainGrid.getNode(terrainIdx + MarchingCubes.corners[i]);
             // Localspace position for this Terrain Column
             corners[i].position = cornerNode.position - gameObj.transform.position;
@@ -77,11 +79,18 @@ public class TerrainColumn {
       }
     }
 
+    var minXZPt = new Vector2(Mathf.Min(index.x-1,0), Mathf.Min(index.z-1,0));
+    var maxXZPt = Vector2.zero + (new Vector2(TerrainColumn.size,TerrainColumn.size));
+    // Subtract/Add an epsilon to avoid removing vertices at the edges
+    var boundEpsilon = 1e-10f;
+    minXZPt.x -= boundEpsilon; minXZPt.y -= boundEpsilon;
+    maxXZPt.x += boundEpsilon; maxXZPt.y += boundEpsilon;
+
     var mesh = new Mesh();
     mesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
     mesh.vertices = vertices.ToArray();
     mesh.triangles = triangles.ToArray();
-    mesh.RecalculateNormals(55.0f, 1e-4f);
+    mesh.RecalculateNormals(50.0f, 1e-6f, minXZPt, maxXZPt);
     mesh.RecalculateBounds();
     meshFilter.sharedMesh = mesh;
     meshCollider.sharedMesh = mesh;

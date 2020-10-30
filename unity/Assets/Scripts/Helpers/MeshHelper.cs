@@ -55,12 +55,14 @@ public static class MeshHelper {
   private class FaceEntry {
     public int[] face;
     public int index;
+    public bool isRemoved = false;
   }
 
   private class VertexEntry {
     public Vector3 vertex;
     public List<Vector3> normals = new List<Vector3>();
     public List<FaceEntry> faces = new List<FaceEntry>();
+    public bool isRemoved = false;
   };
 
   private class NormalGroup {
@@ -68,7 +70,10 @@ public static class MeshHelper {
     public Vector3 avgNormal = new Vector3(0,0,0);
   }
 
-  public static void RecalculateNormals(this Mesh mesh, float smoothingAngle, float tolerance) {
+  public static void RecalculateNormals(
+    this Mesh mesh, float smoothingAngle, float tolerance, in Vector2 minXZ, in Vector2 maxXZ
+  ) {
+
     var decimalShift = Mathf.Log10(1.0f / tolerance);
     var shiftMultiplier = Mathf.Pow(10, decimalShift);
 
@@ -91,7 +96,7 @@ public static class MeshHelper {
         var triIndices  = new int[3]{triangles[i], triangles[i+1], triangles[i+2]};
         var triVertices = new Vector3[3]{vertices[triIndices[0]], vertices[triIndices[1]], vertices[triIndices[2]]};
         var triNormal   = Vector3.Cross(triVertices[1] - triVertices[0], triVertices[2] - triVertices[0]).normalized;
-        int[] triFace = new int[3]{0,0,0};
+        int[] triFace = new int[3]{0,0,0}; // Used later to rebuild the faces
         for (var j = 0; j < 3; j++) {
           var hash = makeVertexHash(triVertices[j]);
           VertexEntry vEntry;
@@ -110,6 +115,14 @@ public static class MeshHelper {
 
     foreach (var vertexMap in vertexMaps) {
       foreach (var vertexEntry in vertexMap.Values) {
+        ref readonly var vertex = ref vertexEntry.vertex;
+
+        // Clean up all vertices outside of the min/max
+        if ((vertex.x < minXZ.x || vertex.x > maxXZ.x) || (vertex.z < minXZ.y || vertex.z > maxXZ.y)) {
+          vertexEntry.isRemoved = true;
+          foreach (var face in vertexEntry.faces) { face.isRemoved = true; }
+          continue;
+        }
 
         // Put each normal into its own  group
         var groupedNormals = new List<NormalGroup>();
@@ -125,12 +138,12 @@ public static class MeshHelper {
           // Compare each group's normal with each other to see if they can be combined
           int mergeGroup1 = -1; int mergeGroup2 = -1;
           for (int i = 0; i < groupedNormals.Count; i++) {
-            
             var iNorm = groupedNormals[i].avgNormal;
             float smallestAngle = float.MaxValue;
             mergeGroup2 = -1;
 
-            for (int j = i+1; j < groupedNormals.Count; j++) {
+            for (int j = 0; j < groupedNormals.Count; j++) {
+              if (i == j) { continue; }
               var jNorm = groupedNormals[j].avgNormal;
               var angle = Mathf.Rad2Deg*iNorm.angleTo(jNorm);
               if (angle <= smoothingAngle && angle < smallestAngle) {
@@ -159,15 +172,16 @@ public static class MeshHelper {
           }
         }
 
-        // Go through each of the grouped normals, average each group and insert them as duplicates of the vertices
+        // Go through each of the grouped normals, average each group and insert 
+        // them as duplicates of the vertices
         for (int i = 0; i < groupedNormals.Count; i++) {
           var currNormalGrp = groupedNormals[i];
           for (int j = 0; j < currNormalGrp.normalIndices.Count; j++) {
+            
             var currIndex = currNormalGrp.normalIndices[j];
-            foreach (var faceEntry in vertexEntry.faces) {
-              faceEntry.face[faceEntry.index] = finalVertices.Count;
-            }
-            finalVertices.Add(vertexEntry.vertex);
+            var faceEntry = vertexEntry.faces[currIndex];
+            faceEntry.face[faceEntry.index] = finalVertices.Count;
+            finalVertices.Add(vertex);
             finalNormals.Add(currNormalGrp.avgNormal);
           }
         }
@@ -181,7 +195,9 @@ public static class MeshHelper {
       var vertexMap = vertexMaps[i];
       var subMeshTris = new List<int>();
       foreach (var vertexEntry in vertexMap.Values) {
+        if (vertexEntry.isRemoved) { continue; }
         foreach (var faceEntry in vertexEntry.faces) {
+          if (faceEntry.isRemoved) { continue; }
           subMeshTris.Add(faceEntry.face[0]);
           subMeshTris.Add(faceEntry.face[1]);
           subMeshTris.Add(faceEntry.face[2]);

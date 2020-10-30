@@ -70,7 +70,7 @@
       void surf(Input IN, inout SurfaceOutputStandard o) {
         IN.worldNormal = WorldNormalVector(IN, o.Normal);
 
-        float3 scaledOffsetWorldPos = (IN.worldPos / _TexScale) + float3(_TexOffsetX, _TexOffsetY, 0);
+        float3 scaledOffsetWorldPos = (IN.worldPos * _TexScale) + float3(_TexOffsetX, _TexOffsetY, 0);
         float3 pWeight = 7.0 * (abs(normalize(IN.worldNormal)) - 0.2);
         pWeight = max(pow(pWeight, 3), float3(1, 1, 1));
         pWeight /= max(dot(pWeight, 1), 0.0001);
