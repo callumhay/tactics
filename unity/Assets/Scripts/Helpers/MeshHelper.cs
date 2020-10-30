@@ -52,10 +52,14 @@ public static class MeshHelper {
     };
   }
 
-  private class FaceEntry {
-    public int[] face;
-    public int index;
+  private class Face {
+    public int[] indices;
     public bool isRemoved = false;
+  }
+
+  private class FaceEntry {
+    public Face face;
+    public int index;
   }
 
   private class VertexEntry {
@@ -96,7 +100,11 @@ public static class MeshHelper {
         var triIndices  = new int[3]{triangles[i], triangles[i+1], triangles[i+2]};
         var triVertices = new Vector3[3]{vertices[triIndices[0]], vertices[triIndices[1]], vertices[triIndices[2]]};
         var triNormal   = Vector3.Cross(triVertices[1] - triVertices[0], triVertices[2] - triVertices[0]).normalized;
-        int[] triFace = new int[3]{0,0,0}; // Used later to rebuild the faces
+        
+        // Used later to rebuild the faces
+        var triFace = new Face();
+        triFace.indices = new int[3]{0,0,0};
+
         for (var j = 0; j < 3; j++) {
           var hash = makeVertexHash(triVertices[j]);
           VertexEntry vEntry;
@@ -120,7 +128,7 @@ public static class MeshHelper {
         // Clean up all vertices outside of the min/max
         if ((vertex.x < minXZ.x || vertex.x > maxXZ.x) || (vertex.z < minXZ.y || vertex.z > maxXZ.y)) {
           vertexEntry.isRemoved = true;
-          foreach (var face in vertexEntry.faces) { face.isRemoved = true; }
+          foreach (var faceEntry in vertexEntry.faces) { faceEntry.face.isRemoved = true; }
           continue;
         }
 
@@ -180,7 +188,7 @@ public static class MeshHelper {
             
             var currIndex = currNormalGrp.normalIndices[j];
             var faceEntry = vertexEntry.faces[currIndex];
-            faceEntry.face[faceEntry.index] = finalVertices.Count;
+            faceEntry.face.indices[faceEntry.index] = finalVertices.Count;
             finalVertices.Add(vertex);
             finalNormals.Add(currNormalGrp.avgNormal);
           }
@@ -197,10 +205,10 @@ public static class MeshHelper {
       foreach (var vertexEntry in vertexMap.Values) {
         if (vertexEntry.isRemoved) { continue; }
         foreach (var faceEntry in vertexEntry.faces) {
-          if (faceEntry.isRemoved) { continue; }
-          subMeshTris.Add(faceEntry.face[0]);
-          subMeshTris.Add(faceEntry.face[1]);
-          subMeshTris.Add(faceEntry.face[2]);
+          if (faceEntry.face.isRemoved) { continue; }
+          subMeshTris.Add(faceEntry.face.indices[0]);
+          subMeshTris.Add(faceEntry.face.indices[1]);
+          subMeshTris.Add(faceEntry.face.indices[2]);
         }
       }
       mesh.SetTriangles(subMeshTris.ToArray(), i);

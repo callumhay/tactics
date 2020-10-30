@@ -82,7 +82,7 @@ public class TerrainColumn {
     var minXZPt = new Vector2(Mathf.Min(index.x-1,0), Mathf.Min(index.z-1,0));
     var maxXZPt = Vector2.zero + (new Vector2(TerrainColumn.size,TerrainColumn.size));
     // Subtract/Add an epsilon to avoid removing vertices at the edges
-    var boundEpsilon = 1e-10f;
+    var boundEpsilon = 1e-4f;
     minXZPt.x -= boundEpsilon; minXZPt.y -= boundEpsilon;
     maxXZPt.x += boundEpsilon; maxXZPt.y += boundEpsilon;
 
