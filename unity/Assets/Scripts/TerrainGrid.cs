@@ -334,6 +334,51 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     }
   }
 
+  private TerrainDebris buildTerrainDebris(in HashSet<TerrainGridNode> nodes) {
+
+    // Find the index bounding box that includes all the given nodes
+    var bbMin = new Vector3Int(int.MaxValue, int.MaxValue, int.MaxValue);
+    var bbMax = new Vector3Int(int.MinValue, int.MinValue, int.MinValue);
+    foreach (var node in nodes) {
+      bbMin = Vector3Int.Min(bbMin, node.gridIndex);
+      bbMax = Vector3Int.Max(bbMax, node.gridIndex);
+    }
+
+    // Make the box wider on each side by one, this allows us to fill the outer nodes
+    // with empty isovalues so that when we use marching cubes we create a convex shape
+    // (i.e., a chunk that "broke off" from the terrain).
+    bbMin -= Vector3Int.one;
+    bbMax += Vector3Int.one;
+    var boxBounds = new BoundsInt();
+    boxBounds.SetMinMax(bbMin, bbMax);
+    var boxSize = boxBounds.size;
+
+    // Fill the box up with empty corners
+    var nodeUnits = unitsPerNode();
+    var nodeCorners = new CubeCorner[boxSize.x,boxSize.y,boxSize.z];
+    for (int x = 0; x < boxSize.x; x++) {
+      for (int y = 0; y < boxSize.y; y++) {
+        for (int z = 0; z < boxSize.z; z++) {
+          var nodeCorner = new CubeCorner();
+          nodeCorner.isoVal = 0;
+          // Store a localspace position
+          nodeCorner.position = new Vector3(x*nodeUnits, y*nodeUnits, z*nodeUnits) - boxBounds.center;
+          nodeCorners[x,y,z] = nodeCorner;
+        }
+      }
+    }
+    // Map each of the nodes isovalues into the corners array
+    foreach (var node in nodes) {
+      ref readonly var idx = ref node.gridIndex;
+      ref var corner = ref nodeCorners[idx.x-bbMin.x, idx.y-bbMin.y, idx.z-bbMin.z];
+      corner.isoVal = node.isoVal;
+    }
+
+    var result = new TerrainDebris(boxBounds.center);
+    result.regenerateMesh(nodeCorners);
+    return result;
+  }
+
   public HashSet<TerrainColumn> terrainPhysicsCleanup() {
     return terrainPhysicsCleanup(new List<TerrainColumn>());
   }

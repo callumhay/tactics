@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 
 public class CubeCorner {
+  public static int numCorners = 8;
   public Vector3 position;
   public float isoVal;
 }

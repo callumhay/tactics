@@ -53,8 +53,8 @@ public class TerrainColumn {
     var _numNodesY = numNodesY();
     var _numNodesZ = numNodesZ();
 
-    var corners = new CubeCorner[8];
-    for (int i = 0; i < 8; i++) { corners[i] = new CubeCorner(); }
+    var corners = new CubeCorner[CubeCorner.numCorners];
+    for (int i = 0; i < CubeCorner.numCorners; i++) { corners[i] = new CubeCorner(); }
 
     var localIdx = new Vector3Int();
     for (int x = -1; x < _numNodesX; x++) {
@@ -65,7 +65,7 @@ public class TerrainColumn {
           localIdx.z = z;
           
           var terrainIdx = terrainGrid.terrainColumnNodeIndex(this, localIdx); // "global" index within the whole terrain
-          for (int i = 0; i < 8; i++) {
+          for (int i = 0; i < CubeCorner.numCorners; i++) {
             // Get the node at the current index in the grid 
             // (also gets empty "ghost" nodes at the edges)
             var cornerNode = terrainGrid.getNode(terrainIdx + MarchingCubes.corners[i]);
