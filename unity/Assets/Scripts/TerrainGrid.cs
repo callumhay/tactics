@@ -15,9 +15,9 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
   private TerrainGridNode[,,] nodes; // Does not include the outer "ghost" nodes with zeroed isovalues
   private Dictionary<Vector3Int, TerrainColumn> terrainColumns;
 
-  private int numNodesX() { return (int)(xSize*TerrainColumn.size*TerrainGrid.nodesPerUnit)+1-xSize; }
-  private int numNodesY() { return (int)(ySize*TerrainColumn.size*TerrainGrid.nodesPerUnit)+1-ySize; }
-  private int numNodesZ() { return (int)(zSize*TerrainColumn.size*TerrainGrid.nodesPerUnit)+1-zSize; }
+  public int numNodesX() { return (int)(xSize*TerrainColumn.size*TerrainGrid.nodesPerUnit)+1-xSize; }
+  public int numNodesY() { return (int)(ySize*TerrainColumn.size*TerrainGrid.nodesPerUnit)+1-ySize; }
+  public int numNodesZ() { return (int)(zSize*TerrainColumn.size*TerrainGrid.nodesPerUnit)+1-zSize; }
   public int numNodes()  { return numNodesX()*numNodesY()*numNodesZ(); }
 
   public float unitsPerNode() { return (((float)TerrainColumn.size) / ((float)TerrainGrid.nodesPerUnit-1)); }

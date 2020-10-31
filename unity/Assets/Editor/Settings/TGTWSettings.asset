@@ -12,6 +12,6 @@ MonoBehaviour:
   m_Script: {fileID: 0}
   m_Name: TGTWSettings
   m_EditorClassIdentifier: Assembly-CSharp-Editor::TGTWSettings
-  brushSize: 2.43
+  brushSize: 0
   paintType: 0
   brushType: 0
