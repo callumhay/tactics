@@ -98,7 +98,7 @@ public class TerrainColumn {
     mesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
     mesh.vertices = vertices.ToArray();
     mesh.triangles = triangles.ToArray();
-    mesh.RecalculateNormals(50.0f, 1e-6f, minXZPt, maxXZPt);
+    mesh.RecalculateNormals(MeshHelper.defaultSmoothingAngle, MeshHelper.defaultTolerance, minXZPt, maxXZPt);
     mesh.RecalculateBounds();
     meshFilter.sharedMesh = mesh;
     meshCollider.sharedMesh = mesh;

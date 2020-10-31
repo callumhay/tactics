@@ -326,9 +326,15 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     var terrainCols = new HashSet<TerrainColumn>();
     
     foreach (var node in nodes) {
-      //Debug.Log(node.terrainColumnIndex);
       foreach (var tcIndex in node.columnIndices) { terrainCols.Add(terrainColumns[tcIndex]); }
+      // We also need to add TerrainColumns associated with any adjacent nodes to avoid seams and other artifacts
+      // caused by the node/cube dependancies that exist at the edges of each TerrainColumn mesh
+      var neighbourNodes = getNeighboursForNode(node);
+      foreach (var neighbourNode in neighbourNodes) {
+        foreach (var tcIndex in neighbourNode.columnIndices) { terrainCols.Add(terrainColumns[tcIndex]); }
+      }
     }
+    // Regenerate all the unique TerrainColumns
     foreach (var terrainCol in terrainCols) {
       terrainCol.regenerateMesh();
     }
@@ -375,7 +381,7 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     }
 
     var result = new TerrainDebris(boxBounds.center);
-    result.regenerateMesh(nodeCorners);
+    result.build(nodeCorners);
     return result;
   }
 

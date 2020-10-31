@@ -3,15 +3,24 @@ using System.Collections.Generic;
 using UnityEngine;
 
 public class TerrainDebris {
-
-  
+  private GameObject gameObj;
+  private MeshFilter meshFilter;
+  private MeshRenderer meshRenderer;
+  private MeshCollider meshCollider;
+  private Rigidbody rigidbody;
   
   public TerrainDebris(in Vector3 pos) {
-
+    gameObj = new GameObject("Debris");
+    gameObj.transform.position = pos;
+    meshFilter = gameObj.AddComponent<MeshFilter>();
+    meshRenderer = gameObj.AddComponent<MeshRenderer>();
+    meshCollider = gameObj.AddComponent<MeshCollider>();
+    meshCollider.convex = true;
+    rigidbody = gameObj.AddComponent<Rigidbody>();
   }
 
   // Takes a 3D array of localspace nodes and generates the mesh for this debris
-  public void regenerateMesh(in CubeCorner[,,] lsNodes) {
+  public void build(in CubeCorner[,,] lsNodes) {
     var vertices = new List<Vector3>();
     var triangles = new List<int>();
 
@@ -30,9 +39,26 @@ public class TerrainDebris {
         }
       }
     }
+
+    var mesh = new Mesh();
+    mesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
+    mesh.vertices = vertices.ToArray();
+    mesh.triangles = triangles.ToArray();
+    mesh.RecalculateNormals(MeshHelper.defaultSmoothingAngle, MeshHelper.defaultTolerance);
+    mesh.RecalculateBounds();
+    meshFilter.sharedMesh = mesh;
+    meshCollider.sharedMesh = mesh;
+
+    // TODO: Calculate the mass based on the density of the material and the volume of the mesh
     
-    // TODO
+
   }
 
+  public void destroy() {
+    GameObject.Destroy(gameObj); // Cleans up the GameObject and all components
+
+
+
+  }
 
 }

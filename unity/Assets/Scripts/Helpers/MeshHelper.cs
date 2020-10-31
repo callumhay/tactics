@@ -74,6 +74,16 @@ public static class MeshHelper {
     public Vector3 avgNormal = new Vector3(0,0,0);
   }
 
+  public static float defaultSmoothingAngle = 62.5f;
+  public static float defaultTolerance = 1e-6f;
+
+  public static void RecalculateNormals(this Mesh mesh, float smoothingAngle, float tolerance) {
+    MeshHelper.RecalculateNormals(mesh, smoothingAngle, tolerance, 
+      new Vector2(float.MinValue, float.MinValue),
+      new Vector2(float.MaxValue, float.MaxValue)
+    );
+  }
+
   public static void RecalculateNormals(
     this Mesh mesh, float smoothingAngle, float tolerance, in Vector2 minXZ, in Vector2 maxXZ
   ) {
@@ -213,6 +223,22 @@ public static class MeshHelper {
       }
       mesh.SetTriangles(subMeshTris.ToArray(), i);
     }
+  }
+
+  static float signedVolumeOfTriangle(in Vector3 p1, in Vector3 p2, in Vector3 p3) {
+    return Vector3.Dot(p1, Vector3.Cross(p2,p3)) / 6.0f;
+  }
+
+  static float calculateVolume(this Mesh mesh) {
+    float volume = 0.0f;
+    var vertices = mesh.vertices;
+    var triangles = mesh.triangles;
+    for (int i = 0; i < mesh.triangles.Length; i += 3) {
+      volume += MeshHelper.signedVolumeOfTriangle(
+        vertices[triangles[i + 0]], vertices[triangles[i + 1]], vertices[triangles[i + 2]]
+      );
+    }
+    return Mathf.Abs(volume);
   }
 
 }
