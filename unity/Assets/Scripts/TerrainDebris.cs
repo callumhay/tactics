@@ -84,6 +84,7 @@ public class TerrainDebris {
     meshRenderer.material.SetInt("IsTerrain", 0);
 
     // TODO: Calculate the mass and drag based on the density of the material and the volume of the mesh
+    rigidbody.SetDensity(TerrainDebris.density);
     rigidbody.mass = Mathf.Max(1.0f, TerrainDebris.density * mesh.CalculateVolume());
     rigidbody.drag = 0.01f * Mathf.Max(0.1f, (mesh.bounds.size.x * mesh.bounds.size.z));
   }

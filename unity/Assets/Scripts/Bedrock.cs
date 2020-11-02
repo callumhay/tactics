@@ -1,6 +1,4 @@
-﻿using System.Collections;
-using System.Collections.Generic;
-using UnityEngine;
+﻿using UnityEngine;
 
 public class Bedrock {
   public static readonly string gameObjectName = "Bedrock";
@@ -30,7 +28,7 @@ public class Bedrock {
     var halfUnitsPerNode = 0.5f * unitsPerNode;
     var scale = new Vector3(terrain.xSize*TerrainColumn.size + halfUnitsPerNode, height, terrain.zSize*TerrainColumn.size + halfUnitsPerNode);
     gameObj.transform.localScale = scale;
-    gameObj.transform.position = 0.5f * (new Vector3(terrain.xSize, -(height + unitsPerNode + 1e-6f), terrain.zSize));
+    gameObj.transform.position = 0.5f * (new Vector3(terrain.xSize, -height, terrain.zSize));
     var renderer = gameObj.GetComponent<Renderer>();
   }
 }

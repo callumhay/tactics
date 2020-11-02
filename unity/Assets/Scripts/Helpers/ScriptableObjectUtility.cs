@@ -3,7 +3,7 @@ using UnityEditor;
 using System.IO;
  
 public static class ScriptableObjectUtility {
-
+  /*
 	/// <summary>
 	//	This makes it easy to create, name and place unique new ScriptableObject asset files.
 	/// </summary>
@@ -21,6 +21,7 @@ public static class ScriptableObjectUtility {
   	Selection.activeObject = asset;
     return asset;
 	}
+  */
 
   public static T CreateAssetFromPath<T>(in string filePath) where T : ScriptableObject {
     T asset = ScriptableObject.CreateInstance<T>();
