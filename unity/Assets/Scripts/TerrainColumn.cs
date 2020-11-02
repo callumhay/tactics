@@ -5,7 +5,7 @@ using UnityEngine;
 public class TerrainColumn {
   public static int size = 1;
 
-  public TerrainGrid terrainGrid;
+  public TerrainGrid terrain;
   public Vector3Int index { get; private set; } // Index within the TerrainGrid
 
   // GameObject and Mesh data
@@ -14,9 +14,9 @@ public class TerrainColumn {
   private MeshCollider meshCollider;
   private MeshRenderer meshRenderer;
 
-  public TerrainColumn(in Vector3Int _index, in TerrainGrid _terrainGrid) {
+  public TerrainColumn(in Vector3Int _index, in TerrainGrid _terrain) {
     index = _index;
-    terrainGrid = _terrainGrid;
+    terrain = _terrain;
     var name = string.Format("Terrain Column ({0},{1})", _index.x, _index.z);
     var existingGameObj = GameObject.Find(name);
     if (existingGameObj != null) {
@@ -38,7 +38,7 @@ public class TerrainColumn {
   }
 
   private int numNodesX() { return TerrainColumn.size * TerrainGrid.nodesPerUnit; }
-  private int numNodesY() { return terrainGrid.ySize  * TerrainGrid.nodesPerUnit; }
+  private int numNodesY() { return terrain.ySize  * TerrainGrid.nodesPerUnit; }
   private int numNodesZ() { return TerrainColumn.size * TerrainGrid.nodesPerUnit; }
 
   public void clear() {
@@ -64,11 +64,11 @@ public class TerrainColumn {
         for (int z = -1; z <= _numNodesZ; z++) {
           localIdx.z = z;
           
-          var terrainIdx = terrainGrid.terrainColumnNodeIndex(this, localIdx); // "global" index within the whole terrain
+          var terrainIdx = terrain.terrainColumnNodeIndex(this, localIdx); // "global" index within the whole terrain
           for (int i = 0; i < CubeCorner.numCorners; i++) {
             // Get the node at the current index in the grid 
             // (also gets empty "ghost" nodes at the edges)
-            var cornerNode = terrainGrid.getNode(terrainIdx + MarchingCubes.corners[i]);
+            var cornerNode = terrain.getNode(terrainIdx + MarchingCubes.corners[i]);
             // Localspace position for this Terrain Column
             corners[i].position = cornerNode.position - gameObj.transform.position;
             // Isovalue of the node
@@ -82,12 +82,12 @@ public class TerrainColumn {
     
     // If we're at the near or far extents of the grid then we include one layer of the outside coordinates.
     // We do this to avoid culling the triangles that make up the outer walls of the terrain.
-    var outerLayerAmt = terrainGrid.unitsPerNode();
+    var outerLayerAmt = terrain.unitsPerNode();
     var minXZPt = new Vector2(Mathf.Min(index.x-outerLayerAmt,0), Mathf.Min(index.z-outerLayerAmt,0));
     var maxXZPt = Vector2.zero + (new Vector2(TerrainColumn.size,TerrainColumn.size));
-    var extentNodeIdx = terrainGrid.terrainColumnNodeIndex(this, new Vector3Int(_numNodesX, _numNodesY, _numNodesZ));
-    maxXZPt.x += extentNodeIdx.x >= terrainGrid.numNodesX() ? outerLayerAmt : 0;
-    maxXZPt.y += extentNodeIdx.z >= terrainGrid.numNodesZ() ? outerLayerAmt : 0;
+    var extentNodeIdx = terrain.terrainColumnNodeIndex(this, new Vector3Int(_numNodesX, _numNodesY, _numNodesZ));
+    maxXZPt.x += extentNodeIdx.x >= terrain.numNodesX() ? outerLayerAmt : 0;
+    maxXZPt.y += extentNodeIdx.z >= terrain.numNodesZ() ? outerLayerAmt : 0;
 
     // Subtract/Add an epsilon to avoid removing vertices at the edges
     var boundEpsilon = 1e-4f;

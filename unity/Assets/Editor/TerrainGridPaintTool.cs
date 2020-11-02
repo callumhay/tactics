@@ -94,10 +94,10 @@ public class TerrainGridTool : EditorTool {
       // Draw the brush shape
       Handles.color = new Color(0.0f, 0.8f, 1.0f, 0.25f);
       switch (settingsWindow.brushType) {
-        case TerrainGridToolWindow.BrushType.Sphere:
+        case TGTWSettings.BrushType.Sphere:
           Handles.SphereHandleCap(GUIUtility.GetControlID(FocusType.Passive), lastEditPt, rot, settingsWindow.brushSize, EventType.Repaint);
           break;
-        case TerrainGridToolWindow.BrushType.Cube:
+        case TGTWSettings.BrushType.Cube:
           Handles.CubeHandleCap(GUIUtility.GetControlID(FocusType.Passive), lastEditPt, rot, settingsWindow.brushSize, EventType.Repaint);
           break;
         default:

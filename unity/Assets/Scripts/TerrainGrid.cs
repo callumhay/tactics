@@ -6,6 +6,7 @@ using UnityEngine;
 public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver {
   public static int nodesPerUnit = 5;
 
+  public World world;
   [Range(1,32)]
   public int xSize = 10, ySize = 10, zSize = 10;
   [HideInInspector][SerializeField]
@@ -14,6 +15,8 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
   // Live data used in the editor and in-game
   private TerrainGridNode[,,] nodes; // Does not include the outer "ghost" nodes with zeroed isovalues
   private Dictionary<Vector3Int, TerrainColumn> terrainColumns;
+  private Bedrock bedrock;
+  private List<TerrainDebris> debrisList = new List<TerrainDebris>();
 
   public int numNodesX() { return (int)(xSize*TerrainColumn.size*TerrainGrid.nodesPerUnit)+1-xSize; }
   public int numNodesY() { return (int)(ySize*TerrainColumn.size*TerrainGrid.nodesPerUnit)+1-ySize; }
@@ -26,6 +29,8 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
   public Vector3 halfUnitsPerNodeVec3() { var v = unitsPerNodeVec3(); return 0.5f*v; }
 
   public int unitsToNodeIndex(float unitVal) { return Mathf.FloorToInt(unitVal / unitsPerNode()); }
+  public Vector3Int unitsToNodeIndexVec3(float x, float y, float z) { return new Vector3Int(unitsToNodeIndex(x), unitsToNodeIndex(y), unitsToNodeIndex(z)); }
+  public Vector3Int unitsToNodeIndexVec3(in Vector3 unitPos) { return unitsToNodeIndexVec3(unitPos.x, unitPos.y, unitPos.z);}
   public float nodeIndexToUnits(int idx) { return idx*unitsPerNode(); }
   public Vector3 nodeIndexToUnitsVec3(int x, int y, int z) { return nodeIndexToUnitsVec3(new Vector3Int(x,y,z)); }
   public Vector3 nodeIndexToUnitsVec3(in Vector3Int nodeIdx) {
@@ -182,35 +187,20 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
   }
 
   public void Awake() {
-    /* 
-    if (_instance == null) {
-      if (Application.IsPlaying(gameObject)) { DontDestroyOnLoad(gameObject); }
-       _instance = this;
-      generateNodes();
-      buildTerrainColumns();
-      regenerateMeshes();
-    }
-    else if (_instance != this) {
-      Debug.LogWarning("More than one instance of World found, removing duplicate.");
-      GameObject.DestroyImmediate(this.gameObject);
-      return;
-    }
-    */
-
-
     if (Application.IsPlaying(gameObject)) {
+      buildBedrock();
       buildTerrainColumns();
       terrainPhysicsCleanup();
     }
   }
 
   void Start() {
-
     if (Application.IsPlaying(gameObject)) {
     }
     #if UNITY_EDITOR
     else {
       generateNodes();
+      buildBedrock();
       buildTerrainColumns();
       regenerateMeshes();
     }
@@ -288,6 +278,7 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     }
     nodes = tempNodes;
   }
+
   private void buildTerrainColumns() {
     if (terrainColumns == null) { 
       terrainColumns = new Dictionary<Vector3Int, TerrainColumn>();
@@ -317,11 +308,19 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     }
   }
 
+  private void buildBedrock() { 
+    bedrock = new Bedrock(this); 
+    bedrock.gameObj.transform.SetParent(transform); 
+    bedrock.gameObj.transform.SetAsFirstSibling();
+  }
+
   private void regenerateMeshes() {
     foreach (var terrainCol in terrainColumns.Values) {
       terrainCol.regenerateMesh();
-    } 
+    }
+    bedrock.regenerateMesh();
   }
+
   private void regenerateMeshesForNodes(in ICollection<TerrainGridNode> nodes) {
     var terrainCols = new HashSet<TerrainColumn>();
     
@@ -349,18 +348,22 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
       bbMin = Vector3Int.Min(bbMin, node.gridIndex);
       bbMax = Vector3Int.Max(bbMax, node.gridIndex);
     }
-
-    // Make the box wider on each side by one, this allows us to fill the outer nodes
-    // with empty isovalues so that when we use marching cubes we create a convex shape
-    // (i.e., a chunk that "broke off" from the terrain).
-    bbMin -= Vector3Int.one;
-    bbMax += Vector3Int.one;
     var boxBounds = new BoundsInt();
     boxBounds.SetMinMax(bbMin, bbMax);
-    var boxSize = boxBounds.size;
+
+    // Calculate the worldspace position of the debris based on the min/max indices of the nodes
+    var nodeUnits = unitsPerNode();
+    var debrisCenterPos = nodeUnits * boxBounds.center;
+
+    // Make the box wider on each side this allows us to fill the outer nodes
+    // with empty isovalues so that when we use marching cubes we create a convex shape
+    // (i.e., a chunk that "broke off" from the terrain).
+    boxBounds.min -= 2*Vector3Int.one;
+    boxBounds.max += 2*Vector3Int.one;
 
     // Fill the box up with empty corners
-    var nodeUnits = unitsPerNode();
+    var boxSize = boxBounds.size;
+    var lsCenterPos = 0.5f * nodeUnits * (Vector3)(boxBounds.size);
     var nodeCorners = new CubeCorner[boxSize.x,boxSize.y,boxSize.z];
     for (int x = 0; x < boxSize.x; x++) {
       for (int y = 0; y < boxSize.y; y++) {
@@ -368,7 +371,7 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
           var nodeCorner = new CubeCorner();
           nodeCorner.isoVal = 0;
           // Store a localspace position
-          nodeCorner.position = new Vector3(x*nodeUnits, y*nodeUnits, z*nodeUnits) - boxBounds.center;
+          nodeCorner.position = new Vector3(x*nodeUnits, y*nodeUnits, z*nodeUnits) - lsCenterPos;
           nodeCorners[x,y,z] = nodeCorner;
         }
       }
@@ -376,32 +379,66 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     // Map each of the nodes isovalues into the corners array
     foreach (var node in nodes) {
       ref readonly var idx = ref node.gridIndex;
-      ref var corner = ref nodeCorners[idx.x-bbMin.x, idx.y-bbMin.y, idx.z-bbMin.z];
+      ref var corner = ref nodeCorners[idx.x-boxBounds.min.x, idx.y-boxBounds.min.y, idx.z-boxBounds.min.z];
       corner.isoVal = node.isoVal;
     }
 
-    var result = new TerrainDebris(boxBounds.center);
+    // TODO: Feed in the material for the debris here as well
+    var result = new TerrainDebris(this, debrisCenterPos);
+    result.gameObj.transform.SetParent(transform);
     result.build(nodeCorners);
     return result;
+  }
+
+  public void removeDebris(in TerrainDebris debris) { debrisList.Remove(debris); }
+  public void mergeDebrisIntoTerrain(in TerrainDebris debris) {
+    var debrisGO = debris.gameObj;
+
+    // Get the bounding box of the debris in worldspace - we use this as a rough estimate
+    // of which nodes we need to iterate through to convert the mesh back into nodes
+    var debrisRenderer = debrisGO.GetComponent<Renderer>();
+    var debrisWSBounds = debrisRenderer.bounds;
+
+    // Find the bounds in node index space
+    var nodeIdxRange = getIndexRangeForMinMax(debrisWSBounds.min - transform.position, debrisWSBounds.max - transform.position);
+
+    // Go through each potential node and cast a ray from the center of that node (in any direction)
+    // If the ray intersects with the inside of the debris' mesh then add back the isovalue for that node
+    var debrisCollider = debrisGO.GetComponent<Collider>();
+    var affectedNodes = new List<TerrainGridNode>();
+    for (int x = nodeIdxRange.xStartIdx; x <= nodeIdxRange.xEndIdx; x++) {
+      for (int y = nodeIdxRange.yStartIdx; y <= nodeIdxRange.yEndIdx; y++) {
+        for (int z = nodeIdxRange.zStartIdx; z <= nodeIdxRange.zEndIdx; z++) {
+          var node = nodes[x,y,z];
+          var nodeWSPos = node.position + transform.position;
+          if (debrisCollider.IsPointInside(nodeWSPos)) {
+            node.isoVal = 1;
+            affectedNodes.Add(node);
+          }
+        }
+      }
+    }
+
+    regenerateMeshesForNodes(affectedNodes);
+    removeDebris(debris);
   }
 
   public HashSet<TerrainColumn> terrainPhysicsCleanup() {
     return terrainPhysicsCleanup(new List<TerrainColumn>());
   }
+
   public HashSet<TerrainColumn> terrainPhysicsCleanup(in IEnumerable<TerrainColumn> affectedTCs) {
+
     TerrainNodeTraverser.updateGroundedNodes(this, affectedTCs);
     var islands = TerrainNodeTraverser.traverseNodeIslands(this);
-    Debug.Log("Found " + islands.Count + " node islands.");
-
     var resultTCs = new HashSet<TerrainColumn>();
     foreach (var islandNodeSet in islands) {
-      // TODO: Build debris for each island
-      //Debug.Log("Debris island found, size: " + islandNodeSet.Count);
-      //World.instance.addDebris(new TerrainDebris(islandNodeSet));
-
+      // Build debris for each island
+      var debris = buildTerrainDebris(islandNodeSet);
+      this.debrisList.Add(debris);
+      // And clear the isovalues for all the nodes that make up the debris (which is now a separate mesh)
       foreach (var node in islandNodeSet) {
         foreach (var tcIndex in node.columnIndices) { resultTCs.Add(terrainColumns[tcIndex]); }
-        // The nodes should no longer have terrain in them
         node.isoVal = 0;
       }
     }
@@ -419,6 +456,7 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
   }
   void delayedOnValidate() {
     generateNodes();
+    buildBedrock();
     buildTerrainColumns();
     regenerateMeshes();
   }

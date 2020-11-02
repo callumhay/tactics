@@ -1,14 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 using UnityEditor;
-
-public class TGTWSettings : ScriptableObject {
-  public static string assetPath = "Assets/Editor/Settings/TGTWSettings.asset";
-  public float brushSize;
-  public TerrainGridToolWindow.PaintType paintType;
-  public TerrainGridToolWindow.BrushType brushType;
-}
 
 public class TerrainGridToolWindow : EditorWindow {
   public static string windowTitle = "Terrain Grid Tool";
@@ -18,19 +10,12 @@ public class TerrainGridToolWindow : EditorWindow {
   [InitializeOnLoadMethod]
   private static void OnLoad() {
     if (!settings) {
-      settings = AssetDatabase.LoadAssetAtPath<TGTWSettings>(TGTWSettings.assetPath);
-      if (settings) { return; }
-      settings = CreateInstance<TGTWSettings>();
-      AssetDatabase.CreateAsset(settings, TGTWSettings.assetPath);
-      AssetDatabase.Refresh();
+      settings = ScriptableObjectUtility.LoadOrCreateAssetFromPath<TGTWSettings>(TGTWSettings.assetPath);
     }
   }
 
-  public enum PaintType { IsoValues = 0 };
-  public enum BrushType { Sphere = 0, Cube = 1 };
-
-  public PaintType paintType { get { return settings.paintType; } }
-  public BrushType brushType { get { return settings.brushType; } }
+  public TGTWSettings.PaintType paintType { get { return settings.paintType; } }
+  public TGTWSettings.BrushType brushType { get { return settings.brushType; } }
   public float brushSize { get { return settings.brushSize; } }
 
   [MenuItem("Window/Terrain Grid Tool")]
@@ -58,10 +43,10 @@ public class TerrainGridToolWindow : EditorWindow {
   public List<TerrainGridNode> getAffectedNodesAtPoint(in Vector3 editPt, in TerrainGrid terrainGrid) {
     List<TerrainGridNode> nodes = null;
     switch (brushType) {
-      case TerrainGridToolWindow.BrushType.Sphere:
+      case TGTWSettings.BrushType.Sphere:
         nodes = terrainGrid?.getNodesInsideSphere(editPt, brushSize/2);
         break;
-      case TerrainGridToolWindow.BrushType.Cube:
+      case TGTWSettings.BrushType.Cube:
         nodes = terrainGrid?.getNodesInsideBox(new Bounds(editPt, new Vector3(brushSize, brushSize, brushSize)));
         break;
       default:
@@ -72,7 +57,7 @@ public class TerrainGridToolWindow : EditorWindow {
 
   public void paintNodes(in List<TerrainGridNode> nodes, in TerrainGrid terrainGrid) {
     switch (paintType) {
-      case PaintType.IsoValues:
+      case TGTWSettings.PaintType.IsoValues:
         terrainGrid?.addIsoValuesToNodes(1f, nodes);
         break;
       default:
@@ -81,7 +66,7 @@ public class TerrainGridToolWindow : EditorWindow {
   }
   public void eraseNodes(in List<TerrainGridNode> nodes, in TerrainGrid terrainGrid) {
     switch (paintType) {
-      case PaintType.IsoValues:
+      case TGTWSettings.PaintType.IsoValues:
         terrainGrid?.addIsoValuesToNodes(-1, nodes);
         break;
       default:

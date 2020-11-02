@@ -225,16 +225,16 @@ public static class MeshHelper {
     }
   }
 
-  static float signedVolumeOfTriangle(in Vector3 p1, in Vector3 p2, in Vector3 p3) {
+  public static float SignedVolumeOfTriangle(in Vector3 p1, in Vector3 p2, in Vector3 p3) {
     return Vector3.Dot(p1, Vector3.Cross(p2,p3)) / 6.0f;
   }
 
-  static float calculateVolume(this Mesh mesh) {
+  public static float CalculateVolume(this Mesh mesh) {
     float volume = 0.0f;
     var vertices = mesh.vertices;
     var triangles = mesh.triangles;
     for (int i = 0; i < mesh.triangles.Length; i += 3) {
-      volume += MeshHelper.signedVolumeOfTriangle(
+      volume += MeshHelper.SignedVolumeOfTriangle(
         vertices[triangles[i + 0]], vertices[triangles[i + 1]], vertices[triangles[i + 2]]
       );
     }
