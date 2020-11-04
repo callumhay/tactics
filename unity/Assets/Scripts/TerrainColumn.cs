@@ -59,7 +59,7 @@ public class TerrainColumn {
     var localIdx = new Vector3Int();
     for (int x = -1; x <= _numNodesX; x++) {
       localIdx.x = x;
-      for (int y = -1; y <= _numNodesY; y++) {
+      for (int y = -1; y < _numNodesY; y++) {
         localIdx.y = y;
         for (int z = -1; z <= _numNodesZ; z++) {
           localIdx.z = z;
@@ -79,7 +79,6 @@ public class TerrainColumn {
       }
     }
 
-    
     // If we're at the near or far extents of the grid then we include one layer of the outside coordinates.
     // We do this to avoid culling the triangles that make up the outer walls of the terrain.
     var outerLayerAmt = terrain.unitsPerNode();

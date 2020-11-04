@@ -42,6 +42,25 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     var nodeUnitsVec = unitsPerNodeVec3(); return Vector3.Scale(nodeIdx, nodeUnitsVec); 
   }
 
+  public void getGridSnappedPoint(ref Vector3 wsPt) {
+    // Find the closest column center to the given point and snap to it
+    var lsPt = wsPt - transform.position; // local space
+
+    var unitsPerTC = (unitsPerNode()*TerrainColumn.size*(nodesPerUnit-1));
+    var oneOverUnitsPerTC = 1.0f / unitsPerTC;
+    var halfUnitsPerTC = unitsPerTC / 2.0f;
+
+    // Calculate the rounded terrain column index for snapping
+    var tcIdxPt = Vector3.Scale(lsPt, new Vector3(oneOverUnitsPerTC,oneOverUnitsPerTC,oneOverUnitsPerTC));
+    tcIdxPt.x = Math.Min(xSize-1, Math.Max(0, Mathf.RoundToInt(tcIdxPt.x)));
+    tcIdxPt.y = Math.Min(ySize-1, Math.Max(0, Mathf.RoundToInt(tcIdxPt.y)));
+    tcIdxPt.z = Math.Min(zSize-1, Math.Max(0, Mathf.RoundToInt(tcIdxPt.z)));
+
+    // Snap the point to the middle of the closest terrain column
+    // and move it back into world space
+    wsPt = (unitsPerTC * tcIdxPt) + new Vector3(halfUnitsPerTC,halfUnitsPerTC,halfUnitsPerTC) + transform.position;
+  }
+
   // Get the worldspace bounds of the grid
   public Bounds wsBounds() { 
     var b = new Bounds();
@@ -146,10 +165,11 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     // Find the highest y node in the xz coordinates with an isovalue
     var isCenter = unitsToNodeIndexVec3(lsCenter); isCenter.y++;
     while (isCenter.y > 1 && !nodes[isCenter.x,isCenter.y-1,isCenter.z].isTerrain()) { isCenter.y--; }
+    while (isCenter.y < nodes.GetLength(1)-1 && nodes[isCenter.x,isCenter.y,isCenter.z].isTerrain()) { isCenter.y++; }
 
     // Get the nodes in a square box that encloses the circle
     var dia = 2*radius;
-    var box = new Bounds(nodeIndexToUnitsVec3(isCenter), new Vector3(dia, unitsPerNode(), dia));
+    var box = new Bounds(nodeIndexToUnitsVec3(isCenter), new Vector3(dia, 1.5f*halfUnitsPerNode(), dia));
     var indices = getIndexRangeForBox(box);
     var result = new List<TerrainGridNode>();
     var sqrRadius = radius*radius;
@@ -168,8 +188,9 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     // Find the highest y node in the xz coordinates with an isovalue
     var isCenter = unitsToNodeIndexVec3(lsCenter); isCenter.y++;
     while (isCenter.y > 1 && !nodes[isCenter.x,isCenter.y-1,isCenter.z].isTerrain()) { isCenter.y--; }
+    while (isCenter.y < nodes.GetLength(1)-1 && nodes[isCenter.x,isCenter.y,isCenter.z].isTerrain()) { isCenter.y++; }
 
-    var projBox = new Bounds(nodeIndexToUnitsVec3(isCenter), new Vector3(box.size.x, unitsPerNode(), box.size.z));
+    var projBox = new Bounds(nodeIndexToUnitsVec3(isCenter), new Vector3(box.size.x, 1.5f*halfUnitsPerNode(), box.size.z));
     return getNodesInsideBox(projBox);
   }
 

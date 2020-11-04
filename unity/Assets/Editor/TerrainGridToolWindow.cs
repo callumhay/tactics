@@ -18,6 +18,7 @@ public class TerrainGridToolWindow : EditorWindow {
   public TGTWSettings.PaintMode paintMode { get { return settings.paintMode; } }
   public TGTWSettings.BrushType brushType { get { return settings.brushType; } }
   public float brushSize { get { return settings.brushSize; } }
+  public bool gridSnaping { get { return settings.gridSnaping; } }
 
   [MenuItem("Window/Terrain Grid Tool")]
   static void Open() {
@@ -34,27 +35,32 @@ public class TerrainGridToolWindow : EditorWindow {
     var paintModeProp = serializedObj.FindProperty("paintMode");
     var brushTypeProp = serializedObj.FindProperty("brushType");
     var brushSizeProp = serializedObj.FindProperty("brushSize");
+    var gridSnapProp  = serializedObj.FindProperty("gridSnaping");
     
     EditorGUILayout.PropertyField(paintTypeProp);
     EditorGUILayout.PropertyField(paintModeProp);
     EditorGUILayout.PropertyField(brushTypeProp);
-
     brushSizeProp.floatValue = EditorGUILayout.Slider("Brush Size", brushSizeProp.floatValue, 0.25f, 5.0f);
+    EditorGUILayout.PropertyField(gridSnapProp);
 
     serializedObj.ApplyModifiedProperties();
   }
 
   public List<TerrainGridNode> getAffectedNodesAtPoint(in Vector3 editPt, in TerrainGrid terrainGrid) {
     List<TerrainGridNode> nodes = null;
-    var paintMode3D = (paintMode == TGTWSettings.PaintMode.Freeform_3D);
+    var paintMode3D = (paintMode == TGTWSettings.PaintMode.Floating);
+    var snappedPt = editPt;
+    if (gridSnaping) {
+      terrainGrid?.getGridSnappedPoint(ref snappedPt);
+    }
     
     switch (brushType) {
       case TGTWSettings.BrushType.Sphere:
         var radius = 0.5f * brushSize;
-        nodes = paintMode3D ? terrainGrid?.getNodesInsideSphere(editPt, radius) : terrainGrid?.getNodesInsideProjXZCircle(editPt, radius);
+        nodes = paintMode3D ? terrainGrid?.getNodesInsideSphere(snappedPt, radius) : terrainGrid?.getNodesInsideProjXZCircle(snappedPt, radius);
         break;
       case TGTWSettings.BrushType.Cube:
-        var bounds = new Bounds(editPt, new Vector3(brushSize, brushSize, brushSize));
+        var bounds = new Bounds(snappedPt, new Vector3(brushSize, brushSize, brushSize));
         nodes = paintMode3D ? terrainGrid?.getNodesInsideBox(bounds) : terrainGrid?.getNodesInsideProjXZSquare(bounds);
         break;
       default:

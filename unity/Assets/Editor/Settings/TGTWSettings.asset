@@ -12,6 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 98d9b1dd3dee9476ba6c0f6586489315, type: 3}
   m_Name: TGTWSettings
   m_EditorClassIdentifier: 
-  brushSize: 2.23
+  brushSize: 0.25
   paintType: 0
+  paintMode: 0
   brushType: 0

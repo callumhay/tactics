@@ -20,13 +20,15 @@ public class Bedrock {
       var renderer = gameObj.GetComponent<Renderer>();
       renderer.sharedMaterial = Resources.Load<Material>("Materials/BedrockMat");
     }
+    var collider = gameObj.GetComponent<Collider>();
+    collider.material = Resources.Load<PhysicMaterial>("Materials/BedrockPhysMat");
     regenerateMesh();
   }
 
   public void regenerateMesh() {
     var unitsPerNode = terrain.unitsPerNode();
-    var halfUnitsPerNode = 0.5f * unitsPerNode;
-    var scale = new Vector3(terrain.xSize*TerrainColumn.size + halfUnitsPerNode, height, terrain.zSize*TerrainColumn.size + halfUnitsPerNode);
+    var unitAdjust = unitsPerNode*(1-MarchingCubes.isoValCutoff);
+    var scale = new Vector3(terrain.xSize*TerrainColumn.size + unitAdjust, height, terrain.zSize*TerrainColumn.size + unitAdjust);
     gameObj.transform.localScale = scale;
     gameObj.transform.position = 0.5f * (new Vector3(terrain.xSize, -height, terrain.zSize));
     var renderer = gameObj.GetComponent<Renderer>();

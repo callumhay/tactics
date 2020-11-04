@@ -91,19 +91,20 @@ public class TerrainGridTool : EditorTool {
       if (!settingsWindow) { return; }
 
       var rot = new Quaternion(0,0,0,1);
-      // Draw the brush shape
-      Handles.color = new Color(0.0f, 0.8f, 1.0f, 0.25f);
-      switch (settingsWindow.brushType) {
-        case TGTWSettings.BrushType.Sphere:
-          Handles.SphereHandleCap(GUIUtility.GetControlID(FocusType.Passive), lastEditPt, rot, settingsWindow.brushSize, EventType.Repaint);
-          break;
-        case TGTWSettings.BrushType.Cube:
-          Handles.CubeHandleCap(GUIUtility.GetControlID(FocusType.Passive), lastEditPt, rot, settingsWindow.brushSize, EventType.Repaint);
-          break;
-        default:
-          return;
+      if (settingsWindow.paintMode == TGTWSettings.PaintMode.Floating) {
+        // Draw the brush shape
+        Handles.color = new Color(0.0f, 0.8f, 1.0f, 0.25f);
+        switch (settingsWindow.brushType) {
+          case TGTWSettings.BrushType.Sphere:
+            Handles.SphereHandleCap(GUIUtility.GetControlID(FocusType.Passive), lastEditPt, rot, settingsWindow.brushSize, EventType.Repaint);
+            break;
+          case TGTWSettings.BrushType.Cube:
+            Handles.CubeHandleCap(GUIUtility.GetControlID(FocusType.Passive), lastEditPt, rot, settingsWindow.brushSize, EventType.Repaint);
+            break;
+          default:
+            return;
+        }
       }
-
       // Draw all the nodes that the tool is colliding with / affecting
       List<TerrainGridNode> nodes = settingsWindow.getAffectedNodesAtPoint(lastEditPt, terrainGrid);
       if (nodes != null) {

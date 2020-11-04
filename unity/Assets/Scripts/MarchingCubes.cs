@@ -9,7 +9,7 @@ public class CubeCorner {
 }
 
 public class MarchingCubes {
-  public static float isoValCutoff = 0.5f;
+  public static float isoValCutoff = 0.8f;
   public static Vector3Int[] corners = new Vector3Int[]{
     new Vector3Int(0, 0, 0), new Vector3Int(1, 0, 0), 
     new Vector3Int(1, 0, 1), new Vector3Int(0, 0, 1), 
