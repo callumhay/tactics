@@ -6,8 +6,14 @@ public class GameEvent : ScriptableObject {
   private List<GameEventListener> subscribers = new List<GameEventListener>();
 
   public void FireEvent() {
-    for(int i = 0; i < subscribers.Count; ++i) {
+    for (int i = 0; i < subscribers.Count; ++i) {
       subscribers[i].OnEventFired();
+    }
+  }
+
+  public void FireEvent(GameObject eventGO) {
+    for (int i = 0; i < subscribers.Count; ++i) {
+      subscribers[i].OnEventFired(eventGO);
     }
   }
 

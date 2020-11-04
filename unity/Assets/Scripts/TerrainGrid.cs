@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Events;
 
 [ExecuteAlways]
 public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver {
@@ -16,7 +17,6 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
   private TerrainGridNode[,,] nodes; // Does not include the outer "ghost" nodes with zeroed isovalues
   private Dictionary<Vector3Int, TerrainColumn> terrainColumns;
   private Bedrock bedrock;
-  private List<TerrainDebris> debrisList = new List<TerrainDebris>();
 
   public int numNodesX() { return (int)(xSize*TerrainColumn.size*TerrainGrid.nodesPerUnit)+1-xSize; }
   public int numNodesY() { return (int)(ySize*TerrainColumn.size*TerrainGrid.nodesPerUnit)+1-ySize; }
@@ -29,7 +29,12 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
   public Vector3 halfUnitsPerNodeVec3() { var v = unitsPerNodeVec3(); return 0.5f*v; }
 
   public int unitsToNodeIndex(float unitVal) { return Mathf.FloorToInt(unitVal / unitsPerNode()); }
-  public Vector3Int unitsToNodeIndexVec3(float x, float y, float z) { return new Vector3Int(unitsToNodeIndex(x), unitsToNodeIndex(y), unitsToNodeIndex(z)); }
+  public Vector3Int unitsToNodeIndexVec3(float x, float y, float z) { 
+    return new Vector3Int(
+      Mathf.Clamp(unitsToNodeIndex(x), 0, nodes.GetLength(0)-1), 
+      Mathf.Clamp(unitsToNodeIndex(y), 0, nodes.GetLength(1)-1), 
+      Mathf.Clamp(unitsToNodeIndex(z), 0, nodes.GetLength(2)-1));
+    }
   public Vector3Int unitsToNodeIndexVec3(in Vector3 unitPos) { return unitsToNodeIndexVec3(unitPos.x, unitPos.y, unitPos.z);}
   public float nodeIndexToUnits(int idx) { return idx*unitsPerNode(); }
   public Vector3 nodeIndexToUnitsVec3(int x, int y, int z) { return nodeIndexToUnitsVec3(new Vector3Int(x,y,z)); }
@@ -135,6 +140,40 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     return result;
   }
 
+  public List<TerrainGridNode> getNodesInsideProjXZCircle(in Vector3 center, float radius) {
+    var lsCenter = center - transform.position; // Get the center in localspace
+    
+    // Find the highest y node in the xz coordinates with an isovalue
+    var isCenter = unitsToNodeIndexVec3(lsCenter); isCenter.y++;
+    while (isCenter.y > 1 && !nodes[isCenter.x,isCenter.y-1,isCenter.z].isTerrain()) { isCenter.y--; }
+
+    // Get the nodes in a square box that encloses the circle
+    var dia = 2*radius;
+    var box = new Bounds(nodeIndexToUnitsVec3(isCenter), new Vector3(dia, unitsPerNode(), dia));
+    var indices = getIndexRangeForBox(box);
+    var result = new List<TerrainGridNode>();
+    var sqrRadius = radius*radius;
+    for (int x = indices.xStartIdx; x <= indices.xEndIdx; x++) {
+      for (int y = indices.yStartIdx; y <= indices.yEndIdx; y++) {
+        for (int z = indices.zStartIdx; z <= indices.zEndIdx; z++) {
+          var node = this.nodes[x,y,z];
+          if ((node.position - lsCenter).sqrMagnitude <= sqrRadius) { result.Add(node); }
+        }
+      }
+    }
+    return result;
+  }
+  public List<TerrainGridNode> getNodesInsideProjXZSquare(in Bounds box) {
+    var lsCenter = box.center - transform.position; // Get the center in localspace
+    // Find the highest y node in the xz coordinates with an isovalue
+    var isCenter = unitsToNodeIndexVec3(lsCenter); isCenter.y++;
+    while (isCenter.y > 1 && !nodes[isCenter.x,isCenter.y-1,isCenter.z].isTerrain()) { isCenter.y--; }
+
+    var projBox = new Bounds(nodeIndexToUnitsVec3(isCenter), new Vector3(box.size.x, unitsPerNode(), box.size.z));
+    return getNodesInsideBox(projBox);
+  }
+
+
   public Vector3Int terrainColumnNodeIndex(in TerrainColumn terrainCol, in Vector3Int localIdx) {
     return new Vector3Int(
       terrainCol.index.x * (TerrainGrid.nodesPerUnit * TerrainColumn.size - 1), 0, 
@@ -196,6 +235,12 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
 
   void Start() {
     if (Application.IsPlaying(gameObject)) {
+      gameObject.SetActive(false);
+      var onSleepEventListener = gameObject.AddComponent<GameEventListener>();
+      onSleepEventListener.unityEvent = new UnityEvent<GameObject>();
+      onSleepEventListener.unityEvent.AddListener(mergeDebrisIntoTerrain);
+      onSleepEventListener.gameEvent = Resources.Load<GameEvent>("Events/DebrisSleepEvent");
+      gameObject.SetActive(true);
     }
     #if UNITY_EDITOR
     else {
@@ -384,15 +429,14 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     }
 
     // TODO: Feed in the material for the debris here as well
-    var result = new TerrainDebris(this, debrisCenterPos);
+    var result = new TerrainDebris(debrisCenterPos);
     result.gameObj.transform.SetParent(transform);
     result.build(nodeCorners);
     return result;
   }
 
-  public void removeDebris(in TerrainDebris debris) { debrisList.Remove(debris); }
-  public void mergeDebrisIntoTerrain(in TerrainDebris debris) {
-    var debrisGO = debris.gameObj;
+  public void mergeDebrisIntoTerrain(GameObject debrisGO) {
+    //Debug.Log("mergeDebrisIntoTerrain - merging debris GameObject mesh into nodes (in TerrainGrid)");
 
     // Get the bounding box of the debris in worldspace - we use this as a rough estimate
     // of which nodes we need to iterate through to convert the mesh back into nodes
@@ -418,9 +462,9 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
         }
       }
     }
-
+    // Regenerate the new meshes which will incorporate the debris into the terrain and destroy the debris
     regenerateMeshesForNodes(affectedNodes);
-    removeDebris(debris);
+    Destroy(debrisGO);
   }
 
   public HashSet<TerrainColumn> terrainPhysicsCleanup() {
@@ -435,7 +479,6 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     foreach (var islandNodeSet in islands) {
       // Build debris for each island
       var debris = buildTerrainDebris(islandNodeSet);
-      this.debrisList.Add(debris);
       // And clear the isovalues for all the nodes that make up the debris (which is now a separate mesh)
       foreach (var node in islandNodeSet) {
         foreach (var tcIndex in node.columnIndices) { resultTCs.Add(terrainColumns[tcIndex]); }

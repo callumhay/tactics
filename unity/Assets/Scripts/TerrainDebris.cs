@@ -5,6 +5,8 @@ using UnityEngine.Events;
 public class TerrainDebris {
   // TODO: Remove this and use materials to define the density!
   private static float density = 1000.0f; // kg/m^3
+  
+  public static string gameObjName = "Debris";
 
   public GameObject gameObj;
   private MeshFilter meshFilter;
@@ -12,39 +14,49 @@ public class TerrainDebris {
   private MeshCollider meshCollider;
   private Rigidbody rigidbody;
   private DebrisCollisionMonitor collisionMonitor;
-  private GameEventListener onSleepEventListener;
-  private GameEventListener onFellOffEventListener;
+  private GameEventListener felloffListener;
+  private MeshFracturer meshFracturer;
 
-  private TerrainGrid terrain;
-  
-  public TerrainDebris(in TerrainGrid _terrain, in Vector3 pos) {
-    terrain = _terrain;
-
-    gameObj = new GameObject("Debris");
+  public TerrainDebris(in Vector3 pos) {
+    gameObj = new GameObject(gameObjName);
     gameObj.transform.position = pos;
-    gameObj.SetActive(false); // Needed in order to properly register events
-    
-    meshFilter = gameObj.AddComponent<MeshFilter>();
-    meshRenderer = gameObj.AddComponent<MeshRenderer>();
+    initComponents();
+  }
+
+  private void initComponents() {
+    gameObj.SetActive(false);
+
+    meshFilter = gameObj.GetComponent<MeshFilter>(); 
+    if (meshFilter == null) { meshFilter = gameObj.AddComponent<MeshFilter>(); }
+    meshRenderer = gameObj.GetComponent<MeshRenderer>(); 
+    if (meshRenderer == null) { meshRenderer = gameObj.AddComponent<MeshRenderer>(); }
     meshRenderer.sharedMaterial = Resources.Load<Material>("Materials/TerrainMat");
-    meshCollider = gameObj.AddComponent<MeshCollider>();
+    meshRenderer.material.SetInt("IsTerrain", 0);
+
+    meshCollider = gameObj.GetComponent<MeshCollider>();
+    if (meshCollider == null) { meshCollider = gameObj.AddComponent<MeshCollider>(); }
     meshCollider.convex = true;
-    rigidbody = gameObj.AddComponent<Rigidbody>();
+    rigidbody = gameObj.GetComponent<Rigidbody>();
+    if (rigidbody == null) { rigidbody = gameObj.AddComponent<Rigidbody>(); }
 
     // Monitor collisions with game events and listeners
-    onSleepEventListener = gameObj.AddComponent<GameEventListener>();
-    onSleepEventListener.unityEvent = new UnityEvent();
-    onSleepEventListener.unityEvent.AddListener(onDebrisSleep);
-    onSleepEventListener.gameEvent = Resources.Load<GameEvent>("Events/DebrisSleepEvent");
+    //sleepListener = gameObj.GetComponent<GameEventListener>() ?? gameObj.AddComponent<GameEventListener>();
+    //sleepListener.unityEvent = sleepListener.unityEvent ?? new UnityEvent<GameObject>();
+    //sleepListener.unityEvent.AddListener(onDebrisSleep);
+    //sleepListener.gameEvent = Resources.Load<GameEvent>("Events/DebrisSleepEvent");
 
-    onFellOffEventListener = gameObj.AddComponent<GameEventListener>();
-    onFellOffEventListener.unityEvent = new UnityEvent();
-    onFellOffEventListener.unityEvent.AddListener(onDebrisFellOff);
-    onFellOffEventListener.gameEvent = Resources.Load<GameEvent>("Events/DebrisFellOffTerrainEvent");
+    felloffListener = gameObj.GetComponent<GameEventListener>();
+    if (felloffListener == null) { felloffListener =  gameObj.AddComponent<GameEventListener>(); }
+    felloffListener.unityEvent = felloffListener.unityEvent ?? new UnityEvent<GameObject>();
+    felloffListener.unityEvent.AddListener(onDebrisFellOff);
+    felloffListener.gameEvent = Resources.Load<GameEvent>("Events/DebrisFellOffTerrainEvent");
 
-    collisionMonitor = gameObj.AddComponent<DebrisCollisionMonitor>();
-    collisionMonitor.onSleepEvent = onSleepEventListener.gameEvent;
-    collisionMonitor.onFellOffEvent = onFellOffEventListener.gameEvent;
+    collisionMonitor = gameObj.GetComponent<DebrisCollisionMonitor>();
+    if (collisionMonitor == null) { collisionMonitor = gameObj.AddComponent<DebrisCollisionMonitor>(); }
+
+    // No fracturing for now... need to implement fracturing using Voronoi splitting, right now it looks a bit strange
+    //meshFracturer = gameObj.GetComponent<MeshFracturer>();
+    //if (meshFracturer == null) { meshFracturer = gameObj.AddComponent<MeshFracturer>(); }
 
     gameObj.SetActive(true);
   }
@@ -78,10 +90,12 @@ public class TerrainDebris {
     mesh.triangles = triangles.ToArray();
     mesh.RecalculateNormals(MeshHelper.defaultSmoothingAngle, MeshHelper.defaultTolerance);
     mesh.RecalculateBounds();
+    setMesh(mesh);
+  }
+
+  public void setMesh(in Mesh mesh) {
     meshFilter.sharedMesh = mesh;
     meshCollider.sharedMesh = mesh;
-
-    meshRenderer.material.SetInt("IsTerrain", 0);
 
     // TODO: Calculate the mass and drag based on the density of the material and the volume of the mesh
     rigidbody.SetDensity(TerrainDebris.density);
@@ -89,14 +103,10 @@ public class TerrainDebris {
     rigidbody.drag = 0.01f * Mathf.Max(0.1f, (mesh.bounds.size.x * mesh.bounds.size.z));
   }
 
-  private void onDebrisSleep() {
-    Debug.Log("Sleeping.");
-    terrain.mergeDebrisIntoTerrain(this);
-    GameObject.Destroy(gameObj);
-  }
-  private void onDebrisFellOff() {
-    Debug.Log("Fell off the terrain.");
-    terrain.removeDebris(this);
-    GameObject.Destroy(gameObj);
+  private void onDebrisFellOff(GameObject eventGO) {
+    if (eventGO == gameObj) {
+      //Debug.Log("onDebrisFellOff - destroying TerrainDebris GameObject (in TerrainDebris).");
+      GameObject.Destroy(gameObj);
+    }
   }
 }

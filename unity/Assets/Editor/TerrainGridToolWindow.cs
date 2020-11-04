@@ -15,6 +15,7 @@ public class TerrainGridToolWindow : EditorWindow {
   }
 
   public TGTWSettings.PaintType paintType { get { return settings.paintType; } }
+  public TGTWSettings.PaintMode paintMode { get { return settings.paintMode; } }
   public TGTWSettings.BrushType brushType { get { return settings.brushType; } }
   public float brushSize { get { return settings.brushSize; } }
 
@@ -30,11 +31,14 @@ public class TerrainGridToolWindow : EditorWindow {
     serializedObj.Update();
     
     var paintTypeProp = serializedObj.FindProperty("paintType");
+    var paintModeProp = serializedObj.FindProperty("paintMode");
     var brushTypeProp = serializedObj.FindProperty("brushType");
     var brushSizeProp = serializedObj.FindProperty("brushSize");
     
     EditorGUILayout.PropertyField(paintTypeProp);
+    EditorGUILayout.PropertyField(paintModeProp);
     EditorGUILayout.PropertyField(brushTypeProp);
+
     brushSizeProp.floatValue = EditorGUILayout.Slider("Brush Size", brushSizeProp.floatValue, 0.25f, 5.0f);
 
     serializedObj.ApplyModifiedProperties();
@@ -42,16 +46,21 @@ public class TerrainGridToolWindow : EditorWindow {
 
   public List<TerrainGridNode> getAffectedNodesAtPoint(in Vector3 editPt, in TerrainGrid terrainGrid) {
     List<TerrainGridNode> nodes = null;
+    var paintMode3D = (paintMode == TGTWSettings.PaintMode.Freeform_3D);
+    
     switch (brushType) {
       case TGTWSettings.BrushType.Sphere:
-        nodes = terrainGrid?.getNodesInsideSphere(editPt, brushSize/2);
+        var radius = 0.5f * brushSize;
+        nodes = paintMode3D ? terrainGrid?.getNodesInsideSphere(editPt, radius) : terrainGrid?.getNodesInsideProjXZCircle(editPt, radius);
         break;
       case TGTWSettings.BrushType.Cube:
-        nodes = terrainGrid?.getNodesInsideBox(new Bounds(editPt, new Vector3(brushSize, brushSize, brushSize)));
+        var bounds = new Bounds(editPt, new Vector3(brushSize, brushSize, brushSize));
+        nodes = paintMode3D ? terrainGrid?.getNodesInsideBox(bounds) : terrainGrid?.getNodesInsideProjXZSquare(bounds);
         break;
       default:
         break;
     }
+
     return nodes;
   }
 
