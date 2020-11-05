@@ -7,11 +7,11 @@ using UnityEngine.Events;
 public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver {
   public static int nodesPerUnit = 5;
 
-  public World world;
-  [Range(1,32)]
-  public int xSize = 10, ySize = 10, zSize = 10;
-  [HideInInspector][SerializeField]
-  private TerrainGridNode[] _serializedNodes; // Used to save nodes (NOTE: Unity doesn't save multidim arrays!)
+  public LevelData levelData;
+
+  public int xSize { get { return levelData.xSize; } }
+  public int ySize { get { return levelData.ySize; } }
+  public int zSize { get { return levelData.zSize; } }
 
   // Live data used in the editor and in-game
   private TerrainGridNode[,,] nodes; // Does not include the outer "ghost" nodes with zeroed isovalues
@@ -215,35 +215,26 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     return nodes[nodeIdx.x,nodeIdx.y,nodeIdx.z];
   }
 
+  private void initLevelData() {
+    if (levelData == null) {
+      levelData = ScriptableObjectUtility.LoadOrCreateAssetFromPath<LevelData>(LevelData.emptyLevelAssetPath);
+    }
+  }
   public void OnBeforeSerialize() {
-    if (nodes != null) {
-      _serializedNodes = new TerrainGridNode[this.numNodes()];
-      var numNodesX = this.numNodesX();
-      var numNodesY = this.numNodesY();
-      for (int x = 0; x < nodes.GetLength(0); x++) {
-        for (int y = 0; y < nodes.GetLength(1); y++) {
-          for (int z = 0; z < nodes.GetLength(2); z++) {
-            _serializedNodes[z + (y*numNodesX) + (x*numNodesX*numNodesY)] = nodes[x,y,z];
-          }
-        }
-      }
+    initLevelData();
+    if (Application.IsPlaying(gameObject)) {
+      levelData.setNodesFrom3DArray(nodes);
+    }
+    else {
+      levelData.Update();
     }
   }
   public void OnAfterDeserialize() {
-    if (_serializedNodes != null) {
-      var numNodesX = this.numNodesX();
-      var numNodesY = this.numNodesY();
-      var numNodesZ = this.numNodesZ();
-      nodes = new TerrainGridNode[numNodesX,numNodesY,numNodesZ];
-      for (int x = 0; x < numNodesX; x++) {
-        for (int y = 0; y < numNodesY; y++) {
-          for (int z = 0; z < numNodesZ; z++) {
-            nodes[x,y,z] = _serializedNodes[z + (y*numNodesX) + (x*numNodesX*numNodesY)];
-          }
-        }
-      }
+    initLevelData();
+    nodes = levelData.getNodesAs3DArray(numNodesX(), numNodesY(), numNodesZ());
+    if (nodes == null) { 
+      generateNodes();
     }
-    _serializedNodes = null;
   }
 
   public void Awake() {
@@ -516,6 +507,7 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
   private static float editorAlpha = 0.5f;
 
   void OnValidate() {
+    //initLevelData();
     Invoke("delayedOnValidate", 0);
   }
   void delayedOnValidate() {

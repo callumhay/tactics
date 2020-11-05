@@ -16,6 +16,7 @@ public class Bedrock {
     }
     else {
       gameObj = GameObject.CreatePrimitive(PrimitiveType.Cube);
+      gameObj.transform.position = new Vector3(0,0,0);
       gameObj.name = Bedrock.gameObjectName;
       var renderer = gameObj.GetComponent<Renderer>();
       renderer.sharedMaterial = Resources.Load<Material>("Materials/BedrockMat");
@@ -30,7 +31,7 @@ public class Bedrock {
     var unitAdjust = unitsPerNode*(1-MarchingCubes.isoValCutoff);
     var scale = new Vector3(terrain.xSize*TerrainColumn.size + unitAdjust, height, terrain.zSize*TerrainColumn.size + unitAdjust);
     gameObj.transform.localScale = scale;
-    gameObj.transform.position = 0.5f * (new Vector3(terrain.xSize, -height, terrain.zSize));
+    gameObj.transform.localPosition = 0.5f * (new Vector3(terrain.xSize, -height, terrain.zSize));
     var renderer = gameObj.GetComponent<Renderer>();
   }
 }
