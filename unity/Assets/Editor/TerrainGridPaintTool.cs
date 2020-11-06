@@ -31,8 +31,9 @@ public class TerrainGridTool : EditorTool {
   }
 
   public override void OnToolGUI(EditorWindow window) {
+
     var terrainGrid = target as TerrainGrid;
-    if (!InternalEditorUtility.isApplicationActive || terrainGrid == null) { 
+    if (!InternalEditorUtility.isApplicationActive || !terrainGrid || !settingsWindow) { 
       editPtActive = false;
       return;
     }
@@ -95,15 +96,11 @@ public class TerrainGridTool : EditorTool {
   }
 
   void onSceneGUI(SceneView sceneView) {
-    if (!InternalEditorUtility.isApplicationActive) { return; }
-
+    
     var terrainGrid = target as TerrainGrid;
-    if (!target) { return; }
+    if (!InternalEditorUtility.isApplicationActive || !terrainGrid || !settingsWindow) { return; }
 
     if (editPtActive) {
-      var settingsWindow = EditorWindow.GetWindow<TerrainGridToolWindow>();
-      if (!settingsWindow) { return; }
-
       var rot = new Quaternion(0,0,0,1);
       /*
       if (settingsWindow.paintMode == TGTWSettings.PaintMode.Floating) {
@@ -137,7 +134,4 @@ public class TerrainGridTool : EditorTool {
     }
     
   }
-  //private void activeToolChanged() {
-  //  if (!EditorTools.IsActiveTool(this)) { return; }
-  //}
 }

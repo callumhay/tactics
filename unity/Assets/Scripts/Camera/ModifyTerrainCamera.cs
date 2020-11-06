@@ -27,6 +27,14 @@ public class ModifyTerrainCamera : MonoBehaviour {
     return Physics.Raycast(ray, out hit);
   }
 
+  private void addIsoValuesAtHit(in RaycastHit hit, float val) {
+    var terrain = hit.transform.parent.GetComponent<TerrainGrid>();
+    if (terrain) {
+      var hitNodes = terrain.getNodesInsideSphere(hit.point, radius);
+      terrain.addIsoValuesToNodes(val, hitNodes);
+    }
+  }
+
   void Update() {
     // Left mouse button = Remove from terrain
     if (Input.GetMouseButtonDown(0)) {
@@ -34,12 +42,7 @@ public class ModifyTerrainCamera : MonoBehaviour {
       if (castRayFromViewportCenter(out hit)) {
         coroutine = reticleColorChange(new Color(1,0,0,1));
         StartCoroutine(coroutine);
-
-        var terrain = hit.transform.parent.GetComponent<TerrainGrid>();
-        if (terrain) {
-          var hitNodes = terrain.getNodesInsideSphere(hit.point, radius);
-          Debug.Log("Nodes hit: " + hitNodes.Count);
-        }
+        addIsoValuesAtHit(hit, -1);
       }
     }
     // Right mouse button = Add to terrain
@@ -48,7 +51,7 @@ public class ModifyTerrainCamera : MonoBehaviour {
       if (castRayFromViewportCenter(out hit)) {
         coroutine = reticleColorChange(new Color(0,1,0,1));
         StartCoroutine(coroutine);
-
+        addIsoValuesAtHit(hit, 1);
       }
     }
   }
@@ -56,7 +59,7 @@ public class ModifyTerrainCamera : MonoBehaviour {
   private IEnumerator reticleColorChange(Color c) {
     if (!reticleImg) { yield break; }
     reticleImg.color = c;
-    yield return new WaitForSeconds(0.15f);
+    yield return new WaitForSeconds(0.2f);
     reticleImg.color = defaultReticleColour;
   }
 

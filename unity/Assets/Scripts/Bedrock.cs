@@ -31,7 +31,7 @@ public class Bedrock {
     var unitAdjust = unitsPerNode*(1-MarchingCubes.isoValCutoff);
     var scale = new Vector3(terrain.xSize*TerrainColumn.size + unitAdjust, height, terrain.zSize*TerrainColumn.size + unitAdjust);
     gameObj.transform.localScale = scale;
-    gameObj.transform.localPosition = 0.5f * (new Vector3(terrain.xSize, -height, terrain.zSize));
+    gameObj.transform.localPosition = 0.5f * (new Vector3(terrain.xSize, -(height+2*unitAdjust), terrain.zSize));
     var renderer = gameObj.GetComponent<Renderer>();
   }
 }

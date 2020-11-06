@@ -397,9 +397,19 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     bedrock.regenerateMesh();
   }
 
-  private void regenerateMeshesForNodes(in ICollection<TerrainGridNode> nodes) {
+  private void regenerateMeshes(in ICollection<TerrainColumn> terrainCols) {
+    foreach (var terrainCol in terrainCols) {
+      terrainCol.regenerateMesh();
+    }
+  }
+  private HashSet<TerrainColumn> regenerateMeshes(in ICollection<TerrainGridNode> nodes) {
+    var terrainCols = findAllPotentiallyAffectedTCs(nodes);
+    regenerateMeshes(terrainCols);
+    return terrainCols;
+  }
+
+  private HashSet<TerrainColumn> findAllPotentiallyAffectedTCs(in ICollection<TerrainGridNode> nodes) {
     var terrainCols = new HashSet<TerrainColumn>();
-    
     foreach (var node in nodes) {
       foreach (var tcIndex in node.columnIndices) { terrainCols.Add(terrainColumns[tcIndex]); }
       // We also need to add TerrainColumns associated with any adjacent nodes to avoid seams and other artifacts
@@ -409,10 +419,7 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
         foreach (var tcIndex in neighbourNode.columnIndices) { terrainCols.Add(terrainColumns[tcIndex]); }
       }
     }
-    // Regenerate all the unique TerrainColumns
-    foreach (var terrainCol in terrainCols) {
-      terrainCol.regenerateMesh();
-    }
+    return terrainCols;
   }
 
   private TerrainDebris buildTerrainDebris(in HashSet<TerrainGridNode> nodes) {
@@ -479,6 +486,7 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
 
     // Go through each potential node and cast a ray from the center of that node (in any direction)
     // If the ray intersects with the inside of the debris' mesh then add back the isovalue for that node
+    var closenessEpsilon = 0.5f*halfUnitsPerNode();
     var debrisCollider = debrisGO.GetComponent<Collider>();
     var affectedNodes = new List<TerrainGridNode>();
     for (int x = nodeIdxRange.xStartIdx; x <= nodeIdxRange.xEndIdx; x++) {
@@ -486,7 +494,7 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
         for (int z = nodeIdxRange.zStartIdx; z <= nodeIdxRange.zEndIdx; z++) {
           var node = nodes[x,y,z];
           var nodeWSPos = node.position + transform.position;
-          if (debrisCollider.IsPointInside(nodeWSPos)) {
+          if (debrisCollider.IsPointInside(nodeWSPos, closenessEpsilon)) {
             node.isoVal = 1;
             affectedNodes.Add(node);
           }
@@ -494,7 +502,7 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
       }
     }
     // Regenerate the new meshes which will incorporate the debris into the terrain and destroy the debris
-    regenerateMeshesForNodes(affectedNodes);
+    regenerateMeshes(affectedNodes);
     Destroy(debrisGO);
   }
 
@@ -506,7 +514,7 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
 
     TerrainNodeTraverser.updateGroundedNodes(this, affectedTCs);
     var islands = TerrainNodeTraverser.traverseNodeIslands(this);
-    var resultTCs = new HashSet<TerrainColumn>();
+    var resultTCs = new HashSet<TerrainColumn>(affectedTCs);
     foreach (var islandNodeSet in islands) {
       // Build debris for each island
       var debris = buildTerrainDebris(islandNodeSet);
@@ -516,6 +524,7 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
         node.isoVal = 0;
       }
     }
+    regenerateMeshes(resultTCs);
 
     return resultTCs;
   }
@@ -527,11 +536,13 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
       node.isoVal = Mathf.Clamp(node.isoVal + isoVal, 0, 1);
       if (node.isoVal != prevIsoVal) { changedNodes.Add(node); }
     }
-    // Only regenerate the necessary TerrainColumns for the changed nodes
-    regenerateMeshesForNodes(changedNodes);
 
-    // Only edit the actual terrain if we're not in play mode
-    if (!Application.IsPlaying(gameObject)) {
+    
+
+    #if UNITY_EDITOR
+    var appIsPlaying = Application.IsPlaying(gameObject);
+    if (!appIsPlaying) {
+      var affectedTCs = regenerateMeshes(changedNodes);
       foreach (var node in changedNodes) {
         var gridIdx = node.gridIndex;
         var flatIdx = LevelData.node3DIndexToFlatIndex(gridIdx.x, gridIdx.y, gridIdx.z, numNodesX(), numNodesY());
@@ -540,6 +551,42 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
       EditorUtility.SetDirty(levelData);
       AssetDatabase.SaveAssets();
     }
+    else 
+    #endif
+    {
+      var affectedTCs = findAllPotentiallyAffectedTCs(changedNodes);
+      terrainPhysicsCleanup(affectedTCs);
+    }
+
+    /*
+
+    var changedTCs = findAllPotentiallyAffectedTCs(changedNodes);
+
+    #if UNITY_EDITOR
+    var appIsPlaying = Application.IsPlaying(gameObject);
+    if (appIsPlaying) {
+      // In play mode we do terrain physics traversal to make sure parts of the terrain fall off when they get detached
+      terrainPhysicsCleanup(changedTCs);
+    }
+    else {
+      // Only regenerate the necessary TerrainColumns for the changed nodes
+      regenerateMeshes(changedTCs);
+    }
+    // Only edit the actual terrain if we're not in play mode
+    if (!appIsPlaying) {
+      foreach (var node in changedNodes) {
+        var gridIdx = node.gridIndex;
+        var flatIdx = LevelData.node3DIndexToFlatIndex(gridIdx.x, gridIdx.y, gridIdx.z, numNodesX(), numNodesY());
+        levelData.nodes[flatIdx].isoVal = node.isoVal;
+      }
+      EditorUtility.SetDirty(levelData);
+      AssetDatabase.SaveAssets();
+    }
+
+    #else
+      terrainPhysicsCleanup(changedTCs);
+    #endif
+    */
 
     // This is incredibly slow... not sure why.
     /*
