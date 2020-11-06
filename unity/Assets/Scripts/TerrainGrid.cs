@@ -19,10 +19,11 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
   private Dictionary<Vector3Int, TerrainColumn> terrainColumns;
   private Bedrock bedrock;
 
-  public int numNodesX() { return (int)(xSize*TerrainColumn.size*TerrainGrid.nodesPerUnit)+1-xSize; }
-  public int numNodesY() { return (int)(ySize*TerrainColumn.size*TerrainGrid.nodesPerUnit)+1-ySize; }
-  public int numNodesZ() { return (int)(zSize*TerrainColumn.size*TerrainGrid.nodesPerUnit)+1-zSize; }
+  public int numNodesX() { return LevelData.sizeToNumNodes(xSize); }
+  public int numNodesY() { return LevelData.sizeToNumNodes(ySize); }
+  public int numNodesZ() { return LevelData.sizeToNumNodes(zSize); }
   public int numNodes()  { return numNodesX()*numNodesY()*numNodesZ(); }
+
 
   public float unitsPerNode() { return (((float)TerrainColumn.size) / ((float)TerrainGrid.nodesPerUnit-1)); }
   public float halfUnitsPerNode() { return (0.5f * unitsPerNode()); }
@@ -217,10 +218,15 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
   }
 
   private void loadLevelDataNodes() {
-    if (levelData != null) {
-      nodes = levelData.getNodesAs3DArray(numNodesX(), numNodesY(), numNodesZ());
-      generateNodes();
+    if (levelData == null) {
+      levelData = ScriptableObjectUtility.LoadOrCreateAssetFromPath<LevelData>(LevelData.emptyLevelAssetPath);
     }
+    // When we load the nodes we are only loading their index and isovalue, the rest of
+    // the information inside each node needs to be rebuilt (this is done in generateNodes).
+    var newNodes = levelData.getNodesAs3DArray(numNodesX(), numNodesY(), numNodesZ());
+    if (newNodes != null) { nodes = newNodes; }
+    generateNodes();
+
   }
   public void OnBeforeSerialize() {
     if (levelData != null) {
@@ -321,8 +327,11 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
           TerrainGridNode currNode = null;
           if (nodes != null && x < nodes.GetLength(0) && y < nodes.GetLength(1) && z < nodes.GetLength(2)) {
             currNode = nodes[x,y,z];
-            currNode.position = unitPos;
-            currNode.gridIndex = gridIdx;
+            if (currNode == null) { currNode = new TerrainGridNode(unitPos, gridIdx, 0.0f); }
+            else {
+              currNode.position = unitPos;
+              currNode.gridIndex = gridIdx;
+            }
           }
           else {
             currNode = new TerrainGridNode(unitPos, gridIdx, 0.0f);
