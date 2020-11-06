@@ -218,15 +218,18 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
   }
 
   private void loadLevelDataNodes() {
-    if (levelData == null) {
-      levelData = ScriptableObjectUtility.LoadOrCreateAssetFromPath<LevelData>(LevelData.emptyLevelAssetPath);
-    }
-    // When we load the nodes we are only loading their index and isovalue, the rest of
-    // the information inside each node needs to be rebuilt (this is done in generateNodes).
-    var newNodes = levelData.getNodesAs3DArray(numNodesX(), numNodesY(), numNodesZ());
-    if (newNodes != null) { nodes = newNodes; }
-    generateNodes();
+    // Uncommenting this can wipe the entire levelData object... not great.
+    //if (levelData == null) {
+    //  levelData = ScriptableObjectUtility.LoadOrCreateAssetFromPath<LevelData>(LevelData.emptyLevelAssetPath);
+    //}
 
+    if (levelData != null) {
+      // When we load the nodes we are only loading their index and isovalue, the rest of
+      // the information inside each node needs to be rebuilt (this is done in generateNodes).
+      var newNodes = levelData.getNodesAs3DArray(numNodesX(), numNodesY(), numNodesZ());
+      if (newNodes != null) { nodes = newNodes; }
+      generateNodes();
+    }
   }
   public void OnBeforeSerialize() {
     if (levelData != null) {
@@ -517,6 +520,43 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     return resultTCs;
   }
 
+  public void addIsoValuesToNodes(float isoVal, in List<TerrainGridNode> nodes) {
+    var changedNodes = new HashSet<TerrainGridNode>();
+    foreach (var node in nodes) {
+      var prevIsoVal = node.isoVal;
+      node.isoVal = Mathf.Clamp(node.isoVal + isoVal, 0, 1);
+      if (node.isoVal != prevIsoVal) { changedNodes.Add(node); }
+    }
+    // Only regenerate the necessary TerrainColumns for the changed nodes
+    regenerateMeshesForNodes(changedNodes);
+
+    // Only edit the actual terrain if we're not in play mode
+    if (!Application.IsPlaying(gameObject)) {
+      foreach (var node in changedNodes) {
+        var gridIdx = node.gridIndex;
+        var flatIdx = LevelData.node3DIndexToFlatIndex(gridIdx.x, gridIdx.y, gridIdx.z, numNodesX(), numNodesY());
+        levelData.nodes[flatIdx].isoVal = node.isoVal;
+      }
+      EditorUtility.SetDirty(levelData);
+      AssetDatabase.SaveAssets();
+    }
+
+    // This is incredibly slow... not sure why.
+    /*
+    // Update the serialized version of the terrain
+    var serializedObj = new SerializedObject(levelData);
+    serializedObj.Update();
+    var nodesProp = serializedObj.FindProperty("nodes");
+    foreach (var node in changedNodes) {
+      var gridIdx = node.gridIndex;
+      var flatIdx = LevelData.node3DIndexToFlatIndex(gridIdx.x, gridIdx.y, gridIdx.z, numNodesX(), numNodesY());
+      var isoValProp = nodesProp.GetArrayElementAtIndex(flatIdx).FindPropertyRelative("isoVal");
+      isoValProp.floatValue = node.isoVal;
+    }
+    serializedObj.ApplyModifiedProperties();
+    */
+  }
+
   // Editor-Only Stuff ----------------------------------------------
   #if UNITY_EDITOR
 
@@ -542,44 +582,9 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     );
   }
 
-  public void addIsoValuesToNodes(float isoVal, in List<TerrainGridNode> nodes) {
-    var changedNodes = new HashSet<TerrainGridNode>();
-    foreach (var node in nodes) {
-      var prevIsoVal = node.isoVal;
-      node.isoVal = Mathf.Clamp(node.isoVal + isoVal, 0, 1);
-      if (node.isoVal != prevIsoVal) { changedNodes.Add(node); }
-    }
-    // Only regenerate the necessary TerrainColumns for the changed nodes
-    regenerateMeshesForNodes(changedNodes);
-
-    foreach (var node in changedNodes) {
-      var gridIdx = node.gridIndex;
-      var flatIdx = LevelData.node3DIndexToFlatIndex(gridIdx.x, gridIdx.y, gridIdx.z, numNodesX(), numNodesY());
-      levelData.nodes[flatIdx].isoVal = node.isoVal;
-    }
-    EditorUtility.SetDirty(levelData);
-    AssetDatabase.SaveAssets();
-
-    
-    // This is incredibly slow.
-    /*
-    // Update the serialized version of the terrain
-    var serializedObj = new SerializedObject(levelData);
-    serializedObj.Update();
-    var nodesProp = serializedObj.FindProperty("nodes");
-    foreach (var node in changedNodes) {
-      var gridIdx = node.gridIndex;
-      var flatIdx = LevelData.node3DIndexToFlatIndex(gridIdx.x, gridIdx.y, gridIdx.z, numNodesX(), numNodesY());
-      var isoValProp = nodesProp.GetArrayElementAtIndex(flatIdx).FindPropertyRelative("isoVal");
-      isoValProp.floatValue = node.isoVal;
-    }
-    serializedObj.ApplyModifiedProperties();
-    */
-  }
-
   // Intersect the given ray with this grid, returns the closest relevant edit point
   // when there's a collision (on return true). Returns false on no collision.
-  public bool intersectEditorRay(in Ray ray, out Vector3 editPt) {
+  public bool intersectEditorRay(in Ray ray, float yOffset, out Vector3 editPt) {
     editPt = new Vector3(0,0,0);
 
     if (nodes == null) { return false; }
@@ -697,20 +702,7 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     var nodeCenter = new Vector3((nodeSize*currVoxelIdx.x),(nodeSize*currVoxelIdx.y),(nodeSize*currVoxelIdx.z));
     nodeCenter += transform.position; // Back to worldspace
     editPt = nodeCenter;
-    /*
-    // Find where the ray intersects with the given node
-    var nodeBounds = new Bounds(nodeCenter, 
-      new Vector3(nodeSize + 1e-6f, nodeSize + 1e-6f, nodeSize + 1e-6f)
-    );
-    float dist = 0;
-    if (nodeBounds.IntersectRay(ray, out dist)) {
-      editPt = ray.GetPoint(dist);
-    }
-    else {
-      //Debug.Log("Couldn't intersect ray with final node. This shouldn't happen.");
-      editPt = nodeCenter;
-    }
-    */
+    editPt.y += yOffset;
 
     return true;
   }

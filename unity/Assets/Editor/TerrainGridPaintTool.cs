@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using UnityEditor;
 using UnityEditor.EditorTools;
+using UnityEditorInternal;
 using UnityEngine;
 
 [EditorTool("Terrain Grid Painter", typeof(TerrainGrid))]
@@ -23,17 +24,26 @@ public class TerrainGridTool : EditorTool {
   private int mouseDownButton = NO_MOUSE_BUTTON;
   private bool editPtActive = false;
   private Vector3 lastEditPt = new Vector3();
+  private TerrainGridToolWindow settingsWindow;
+
+  void Awake() {
+    settingsWindow = EditorWindow.GetWindow<TerrainGridToolWindow>();
+  }
 
   public override void OnToolGUI(EditorWindow window) {
+    var terrainGrid = target as TerrainGrid;
+    if (!InternalEditorUtility.isApplicationActive || terrainGrid == null) { 
+      editPtActive = false;
+      return;
+    }
+
     // Take control of the mouse so that we can properly paint - this MUST be called first!
     HandleUtility.AddDefaultControl(GUIUtility.GetControlID(FocusType.Passive));
 
-    var terrainGrid = target as TerrainGrid;
-    if (terrainGrid == null) { editPtActive = false; return; }
-
     var e = Event.current;
     var wsRay = HandleUtility.GUIPointToWorldRay(e.mousePosition);
-    if (terrainGrid.intersectEditorRay(wsRay, out lastEditPt)) {
+    var yOffset = settingsWindow.paintMode == TGTWSettings.PaintMode.Floating ? 0.5f*settingsWindow.brushSize : 0;
+    if (terrainGrid.intersectEditorRay(wsRay, yOffset, out lastEditPt)) {
       editPtActive = true;
     }
     else {
@@ -45,7 +55,6 @@ public class TerrainGridTool : EditorTool {
         mouseDownButton = e.button;
         
         // Grab all the nodes inside the brush
-        var settingsWindow = EditorWindow.GetWindow<TerrainGridToolWindow>();
         List<TerrainGridNode> nodes = settingsWindow.getAffectedNodesAtPoint(lastEditPt, terrainGrid);
         if (nodes == null) { return; }
 
@@ -86,6 +95,8 @@ public class TerrainGridTool : EditorTool {
   }
 
   void onSceneGUI(SceneView sceneView) {
+    if (!InternalEditorUtility.isApplicationActive) { return; }
+
     var terrainGrid = target as TerrainGrid;
     if (!target) { return; }
 

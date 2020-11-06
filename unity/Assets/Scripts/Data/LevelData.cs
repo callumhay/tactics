@@ -40,14 +40,7 @@ public class LevelData : ScriptableObject {
     var numNodesY = _nodes.GetLength(1);
     var numNodesZ = _nodes.GetLength(2);
 
-    //var givenXSize = numNodesToSize(numNodesX);
-    //var givenYSize = numNodesToSize(numNodesY);
-    //var givenZSize = numNodesToSize(numNodesZ);
-    //if (xSize != givenXSize || ySize != givenYSize || zSize != givenZSize) {
-    //  if (xSize != givenXSize) { oldXSize = xSize; xSize = givenXSize; }
-    //  if (ySize != givenYSize) { oldYSize = ySize; ySize = givenYSize; }
-    //  if (zSize != givenZSize) { oldZSize = zSize; zSize = givenZSize; }
-    //}
+    if (numNodesX*numNodesY*numNodesZ != nodes.GetLength(0)) { return; }
 
     nodes = new TerrainGridNode[numNodesX*numNodesY*numNodesZ];
     for (int x = 0; x < numNodesX; x++) {
