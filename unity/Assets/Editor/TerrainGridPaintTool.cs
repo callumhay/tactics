@@ -45,6 +45,7 @@ public class TerrainGridTool : EditorTool {
         mouseDownButton = e.button;
         
         //EditorGUI.BeginChangeCheck();
+
         // Grab all the nodes inside the brush
         var settingsWindow = EditorWindow.GetWindow<TerrainGridToolWindow>();
         List<TerrainGridNode> nodes = settingsWindow.getAffectedNodesAtPoint(lastEditPt, terrainGrid);
@@ -63,8 +64,9 @@ public class TerrainGridTool : EditorTool {
           default: // Ignore
             break;
         }
+
         //if (EditorGUI.EndChangeCheck()) {
-        //  Undo.RecordObject(target, "Painting/Erasing Nodes");
+        //  EditorUtility.SetDirty(terrainGrid);
         //}
       }
       else {
@@ -91,6 +93,7 @@ public class TerrainGridTool : EditorTool {
       if (!settingsWindow) { return; }
 
       var rot = new Quaternion(0,0,0,1);
+      /*
       if (settingsWindow.paintMode == TGTWSettings.PaintMode.Floating) {
         // Draw the brush shape
         Handles.color = new Color(0.0f, 0.8f, 1.0f, 0.25f);
@@ -105,6 +108,7 @@ public class TerrainGridTool : EditorTool {
             return;
         }
       }
+      */
       // Draw all the nodes that the tool is colliding with / affecting
       List<TerrainGridNode> nodes = settingsWindow.getAffectedNodesAtPoint(lastEditPt, terrainGrid);
       if (nodes != null) {

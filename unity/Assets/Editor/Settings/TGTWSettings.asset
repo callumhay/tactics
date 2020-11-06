@@ -14,6 +14,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   brushSize: 2.9
   paintType: 0
-  paintMode: 0
+  paintMode: 1
   brushType: 1
   gridSnaping: 1

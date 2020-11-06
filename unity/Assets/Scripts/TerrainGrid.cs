@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEditor;
 using UnityEngine.Events;
 
 [ExecuteAlways]
@@ -215,33 +216,46 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     return nodes[nodeIdx.x,nodeIdx.y,nodeIdx.z];
   }
 
-  private void initLevelData() {
-    if (levelData == null) {
-      levelData = ScriptableObjectUtility.LoadOrCreateAssetFromPath<LevelData>(LevelData.emptyLevelAssetPath);
-    }
-  }
+  //private void initLevelData() {
+  //  if (levelData == null) {
+  //    Debug.LogWarning("Empty level data, substituting " + LevelData.emptyLevelAssetPath);
+  //    levelData = ScriptableObjectUtility.LoadOrCreateAssetFromPath<LevelData>(LevelData.emptyLevelAssetPath);
+  //  }
+  //}
+
   public void OnBeforeSerialize() {
-    initLevelData();
-    if (Application.IsPlaying(gameObject)) {
+    if (levelData != null) {
       levelData.setNodesFrom3DArray(nodes);
-    }
-    else {
-      levelData.Update();
     }
   }
   public void OnAfterDeserialize() {
-    initLevelData();
-    nodes = levelData.getNodesAs3DArray(numNodesX(), numNodesY(), numNodesZ());
-    if (nodes == null) { 
-      generateNodes();
+    if (levelData != null) {
+      nodes = levelData.getNodesAs3DArray(numNodesX(), numNodesY(), numNodesZ());
     }
   }
 
   public void Awake() {
     if (Application.IsPlaying(gameObject)) {
+      // Important! We must instantiate the level data in game mode or else
+      // we'll overwrite the asset while the game plays
+      levelData = Instantiate<LevelData>(levelData);
+      nodes = levelData.getNodesAs3DArray(numNodesX(), numNodesY(), numNodesZ());
+      
+      // Build all the assets for the game that aren't stored in the level data
       buildBedrock();
       buildTerrainColumns();
       terrainPhysicsCleanup();
+    }
+    else {
+      if (levelData != null) {
+        nodes = levelData.getNodesAs3DArray(numNodesX(), numNodesY(), numNodesZ());
+        if (nodes == null) { 
+          generateNodes();
+        }
+        buildBedrock();
+        buildTerrainColumns();
+      }
+      // No terrainPhysicsCleanup in editor
     }
   }
 
@@ -256,10 +270,9 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     }
     #if UNITY_EDITOR
     else {
-      generateNodes();
-      buildBedrock();
-      buildTerrainColumns();
-      regenerateMeshes();
+      //buildBedrock();
+      //buildTerrainColumns();
+      //regenerateMeshes();
     }
     #endif
   }
@@ -507,21 +520,23 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
   private static float editorAlpha = 0.5f;
 
   void OnValidate() {
-    //initLevelData();
     Invoke("delayedOnValidate", 0);
   }
   void delayedOnValidate() {
-    generateNodes();
-    buildBedrock();
-    buildTerrainColumns();
-    regenerateMeshes();
+    if (levelData != null) { 
+      if (nodes == null) { generateNodes(); }
+      buildBedrock();
+      buildTerrainColumns();
+      regenerateMeshes();
+    }
   }
 
   void OnDrawGizmos() {
     if (nodes == null || Application.IsPlaying(gameObject)) { return; }
     Gizmos.color = new Color(1,1,1,editorAlpha);
-    Gizmos.DrawWireCube(transform.position + new Vector3(((float)xSize)/2,((float)ySize)/2,((float)zSize)/2), new Vector3(xSize,ySize,zSize));
-    //Gizmos.DrawWireMesh(gizmoMesh, 0, transform.position);
+    Gizmos.DrawWireCube(transform.position + 
+      new Vector3(((float)xSize)/2,((float)ySize)/2,((float)zSize)/2), new Vector3(xSize,ySize,zSize)
+    );
   }
 
   public void addIsoValuesToNodes(float isoVal, in List<TerrainGridNode> nodes) {
@@ -533,6 +548,30 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     }
     // Only regenerate the necessary TerrainColumns for the changed nodes
     regenerateMeshesForNodes(changedNodes);
+
+    foreach (var node in changedNodes) {
+      var gridIdx = node.gridIndex;
+      var flatIdx = LevelData.node3DIndexToFlatIndex(gridIdx.x, gridIdx.y, gridIdx.z, numNodesX(), numNodesY());
+      levelData.nodes[flatIdx].isoVal = node.isoVal;
+    }
+    EditorUtility.SetDirty(levelData);
+    AssetDatabase.SaveAssets();
+    
+
+    /*
+    // Update the serialized version of the terrain
+    var serializedObj = new SerializedObject(levelData);
+    serializedObj.Update();
+    var nodesProp = serializedObj.FindProperty("nodes");
+    foreach (var node in changedNodes) {
+      var gridIdx = node.gridIndex;
+      var flatIdx = LevelData.node3DIndexToFlatIndex(gridIdx.x, gridIdx.y, gridIdx.z, numNodesX(), numNodesY());
+      var isoValProp = nodesProp.GetArrayElementAtIndex(flatIdx).FindPropertyRelative("isoVal");
+      isoValProp.floatValue = node.isoVal;
+
+    }
+    serializedObj.ApplyModifiedProperties();
+    */
   }
 
   // Intersect the given ray with this grid, returns the closest relevant edit point

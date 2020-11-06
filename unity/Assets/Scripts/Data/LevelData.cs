@@ -1,14 +1,20 @@
 ﻿using System.Collections.Generic;
 using UnityEngine;
+using UnityEditor;
 
+[PreferBinarySerialization]
 [CreateAssetMenu(fileName="New Level", menuName="Tactics/LevelData")]
 public class LevelData : ScriptableObject {
-  public static string emptyLevelAssetPath = "Assets/Levels/Empty Level.asset";
+  public static string emptyLevelAssetPath = "Assets/Resources/Levels/Empty Level.asset";
 
   public string levelName;
   [Range(1,32)]
   public int xSize = 10, ySize = 10, zSize = 10; // Size in units (not nodes!) of the level
   public TerrainGridNode[] nodes;
+
+  public static int node3DIndexToFlatIndex(int x, int y, int z, int numNodesX, int numNodesY) {
+    return z + (y*numNodesX) + (x*numNodesX*numNodesY);
+  }
 
   public void setNodesFrom3DArray(in TerrainGridNode[,,] _nodes) {
     if (_nodes == null) { return; }
@@ -21,7 +27,7 @@ public class LevelData : ScriptableObject {
     for (int x = 0; x < numNodesX; x++) {
       for (int y = 0; y < numNodesY; y++) {
         for (int z = 0; z < numNodesZ; z++) {
-          nodes[z + (y*numNodesX) + (x*numNodesX*numNodesY)] = _nodes[x,y,z];
+          nodes[node3DIndexToFlatIndex(x,y,z,numNodesX,numNodesY)] = _nodes[x,y,z];
         }
       }
     }
@@ -40,7 +46,7 @@ public class LevelData : ScriptableObject {
       for (int x = 0; x < numNodesX; x++) {
         for (int y = 0; y < numNodesY; y++) {
           for (int z = 0; z < numNodesZ; z++) {
-            var idx = z + (y*numNodesX) + (x*numNodesX*numNodesY);
+            var idx = node3DIndexToFlatIndex(x,y,z,numNodesX,numNodesY);
             result[x,y,z] = nodes[idx];
           }
         }
