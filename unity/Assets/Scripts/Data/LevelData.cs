@@ -12,6 +12,14 @@ public class LevelData : ScriptableObject {
   public int xSize = 10, ySize = 10, zSize = 10; // Size in units (not nodes!) of the level
   public TerrainGridNode[] nodes;
 
+  private void OnValidate() {
+    var terrainGrid = FindObjectOfType<TerrainGrid>();
+    if (terrainGrid != null) {
+      terrainGrid.OnValidate();
+    }
+  }
+
+
   public static int node3DIndexToFlatIndex(int x, int y, int z, int numNodesX, int numNodesY) {
     return z + (y*numNodesX) + (x*numNodesX*numNodesY);
   }

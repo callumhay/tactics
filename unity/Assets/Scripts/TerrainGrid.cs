@@ -216,48 +216,22 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     return nodes[nodeIdx.x,nodeIdx.y,nodeIdx.z];
   }
 
-  //private void initLevelData() {
-  //  if (levelData == null) {
-  //    Debug.LogWarning("Empty level data, substituting " + LevelData.emptyLevelAssetPath);
-  //    levelData = ScriptableObjectUtility.LoadOrCreateAssetFromPath<LevelData>(LevelData.emptyLevelAssetPath);
-  //  }
-  //}
-
+  private void loadLevelDataNodes() {
+    if (levelData != null) {
+      nodes = levelData.getNodesAs3DArray(numNodesX(), numNodesY(), numNodesZ());
+      generateNodes();
+    }
+  }
   public void OnBeforeSerialize() {
     if (levelData != null) {
       levelData.setNodesFrom3DArray(nodes);
     }
   }
   public void OnAfterDeserialize() {
-    if (levelData != null) {
-      nodes = levelData.getNodesAs3DArray(numNodesX(), numNodesY(), numNodesZ());
-    }
+    loadLevelDataNodes();
   }
 
-  public void Awake() {
-    if (Application.IsPlaying(gameObject)) {
-      // Important! We must instantiate the level data in game mode or else
-      // we'll overwrite the asset while the game plays
-      levelData = Instantiate<LevelData>(levelData);
-      nodes = levelData.getNodesAs3DArray(numNodesX(), numNodesY(), numNodesZ());
-      
-      // Build all the assets for the game that aren't stored in the level data
-      buildBedrock();
-      buildTerrainColumns();
-      terrainPhysicsCleanup();
-    }
-    else {
-      if (levelData != null) {
-        nodes = levelData.getNodesAs3DArray(numNodesX(), numNodesY(), numNodesZ());
-        if (nodes == null) { 
-          generateNodes();
-        }
-        buildBedrock();
-        buildTerrainColumns();
-      }
-      // No terrainPhysicsCleanup in editor
-    }
-  }
+  public void Awake() {}
 
   void Start() {
     if (Application.IsPlaying(gameObject)) {
@@ -267,29 +241,41 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
       onSleepEventListener.unityEvent.AddListener(mergeDebrisIntoTerrain);
       onSleepEventListener.gameEvent = Resources.Load<GameEvent>("Events/DebrisSleepEvent");
       gameObject.SetActive(true);
+
+      // Important! We must instantiate the level data in game mode or else
+      // we'll overwrite the asset while the game plays
+      levelData = Instantiate<LevelData>(levelData);
+      loadLevelDataNodes();
+      
+      // Build all the assets for the game that aren't stored in the level data
+      buildBedrock();
+      buildTerrainColumns();
+      terrainPhysicsCleanup();
     }
     #if UNITY_EDITOR
     else {
-      //buildBedrock();
-      //buildTerrainColumns();
-      //regenerateMeshes();
+      if (levelData != null) {
+        loadLevelDataNodes();
+        buildBedrock();
+        buildTerrainColumns();
+        // No terrainPhysicsCleanup in editor!
+      }
     }
     #endif
   }
 
+  /// <summary>
+  /// Generates and fills data in for the non-serialized node data based on the serialized data (array of isovalues) alone.
+  /// This method is meant to be as robust as possible so it can properly initialize the runtime node array in almost any state.
+  /// </summary>
   private void generateNodes() {
     var numNodesX = this.numNodesX();
     var numNodesY = this.numNodesY();
     var numNodesZ = this.numNodesZ();
 
-    // Don't rebuild if we already have an array that's suitable!
-    if (nodes != null && nodes.GetLength(0) == numNodesX && 
-        nodes.GetLength(1) == numNodesY && nodes.GetLength(2) == numNodesZ) {
-      return;
-    }
-
     // We use a temporary array to preserve any existing nodes that are still in the grid
-    var tempNodes = new TerrainGridNode[numNodesX,numNodesY,numNodesZ];
+    TerrainGridNode[,,] tempNodes = new TerrainGridNode[numNodesX,numNodesY,numNodesZ];
+
     var tcXIndices = new List<int>();
     var tcZIndices = new List<int>();
     var tcIndices = new List<Vector3Int>();
@@ -329,20 +315,28 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
 
         for (int y = 0; y < numNodesY; y++) {
           var yPos = nodeIndexToUnits(y);
-        
+          var unitPos = new Vector3(xPos, yPos, zPos);
+          var gridIdx = new Vector3Int(x,y,z);
+
+          TerrainGridNode currNode = null;
           if (nodes != null && x < nodes.GetLength(0) && y < nodes.GetLength(1) && z < nodes.GetLength(2)) {
-            tempNodes[x,y,z] = nodes[x,y,z];
+            currNode = nodes[x,y,z];
+            currNode.position = unitPos;
+            currNode.gridIndex = gridIdx;
           }
           else {
-            var unitPos = new Vector3(xPos, yPos, zPos);
-            var gridIdx = new Vector3Int(x,y,z);
-            var node = new TerrainGridNode(unitPos, gridIdx, 0.0f);
-            // A grid node can have multiple associated TerrainColumns since they share nodes at the edges
-            foreach (var tcIndex in tcIndices) {
-              node.columnIndices.Add(tcIndex);
-            } 
-            tempNodes[x,y,z] = node;
+            currNode = new TerrainGridNode(unitPos, gridIdx, 0.0f);
           }
+
+          // A grid node can have multiple associated TerrainColumns since they share nodes at the edges
+          if (currNode.columnIndices == null) { currNode.columnIndices = new List<Vector3Int>(); }
+          else { currNode.columnIndices.Clear(); }
+          
+          foreach (var tcIndex in tcIndices) {
+            currNode.columnIndices.Add(tcIndex);
+          } 
+
+          tempNodes[x,y,z] = currNode;
         }
       }
     }
@@ -378,7 +372,7 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     }
   }
 
-  private void buildBedrock() { 
+  private void buildBedrock() {
     bedrock = new Bedrock(this); 
     bedrock.gameObj.transform.SetParent(transform); 
     bedrock.gameObj.transform.SetAsFirstSibling();
@@ -519,12 +513,12 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
 
   private static float editorAlpha = 0.5f;
 
-  void OnValidate() {
+  public void OnValidate() {
     Invoke("delayedOnValidate", 0);
   }
   void delayedOnValidate() {
-    if (levelData != null) { 
-      if (nodes == null) { generateNodes(); }
+    if (levelData != null) {
+      loadLevelDataNodes();
       buildBedrock();
       buildTerrainColumns();
       regenerateMeshes();
@@ -532,7 +526,7 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
   }
 
   void OnDrawGizmos() {
-    if (nodes == null || Application.IsPlaying(gameObject)) { return; }
+    if (Application.IsPlaying(gameObject)) { return; }
     Gizmos.color = new Color(1,1,1,editorAlpha);
     Gizmos.DrawWireCube(transform.position + 
       new Vector3(((float)xSize)/2,((float)ySize)/2,((float)zSize)/2), new Vector3(xSize,ySize,zSize)
@@ -556,8 +550,9 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     }
     EditorUtility.SetDirty(levelData);
     AssetDatabase.SaveAssets();
-    
 
+    
+    // This is incredibly slow.
     /*
     // Update the serialized version of the terrain
     var serializedObj = new SerializedObject(levelData);
@@ -568,7 +563,6 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
       var flatIdx = LevelData.node3DIndexToFlatIndex(gridIdx.x, gridIdx.y, gridIdx.z, numNodesX(), numNodesY());
       var isoValProp = nodesProp.GetArrayElementAtIndex(flatIdx).FindPropertyRelative("isoVal");
       isoValProp.floatValue = node.isoVal;
-
     }
     serializedObj.ApplyModifiedProperties();
     */

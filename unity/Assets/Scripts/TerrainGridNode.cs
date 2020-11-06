@@ -4,10 +4,15 @@ using UnityEngine;
 
 [Serializable]
 public class TerrainGridNode {
+
+  [NonSerialized]
   public Vector3 position;
+  [NonSerialized]
   public Vector3Int gridIndex;
+  [NonSerialized]
   public List<Vector3Int> columnIndices = new List<Vector3Int>();
-  public float isoVal;
+
+  public float isoVal = 0f;
 
   private bool _isTraversalGrounded = false; // Used during terrain traversal to flag whether this is grounded or not
   public bool isTraversalGrounded {

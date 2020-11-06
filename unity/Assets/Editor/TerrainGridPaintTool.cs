@@ -44,30 +44,31 @@ public class TerrainGridTool : EditorTool {
       if (e.type == EventType.MouseDown && e.modifiers == EventModifiers.None) {
         mouseDownButton = e.button;
         
-        //EditorGUI.BeginChangeCheck();
-
         // Grab all the nodes inside the brush
         var settingsWindow = EditorWindow.GetWindow<TerrainGridToolWindow>();
         List<TerrainGridNode> nodes = settingsWindow.getAffectedNodesAtPoint(lastEditPt, terrainGrid);
         if (nodes == null) { return; }
-        switch (mouseDownButton) {
-          case 0: // Left Click: Paint
-            settingsWindow.paintNodes(nodes, terrainGrid);
-            break;
 
-          case 1: // Right Click: Erase
-            settingsWindow.eraseNodes(nodes, terrainGrid);
-            break;
-
-          case 2: // Middle Click
-            break;
-          default: // Ignore
-            break;
+        EditorGUI.BeginChangeCheck();
+        if (mouseDownButton == 0 || mouseDownButton == 1) {
+          GUI.changed = true;
         }
-
-        //if (EditorGUI.EndChangeCheck()) {
-        //  EditorUtility.SetDirty(terrainGrid);
-        //}
+        if (EditorGUI.EndChangeCheck()) {
+          //Undo.RegisterCompleteObjectUndo(terrainGrid, "Terrain Grid Nodes Edited"); // Not working... no idea why.
+          
+          switch (mouseDownButton) {
+            case 0: // Left Click: Paint
+              settingsWindow.paintNodes(nodes, terrainGrid);
+              break;
+            case 1: // Right Click: Erase
+              settingsWindow.eraseNodes(nodes, terrainGrid);
+              break;
+            case 2: // Middle Click
+              break;
+            default: // Ignore
+              break;
+          }
+        }
       }
       else {
         mouseDownButton = NO_MOUSE_BUTTON;
@@ -109,6 +110,8 @@ public class TerrainGridTool : EditorTool {
         }
       }
       */
+
+
       // Draw all the nodes that the tool is colliding with / affecting
       List<TerrainGridNode> nodes = settingsWindow.getAffectedNodesAtPoint(lastEditPt, terrainGrid);
       if (nodes != null) {
@@ -118,9 +121,8 @@ public class TerrainGridTool : EditorTool {
           Handles.color = currColour;
           Handles.CubeHandleCap(GUIUtility.GetControlID(FocusType.Passive), node.position, rot, terrainGrid.halfUnitsPerNode(), EventType.Repaint);
         }
+        if (nodes.Count > 0) { sceneView.Repaint(); }
       }
-
-      sceneView.Repaint();
     }
     
   }
