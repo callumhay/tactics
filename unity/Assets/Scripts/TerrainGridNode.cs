@@ -13,6 +13,7 @@ public class TerrainGridNode {
   public List<Vector3Int> columnIndices = new List<Vector3Int>();
 
   public float isoVal = 0f;
+  public Material material;
 
   private bool _isTraversalGrounded = false; // Used during terrain traversal to flag whether this is grounded or not
   public bool isTraversalGrounded {

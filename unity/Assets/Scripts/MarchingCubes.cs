@@ -6,6 +6,13 @@ public class CubeCorner {
   public static int numCorners = 8;
   public Vector3 position;
   public float isoVal;
+  public Material material;
+
+  public void setFromNode(in TerrainGridNode node, in Vector3 translation) {
+    position = node.position + translation;
+    isoVal = node.isoVal;
+    material = node.material;
+  }
 }
 
 public class MarchingCubes {
@@ -17,8 +24,16 @@ public class MarchingCubes {
     new Vector3Int(1, 1, 1), new Vector3Int(0, 1, 1)
   };
 
+  /// <summary>
+  /// Given an array of corners this will perform the Marching Cubes algorithm and turn those corners into
+  /// geometry/mesh data that will be appended to the given referenced lists.
+  /// </summary>
+  /// <param name="corners">The corners that will be marched.</param>
+  /// <param name="materials">The materials appended to, corresponding to each index.</param>
+  /// <param name="triangles">The triangles appended to, representing triangles (indices in the vertices list).</param>
+  /// <param name="vertices">The vertices appended to, represents the generated vertexes of the mesh.</param>
   public static void polygonize(
-    in CubeCorner[] corners, ref List<int> triangles, ref List<Vector3> vertices
+    in CubeCorner[] corners, ref List<Material> materials, ref List<int> triangles, ref List<Vector3> vertices
   ) {
 
     // Determine the index into the edge table which tells us which vertices are inside of the surface
@@ -28,17 +43,19 @@ public class MarchingCubes {
     if (edgeLookup == 0) { return; } // Early out: Cube is entirely in/out of the surface
     
     // Find the vertices where the surface intersects the cube
-    var cubeVertices = calcEdgeLookupVertices(corners, edgeLookup);
+    (var cubeVertices, var cubeMaterials) = calcEdgeLookupVertices(corners, edgeLookup);
     var triLookup = triTable[cubeindex];
     
     // Build the triangles
     for (var i = 0; triLookup[i] != -1; i += 3) {
-      var a = cubeVertices[triLookup[i]]; 
-      var b = cubeVertices[triLookup[i+1]];
-      var c = cubeVertices[triLookup[i+2]];
+      var i1 = triLookup[i]; var i2 = triLookup[i+1]; var i3 = triLookup[i+2];
+      var vertA = cubeVertices[i1]; var vertB = cubeVertices[i2]; var vertC = cubeVertices[i3];
+      var matA = cubeMaterials[i1]; var matB = cubeMaterials[i2]; var matC = cubeMaterials[i3];
+
       var currLen = vertices.Count();
       triangles.Add(currLen); triangles.Add(currLen+1); triangles.Add(currLen+2); 
-      vertices.Add(a); vertices.Add(b); vertices.Add(c);
+      materials.Add(matA); materials.Add(matB); materials.Add(matC);
+      vertices.Add(vertA); vertices.Add(vertB); vertices.Add(vertC);
     }
   }
 
@@ -78,22 +95,23 @@ public class MarchingCubes {
     return cubeindex;
   }
 
-  private static Vector3[] calcEdgeLookupVertices(in CubeCorner[] corners, int edgeLookup) {
+  private static (Vector3[], Material[]) calcEdgeLookupVertices(in CubeCorner[] corners, int edgeLookup) {
     // Find the vertices where the surface intersects the cube
     Vector3[] vertexList = new Vector3[12];
-    if ((edgeLookup & 1) != 0)    { vertexList[0]  = interpolateVertex(corners, 0, 1); }
-    if ((edgeLookup & 2) != 0)    { vertexList[1]  = interpolateVertex(corners, 1, 2); }
-    if ((edgeLookup & 4) != 0)    { vertexList[2]  = interpolateVertex(corners, 2, 3); }
-    if ((edgeLookup & 8) != 0)    { vertexList[3]  = interpolateVertex(corners, 3, 0); }
-    if ((edgeLookup & 16) != 0)   { vertexList[4]  = interpolateVertex(corners, 4, 5); }
-    if ((edgeLookup & 32) != 0)   { vertexList[5]  = interpolateVertex(corners, 5, 6); }
-    if ((edgeLookup & 64) != 0)   { vertexList[6]  = interpolateVertex(corners, 6, 7); }
-    if ((edgeLookup & 128) != 0)  { vertexList[7]  = interpolateVertex(corners, 7, 4); }
-    if ((edgeLookup & 256) != 0)  { vertexList[8]  = interpolateVertex(corners, 0, 4); }
-    if ((edgeLookup & 512) != 0)  { vertexList[9]  = interpolateVertex(corners, 1, 5); }
-    if ((edgeLookup & 1024) != 0) { vertexList[10] = interpolateVertex(corners, 2, 6); }
-    if ((edgeLookup & 2048) != 0) { vertexList[11] = interpolateVertex(corners, 3, 7); }
-    return vertexList;
+    Material[] materialList = new Material[12];
+    if ((edgeLookup & 1) != 0)    { vertexList[0]  = interpolateVertex(corners, 0, 1); materialList[0]  = corners[0].material ?? corners[1].material; }
+    if ((edgeLookup & 2) != 0)    { vertexList[1]  = interpolateVertex(corners, 1, 2); materialList[1]  = corners[1].material ?? corners[2].material; }
+    if ((edgeLookup & 4) != 0)    { vertexList[2]  = interpolateVertex(corners, 2, 3); materialList[2]  = corners[2].material ?? corners[3].material; }
+    if ((edgeLookup & 8) != 0)    { vertexList[3]  = interpolateVertex(corners, 3, 0); materialList[3]  = corners[3].material ?? corners[0].material; }
+    if ((edgeLookup & 16) != 0)   { vertexList[4]  = interpolateVertex(corners, 4, 5); materialList[4]  = corners[4].material ?? corners[5].material; }
+    if ((edgeLookup & 32) != 0)   { vertexList[5]  = interpolateVertex(corners, 5, 6); materialList[5]  = corners[5].material ?? corners[6].material; }
+    if ((edgeLookup & 64) != 0)   { vertexList[6]  = interpolateVertex(corners, 6, 7); materialList[6]  = corners[6].material ?? corners[7].material; }
+    if ((edgeLookup & 128) != 0)  { vertexList[7]  = interpolateVertex(corners, 7, 4); materialList[7]  = corners[7].material ?? corners[4].material; }
+    if ((edgeLookup & 256) != 0)  { vertexList[8]  = interpolateVertex(corners, 0, 4); materialList[8]  = corners[0].material ?? corners[4].material; }
+    if ((edgeLookup & 512) != 0)  { vertexList[9]  = interpolateVertex(corners, 1, 5); materialList[9]  = corners[1].material ?? corners[5].material; }
+    if ((edgeLookup & 1024) != 0) { vertexList[10] = interpolateVertex(corners, 2, 6); materialList[10] = corners[2].material ?? corners[6].material; }
+    if ((edgeLookup & 2048) != 0) { vertexList[11] = interpolateVertex(corners, 3, 7); materialList[11] = corners[3].material ?? corners[7].material; }
+    return (vertexList, materialList);
   }
   private static int[] edgeTable = new int[]{
     0x0  , 0x109, 0x203, 0x30a, 0x406, 0x50f, 0x605, 0x70c,

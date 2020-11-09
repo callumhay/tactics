@@ -24,7 +24,6 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
   public int numNodesZ() { return LevelData.sizeToNumNodes(zSize); }
   public int numNodes()  { return numNodesX()*numNodesY()*numNodesZ(); }
 
-
   public float unitsPerNode() { return (((float)TerrainColumn.size) / ((float)TerrainGrid.nodesPerUnit-1)); }
   public float halfUnitsPerNode() { return (0.5f * unitsPerNode()); }
   public Vector3 unitsPerNodeVec3() { var u = unitsPerNode(); return new Vector3(u,u,u); }
@@ -402,15 +401,21 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
       terrainCol.regenerateMesh();
     }
   }
-  private HashSet<TerrainColumn> regenerateMeshes(in ICollection<TerrainGridNode> nodes) {
-    var terrainCols = findAllPotentiallyAffectedTCs(nodes);
+  private HashSet<TerrainColumn> regenerateMeshes(in IEnumerable<TerrainGridNode> nodes) {
+    var terrainCols = findAllAffectedTCs(nodes);
     regenerateMeshes(terrainCols);
     return terrainCols;
   }
 
-  private HashSet<TerrainColumn> findAllPotentiallyAffectedTCs(in ICollection<TerrainGridNode> nodes) {
+  /// <summary>
+  /// Obtain all of the unique TerrainColumns that are affected and will need to be regenerated 
+  /// for the changes to the given nodes.
+  /// </summary>
+  /// <param name="changedNodes">Nodes that have changed.</param>
+  /// <returns>Unique set of TerrainColumns that are affected by the changed nodes.</returns>
+  private HashSet<TerrainColumn> findAllAffectedTCs(in IEnumerable<TerrainGridNode> changedNodes) {
     var terrainCols = new HashSet<TerrainColumn>();
-    foreach (var node in nodes) {
+    foreach (var node in changedNodes) {
       foreach (var tcIndex in node.columnIndices) { terrainCols.Add(terrainColumns[tcIndex]); }
       // We also need to add TerrainColumns associated with any adjacent nodes to avoid seams and other artifacts
       // caused by the node/cube dependancies that exist at the edges of each TerrainColumn mesh
@@ -461,9 +466,10 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     }
     // Map each of the nodes isovalues into the corners array
     foreach (var node in nodes) {
-      ref readonly var idx = ref node.gridIndex;
-      ref var corner = ref nodeCorners[idx.x-boxBounds.min.x, idx.y-boxBounds.min.y, idx.z-boxBounds.min.z];
+      var idx = node.gridIndex;
+      var corner = nodeCorners[idx.x-boxBounds.min.x, idx.y-boxBounds.min.y, idx.z-boxBounds.min.z];
       corner.isoVal = node.isoVal;
+      corner.material = node.material;
     }
 
     // TODO: Feed in the material for the debris here as well
@@ -479,6 +485,7 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     // Get the bounding box of the debris in worldspace - we use this as a rough estimate
     // of which nodes we need to iterate through to convert the mesh back into nodes
     var debrisRenderer = debrisGO.GetComponent<Renderer>();
+    var debrisNodeMapper = debrisGO.GetComponent<DebrisNodeMapper>();
     var debrisWSBounds = debrisRenderer.bounds;
 
     // Find the bounds in node index space
@@ -495,7 +502,11 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
           var node = nodes[x,y,z];
           var nodeWSPos = node.position + transform.position;
           if (debrisCollider.IsPointInside(nodeWSPos, closenessEpsilon)) {
+            // Map the world space position into the local space node index of the debris (via DebrisNodeMapper)
+            // use this to determine what the original material was
+            var origCorner = debrisNodeMapper.mapFromWorldspace(nodeWSPos, this);
             node.isoVal = 1;
+            node.material = origCorner.material;
             affectedNodes.Add(node);
           }
         }
@@ -537,71 +548,17 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
       if (node.isoVal != prevIsoVal) { changedNodes.Add(node); }
     }
 
-    
-
     #if UNITY_EDITOR
     var appIsPlaying = Application.IsPlaying(gameObject);
     if (!appIsPlaying) {
-      var affectedTCs = regenerateMeshes(changedNodes);
-      foreach (var node in changedNodes) {
-        var gridIdx = node.gridIndex;
-        var flatIdx = LevelData.node3DIndexToFlatIndex(gridIdx.x, gridIdx.y, gridIdx.z, numNodesX(), numNodesY());
-        levelData.nodes[flatIdx].isoVal = node.isoVal;
-      }
-      EditorUtility.SetDirty(levelData);
-      AssetDatabase.SaveAssets();
+      updateNodesInEditor(changedNodes);
     }
     else 
     #endif
     {
-      var affectedTCs = findAllPotentiallyAffectedTCs(changedNodes);
+      var affectedTCs = findAllAffectedTCs(changedNodes);
       terrainPhysicsCleanup(affectedTCs);
     }
-
-    /*
-
-    var changedTCs = findAllPotentiallyAffectedTCs(changedNodes);
-
-    #if UNITY_EDITOR
-    var appIsPlaying = Application.IsPlaying(gameObject);
-    if (appIsPlaying) {
-      // In play mode we do terrain physics traversal to make sure parts of the terrain fall off when they get detached
-      terrainPhysicsCleanup(changedTCs);
-    }
-    else {
-      // Only regenerate the necessary TerrainColumns for the changed nodes
-      regenerateMeshes(changedTCs);
-    }
-    // Only edit the actual terrain if we're not in play mode
-    if (!appIsPlaying) {
-      foreach (var node in changedNodes) {
-        var gridIdx = node.gridIndex;
-        var flatIdx = LevelData.node3DIndexToFlatIndex(gridIdx.x, gridIdx.y, gridIdx.z, numNodesX(), numNodesY());
-        levelData.nodes[flatIdx].isoVal = node.isoVal;
-      }
-      EditorUtility.SetDirty(levelData);
-      AssetDatabase.SaveAssets();
-    }
-
-    #else
-      terrainPhysicsCleanup(changedTCs);
-    #endif
-    */
-
-    // This is incredibly slow... not sure why.
-    /*
-    // Update the serialized version of the terrain
-    var serializedObj = new SerializedObject(levelData);
-    serializedObj.Update();
-    var nodesProp = serializedObj.FindProperty("nodes");
-    foreach (var node in changedNodes) {
-      var gridIdx = node.gridIndex;
-      var flatIdx = LevelData.node3DIndexToFlatIndex(gridIdx.x, gridIdx.y, gridIdx.z, numNodesX(), numNodesY());
-      var isoValProp = nodesProp.GetArrayElementAtIndex(flatIdx).FindPropertyRelative("isoVal");
-      isoValProp.floatValue = node.isoVal;
-    }
-    serializedObj.ApplyModifiedProperties();
-    */
   }
 
   // Editor-Only Stuff ----------------------------------------------
@@ -627,6 +584,39 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     Gizmos.DrawWireCube(transform.position + 
       new Vector3(((float)xSize)/2,((float)ySize)/2,((float)zSize)/2), new Vector3(xSize,ySize,zSize)
     );
+  }
+
+  public void updateNodesInEditor(in IEnumerable<TerrainGridNode> nodes) {
+    if (Application.IsPlaying(gameObject)) { return; }
+    var affectedTCs = regenerateMeshes(nodes);
+    foreach (var node in nodes) {
+      var gridIdx = node.gridIndex;
+      var flatIdx = LevelData.node3DIndexToFlatIndex(gridIdx.x, gridIdx.y, gridIdx.z, numNodesX(), numNodesY());
+      var ldNode = levelData.nodes[flatIdx];
+      ldNode.isoVal = node.isoVal;
+      ldNode.material = node.material;
+    }
+    EditorUtility.SetDirty(levelData);
+    AssetDatabase.SaveAssets();
+    /*
+    // This is incredibly slow... not sure why.
+    // Update the serialized version of the terrain
+    var serializedObj = new SerializedObject(levelData);
+    serializedObj.Update();
+    var nodesProp = serializedObj.FindProperty("nodes");
+    foreach (var node in changedNodes) {
+      var gridIdx = node.gridIndex;
+      var flatIdx = LevelData.node3DIndexToFlatIndex(gridIdx.x, gridIdx.y, gridIdx.z, numNodesX(), numNodesY());
+      var isoValProp = nodesProp.GetArrayElementAtIndex(flatIdx).FindPropertyRelative("isoVal");
+      isoValProp.floatValue = node.isoVal;
+    }
+    serializedObj.ApplyModifiedProperties();
+    */
+  }
+
+  public void fillCoreMaterial() {
+    // TODO
+    Debug.LogWarning("Not implemented yet!");
   }
 
   // Intersect the given ray with this grid, returns the closest relevant edit point

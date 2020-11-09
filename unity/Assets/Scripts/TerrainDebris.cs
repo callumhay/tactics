@@ -2,6 +2,8 @@
 using UnityEngine;
 using UnityEngine.Events;
 
+
+
 public class TerrainDebris {
   // TODO: Remove this and use materials to define the density!
   private static float density = 1000.0f; // kg/m^3
@@ -16,6 +18,7 @@ public class TerrainDebris {
   private DebrisCollisionMonitor collisionMonitor;
   private GameEventListener felloffListener;
   private MeshFracturer meshFracturer;
+  private DebrisNodeMapper nodeMapper;
 
   public TerrainDebris(in Vector3 pos) {
     gameObj = new GameObject(gameObjName);
@@ -30,8 +33,6 @@ public class TerrainDebris {
     if (meshFilter == null) { meshFilter = gameObj.AddComponent<MeshFilter>(); }
     meshRenderer = gameObj.GetComponent<MeshRenderer>(); 
     if (meshRenderer == null) { meshRenderer = gameObj.AddComponent<MeshRenderer>(); }
-    meshRenderer.sharedMaterial = Resources.Load<Material>("Materials/TerrainMat");
-    meshRenderer.material.SetInt("IsTerrain", 0);
 
     meshCollider = gameObj.GetComponent<MeshCollider>();
     if (meshCollider == null) { meshCollider = gameObj.AddComponent<MeshCollider>(); }
@@ -54,6 +55,9 @@ public class TerrainDebris {
     collisionMonitor = gameObj.GetComponent<DebrisCollisionMonitor>();
     if (collisionMonitor == null) { collisionMonitor = gameObj.AddComponent<DebrisCollisionMonitor>(); }
 
+    nodeMapper = gameObj.GetComponent<DebrisNodeMapper>();
+    if (nodeMapper == null) { nodeMapper = gameObj.AddComponent<DebrisNodeMapper>(); }
+
     // No fracturing for now... need to implement fracturing using Voronoi splitting, right now it looks a bit strange
     //meshFracturer = gameObj.GetComponent<MeshFracturer>();
     //if (meshFracturer == null) { meshFracturer = gameObj.AddComponent<MeshFracturer>(); }
@@ -62,9 +66,10 @@ public class TerrainDebris {
   }
 
   // Takes a 3D array of localspace nodes and generates the mesh for this debris
-  public void build(in CubeCorner[,,] lsNodes) {
+  public void build(CubeCorner[,,] lsNodes) {
     var vertices = new List<Vector3>();
     var triangles = new List<int>();
+    var materials = new List<Material>();
 
     var corners = new CubeCorner[CubeCorner.numCorners];
     for (int i = 0; i < CubeCorner.numCorners; i++) { corners[i] = new CubeCorner(); }
@@ -78,8 +83,9 @@ public class TerrainDebris {
             var cornerNode = lsNodes[x+cornerInc.x, y+cornerInc.y, z+cornerInc.z];
             corners[i].position = cornerNode.position;
             corners[i].isoVal = cornerNode.isoVal;
+            corners[i].material = cornerNode.material;
           }
-          MarchingCubes.polygonize(corners, ref triangles, ref vertices);
+          MarchingCubes.polygonize(corners, ref materials, ref triangles, ref vertices);
         }
       }
     }
@@ -88,14 +94,29 @@ public class TerrainDebris {
     mesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
     mesh.vertices = vertices.ToArray();
     mesh.triangles = triangles.ToArray();
+
+    // Split the mesh triangles up into their respective material groups (i.e., submeshes)
+    (var submeshTris, var submeshMats) = MeshHelper.Submeshify(triangles, materials, Resources.Load<Material>("Materials/DirtGrass1Mat"));
+    meshRenderer.sharedMaterials = submeshMats;
+    mesh.subMeshCount = submeshTris.GetLength(0);
+    for (int i = 0; i < submeshTris.GetLength(0); i++) {
+      mesh.SetTriangles(submeshTris[i], i);
+    }
+
     mesh.RecalculateNormals(MeshHelper.defaultSmoothingAngle, MeshHelper.defaultTolerance);
     mesh.RecalculateBounds();
     setMesh(mesh);
+
+    nodeMapper.originalCorners = lsNodes;
   }
 
   public void setMesh(in Mesh mesh) {
     meshFilter.sharedMesh = mesh;
     meshCollider.sharedMesh = mesh;
+
+    for (int i = 0; i < meshRenderer.materials.GetLength(0); i++) {
+      meshRenderer.materials[i].SetInt("IsTerrain", 0);
+    }
 
     // TODO: Calculate the mass and drag based on the density of the material and the volume of the mesh
     rigidbody.SetDensity(TerrainDebris.density);

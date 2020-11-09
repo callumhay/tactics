@@ -32,7 +32,7 @@ public class TerrainColumn {
       meshFilter   = gameObj.AddComponent<MeshFilter>();
       meshCollider = gameObj.AddComponent<MeshCollider>();
       meshRenderer = gameObj.AddComponent<MeshRenderer>();
-      meshRenderer.sharedMaterial = Resources.Load<Material>("Materials/TerrainMat");
+      //meshRenderer.sharedMaterial = Resources.Load<Material>("Materials/DirtGrass1Mat");
     }
     gameObj.transform.position = TerrainColumn.size * (Vector3)_index;
   }
@@ -46,8 +46,9 @@ public class TerrainColumn {
   }
 
   public void regenerateMesh() {
-   var vertices = new List<Vector3>();
-   var triangles = new List<int>();
+    var vertices = new List<Vector3>();
+    var triangles = new List<int>();
+    var materials = new List<Material>();
 
     var _numNodesX = numNodesX();
     var _numNodesY = numNodesY();
@@ -69,12 +70,9 @@ public class TerrainColumn {
             // Get the node at the current index in the grid 
             // (also gets empty "ghost" nodes at the edges)
             var cornerNode = terrain.getNode(terrainIdx + MarchingCubes.corners[i]);
-            // Localspace position for this Terrain Column
-            corners[i].position = cornerNode.position - gameObj.transform.position;
-            // Isovalue of the node
-            corners[i].isoVal = cornerNode.isoVal;
+            corners[i].setFromNode(cornerNode, -gameObj.transform.position);
           }
-          MarchingCubes.polygonize(corners, ref triangles, ref vertices);
+          MarchingCubes.polygonize(corners, ref materials, ref triangles, ref vertices);
         }
       }
     }
@@ -96,7 +94,15 @@ public class TerrainColumn {
     var mesh = new Mesh();
     mesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
     mesh.vertices = vertices.ToArray();
-    mesh.triangles = triangles.ToArray();
+
+    // Split the mesh triangles up into their respective material groups (i.e., submeshes)
+    (var submeshTris, var submeshMats) = MeshHelper.Submeshify(triangles, materials, Resources.Load<Material>("Materials/DirtGrass1Mat"));
+    meshRenderer.sharedMaterials = submeshMats;
+    mesh.subMeshCount = submeshTris.GetLength(0);
+    for (int i = 0; i < submeshTris.GetLength(0); i++) {
+      mesh.SetTriangles(submeshTris[i], i);
+    }
+
     mesh.RecalculateNormals(MeshHelper.defaultSmoothingAngle, MeshHelper.defaultTolerance, minXZPt, maxXZPt);
     mesh.RecalculateBounds();
     meshFilter.sharedMesh = mesh;

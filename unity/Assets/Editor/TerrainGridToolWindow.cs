@@ -36,12 +36,32 @@ public class TerrainGridToolWindow : EditorWindow {
     var brushTypeProp = serializedObj.FindProperty("brushType");
     var brushSizeProp = serializedObj.FindProperty("brushSize");
     var gridSnapProp  = serializedObj.FindProperty("gridSnaping");
-    
+    var paintMatProp = serializedObj.FindProperty("paintMaterial");
+
     EditorGUILayout.PropertyField(paintTypeProp);
     EditorGUILayout.PropertyField(paintModeProp);
     EditorGUILayout.PropertyField(brushTypeProp);
     brushSizeProp.floatValue = EditorGUILayout.Slider("Brush Size", brushSizeProp.floatValue, 0.25f, 5.0f);
     EditorGUILayout.PropertyField(gridSnapProp);
+    EditorGUILayout.PropertyField(paintMatProp);
+    EditorGUILayout.Space();
+    if (GUILayout.Button(new GUIContent(){text = "Fill Core Material", tooltip = "Paint core materials into all terrain interiors."})) {
+      var terrainGameObj = GameObject.Find("Terrain");
+      if (!terrainGameObj) { terrainGameObj = GameObject.FindWithTag("Terrain"); }
+      if (terrainGameObj) {
+        var terrainGrid = terrainGameObj.GetComponent<TerrainGrid>();
+        if (terrainGrid) {
+          terrainGrid.fillCoreMaterial();
+        }
+        else {
+          Debug.LogWarning("Could not find component 'TerrainGrid' on found 'Terrain' GameObject.");
+        }
+      }
+      else {
+        Debug.LogWarning("Could not find GameObject named 'Terrain' or with the 'Terrain' tag.");
+      }
+    }
+
 
     serializedObj.ApplyModifiedProperties();
   }
@@ -71,14 +91,21 @@ public class TerrainGridToolWindow : EditorWindow {
   }
 
   public void paintNodes(in List<TerrainGridNode> nodes, in TerrainGrid terrainGrid) {
+
+    // Paint the material
+    foreach (var node in nodes) { node.material = settings.paintMaterial; }
+
+    // If the mode also paints isovalues then we paint those too
     switch (paintType) {
       case TGTWSettings.PaintType.IsoValues:
         terrainGrid?.addIsoValuesToNodes(1f, nodes);
         break;
       default:
+        terrainGrid?.updateNodesInEditor(nodes);
         break;
     }
   }
+  
   public void eraseNodes(in List<TerrainGridNode> nodes, in TerrainGrid terrainGrid) {
     switch (paintType) {
       case TGTWSettings.PaintType.IsoValues:

@@ -1,5 +1,5 @@
-﻿using System.Collections.Generic;
-using System.Linq;
+﻿using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 public static class MeshHelper {
@@ -64,8 +64,12 @@ public static class MeshHelper {
 
   private class VertexEntry {
     public Vector3 vertex;
+    public Vector3 uv;
+
     public List<Vector3> normals = new List<Vector3>();
     public List<FaceEntry> faces = new List<FaceEntry>();
+    
+    public List<Vector3> externalNormals = new List<Vector3>();
     public bool isRemoved = false;
   };
 
@@ -75,7 +79,7 @@ public static class MeshHelper {
   }
 
   public static float defaultSmoothingAngle = 62.5f;
-  public static float defaultTolerance = 1e-6f;
+  public static float defaultTolerance = 1e-4f;
 
   public static void RecalculateNormals(this Mesh mesh, float smoothingAngle, float tolerance) {
     MeshHelper.RecalculateNormals(mesh, smoothingAngle, tolerance, 
@@ -99,8 +103,13 @@ public static class MeshHelper {
     }
 
     var vertices = mesh.vertices;
-    var vertexMaps = new Dictionary<string, VertexEntry>[mesh.subMeshCount]; // Mappings for each submesh
+    var uvs = new List<Vector3>();
+    mesh.GetUVs(0, uvs);
+    while (uvs.Count < vertices.Length) {
+      uvs.Add(new Vector3(0,0,0));
+    }
 
+    var vertexMaps = new Dictionary<string, VertexEntry>[mesh.subMeshCount]; // Mappings for each submesh
     for (var subMeshIndex = 0; subMeshIndex < mesh.subMeshCount; subMeshIndex++) {
       var vertexMap = new Dictionary<string, VertexEntry>();
       vertexMaps[subMeshIndex] = vertexMap;
@@ -109,6 +118,7 @@ public static class MeshHelper {
       for (var i = 0; i < triangles.Length; i += 3) {
         var triIndices  = new int[3]{triangles[i], triangles[i+1], triangles[i+2]};
         var triVertices = new Vector3[3]{vertices[triIndices[0]], vertices[triIndices[1]], vertices[triIndices[2]]};
+        var triUVs      = new Vector3[3]{uvs[triIndices[0]], uvs[triIndices[1]], uvs[triIndices[2]]};
         var triNormal   = Vector3.Cross(triVertices[1] - triVertices[0], triVertices[2] - triVertices[0]).normalized;
         
         // Used later to rebuild the faces
@@ -119,7 +129,7 @@ public static class MeshHelper {
           var hash = makeVertexHash(triVertices[j]);
           VertexEntry vEntry;
           if (!vertexMap.TryGetValue(hash, out vEntry)) {
-            vEntry = new VertexEntry{vertex = triVertices[j]};
+            vEntry = new VertexEntry{vertex = triVertices[j], uv = triUVs[j]};
             vertexMap.Add(hash, vEntry);
           }
           vEntry.normals.Add(triNormal);
@@ -128,12 +138,31 @@ public static class MeshHelper {
       }
     }
 
+    // Make sure we are accounting for normals on shared vertices across submeshes
+    for (var i = 0; i < mesh.subMeshCount; i++) {
+      var vertexMap1 = vertexMaps[i];
+      // Find matching vertices in other submeshes so that we can use their normals in the smoothing calculations as well
+      for (var j = 0; j < mesh.subMeshCount; j++) {
+        if (i == j) { continue; }
+        var vertexMap2 = vertexMaps[j];
+        foreach (var vertexEntry1 in vertexMap1) {
+          VertexEntry vertexEntry2 = null;
+          if (vertexMap2.TryGetValue(vertexEntry1.Key, out vertexEntry2)) {
+            foreach (var normal in vertexEntry2.normals) {
+              vertexEntry1.Value.externalNormals.Add(normal);
+            }
+          }
+        }
+      }
+    }
+
     var finalVertices = new List<Vector3>();
     var finalNormals  = new List<Vector3>();
+    var finalUVs = new List<Vector3>();
 
     foreach (var vertexMap in vertexMaps) {
       foreach (var vertexEntry in vertexMap.Values) {
-        ref readonly var vertex = ref vertexEntry.vertex;
+        var vertex = vertexEntry.vertex;
 
         // Clean up all vertices outside of the min/max
         if ((vertex.x < minXZ.x || vertex.x > maxXZ.x) || (vertex.z < minXZ.y || vertex.z > maxXZ.y)) {
@@ -141,8 +170,11 @@ public static class MeshHelper {
           foreach (var faceEntry in vertexEntry.faces) { faceEntry.face.isRemoved = true; }
           continue;
         }
+    
+        var uv = vertexEntry.uv;
+        var externalNormals = vertexEntry.externalNormals;
 
-        // Put each normal into its own  group
+        // Put each normal into its own group
         var groupedNormals = new List<NormalGroup>();
         for (int i = 0; i < vertexEntry.normals.Count; i++) {
           var grp = new NormalGroup();
@@ -156,14 +188,14 @@ public static class MeshHelper {
           // Compare each group's normal with each other to see if they can be combined
           int mergeGroup1 = -1; int mergeGroup2 = -1;
           for (int i = 0; i < groupedNormals.Count; i++) {
-            var iNorm = groupedNormals[i].avgNormal;
+            var normal1 = groupedNormals[i].avgNormal;
             float smallestAngle = float.MaxValue;
             mergeGroup2 = -1;
 
             for (int j = 0; j < groupedNormals.Count; j++) {
               if (i == j) { continue; }
-              var jNorm = groupedNormals[j].avgNormal;
-              var angle = Mathf.Rad2Deg*iNorm.angleTo(jNorm);
+              var normal2 = groupedNormals[j].avgNormal;
+              var angle = Vector3.Angle(normal1, normal2);
               if (angle <= smoothingAngle && angle < smallestAngle) {
                 smallestAngle = angle;
                 mergeGroup2 = j;
@@ -174,6 +206,7 @@ public static class MeshHelper {
               break;
             }
           }
+
           if (mergeGroup1 != -1) {
             // Join the two groups together and continue
             var g1 = groupedNormals[mergeGroup1];
@@ -182,8 +215,12 @@ public static class MeshHelper {
             for (int i = 0; i < g2.normalIndices.Count; i++) {
               g1.normalIndices.Add(g2.normalIndices[i]);
             }
-            g1.avgNormal += g2.avgNormal;
+
+            // Update the average normal based on all the collected indices
+            g1.avgNormal.Set(0,0,0);
+            foreach (var nIdx in g1.normalIndices) { g1.avgNormal += vertexEntry.normals[nIdx]; }
             g1.avgNormal.Normalize();
+
           } 
           else {
             break;
@@ -195,12 +232,24 @@ public static class MeshHelper {
         for (int i = 0; i < groupedNormals.Count; i++) {
           var currNormalGrp = groupedNormals[i];
           for (int j = 0; j < currNormalGrp.normalIndices.Count; j++) {
-            
+
             var currIndex = currNormalGrp.normalIndices[j];
             var faceEntry = vertexEntry.faces[currIndex];
             faceEntry.face.indices[faceEntry.index] = finalVertices.Count;
             finalVertices.Add(vertex);
-            finalNormals.Add(currNormalGrp.avgNormal);
+            finalUVs.Add(uv);
+
+            // One last thing to do is to make sure we average in any external normals from other submeshes
+            foreach (var extNormal in externalNormals) {
+              var angle = Vector3.Angle(currNormalGrp.avgNormal, extNormal);
+              if (angle <= smoothingAngle) {
+                currNormalGrp.avgNormal += extNormal;
+                //currNormalGrp.avgNormal.Normalize();
+              }
+            }
+
+
+            finalNormals.Add(currNormalGrp.avgNormal.normalized);
           }
         }
       }
@@ -209,7 +258,10 @@ public static class MeshHelper {
     mesh.Clear();
     mesh.vertices = finalVertices.ToArray();
     mesh.normals  = finalNormals.ToArray();
-    for (int i = 0; i < vertexMaps.GetLength(0); i++) {
+    mesh.SetUVs(0, finalUVs);
+    mesh.subMeshCount = vertexMaps.Length;
+    
+    for (int i = 0; i < vertexMaps.Length; i++) {
       var vertexMap = vertexMaps[i];
       var subMeshTris = new List<int>();
       foreach (var vertexEntry in vertexMap.Values) {
@@ -224,6 +276,174 @@ public static class MeshHelper {
       mesh.SetTriangles(subMeshTris.ToArray(), i);
     }
   }
+
+  /*
+  public static Material[] Submeshify(this Mesh mesh, in List<Material> materials, in Material defaultMat) {
+    Debug.Assert(mesh.triangles.Length == materials.Count);
+
+    // Find the first non-null material - this will be our fallback material
+    Material nonNullMat = null;
+    for (int i = 0; i < materials.Count; i++) {
+      if (materials[i] != null) {
+        nonNullMat = materials[i];
+        break;
+      }
+    }
+
+    // Build a dictionary of all the unique materials with indices
+    var matDict = new Dictionary<Material, List<int>>();
+    if (nonNullMat == null) {
+      matDict[defaultMat] = new List<int>();
+    }
+    else {
+      for (int i = 0; i < materials.Count; i++) {
+        var currMat = materials[i] == null ? defaultMat : materials[i];
+        if (!matDict.ContainsKey(currMat)) {
+          matDict[currMat] = new List<int>();
+        }
+      }
+    }
+
+    var multiMatDict = new Dictionary<HashSet<Material>, Material>(HashSet<Material>.CreateSetComparer());
+    var matSet = new HashSet<Material>();
+
+    var triangles = mesh.triangles;
+    for (int i = 0; i < triangles.Length; i += 3) {
+      var t0 = triangles[i]; var t1 = triangles[i+1]; var t2 = triangles[i+2];
+      var m0 = materials[i]; var m1 = materials[i+1]; var m2 = materials[i+2];
+
+      m0 = m0 == null ? defaultMat : m0;
+      m1 = m1 == null ? defaultMat : m1;
+      m2 = m2 == null ? defaultMat : m2;
+
+      // Do the materials all match?
+      if (m0 == m1 && m0 == m2) {
+        var submeshList = matDict[m0];
+        submeshList.Add(t0); submeshList.Add(t1); submeshList.Add(t2);
+      }
+      else {
+        // Materials don't match, adjust the UVs for material blending
+        matSet.Clear();
+        matSet.Add(m0); matSet.Add(m1); matSet.Add(m2);
+        Material multiMat = null;
+        if (!multiMatDict.TryGetValue(matSet, out multiMat)) {
+          multiMat = Resources.Load<Material>("Materials/TriplanarMultiBlendMat");
+
+          m0.GetTexture("")
+
+          //multiMat.SetTexture("GroundTex1", )
+          //multiMat.SetTexture("GroundNormalTex1", )
+          //multiMat.SetTexture("WallTex1", )
+          //multiMat.SetTexture("WallNormalTex1", )
+
+          //multiMat.SetTexture("GroundTex2", )
+          //multiMat.SetTexture("GroundNormalTex2", )
+          //multiMat.SetTexture("WallTex2", )
+          //multiMat.SetTexture("WallNormalTex2", )
+
+          //multiMat.SetTexture("GroundTex3", )
+          //multiMat.SetTexture("GroundNormalTex3", )
+          //multiMat.SetTexture("WallTex3", )
+          //multiMat.SetTexture("WallNormalTex3", )
+
+          multiMatDict[matSet] = multiMat;
+        }
+        else {
+          // Match up the different materials with the portions of the multi-material
+          // TODO
+        }
+
+      }
+    }
+  }
+  */
+  
+  public static (int[][], Material[]) Submeshify(in List<int> triangles, in List<Material> materials, in Material defaultMat) {
+    Debug.Assert(triangles.Count == materials.Count);
+
+    // Find the first non-null material - this will be our fallback material
+    Material nonNullMat = null;
+    for (int i = 0; i < materials.Count; i++) {
+      if (materials[i] != null) {
+        nonNullMat = materials[i];
+        break;
+      }
+    }
+
+    // Build a dictionary of all the unique materials with indices
+    var matDict = new Dictionary<Material, List<int>>();
+    if (nonNullMat == null) {
+      matDict[defaultMat] = new List<int>();
+    }
+    else {
+      for (int i = 0; i < materials.Count; i++) {
+        var currMat = materials[i] == null ? defaultMat : materials[i];
+        if (!matDict.ContainsKey(currMat)) {
+          matDict[currMat] = new List<int>();
+        }
+      }
+    }
+
+    for (int i = 0; i < triangles.Count; i += 3) {
+      var t0 = triangles[i]; var t1 = triangles[i+1]; var t2 = triangles[i+2];
+      var m0 = materials[i]; var m1 = materials[i+1]; var m2 = materials[i+2];
+
+
+      m0 = m0 == null ? defaultMat : m0;
+      m1 = m1 == null ? defaultMat : m1;
+      m2 = m2 == null ? defaultMat : m2;
+
+      // Do the materials all match?
+      if (m0 == m1 && m0 == m2) {
+        var submeshList = matDict[m0];
+        submeshList.Add(t0); submeshList.Add(t1); submeshList.Add(t2);
+      }
+      else {
+        // ... If not then we need blend multiple triangles together
+        if (m0 == m1) {
+          var m0m1SubmeshList = matDict[m0];
+          m0m1SubmeshList.Add(t0); m0m1SubmeshList.Add(t1); m0m1SubmeshList.Add(t2); 
+          //var m2SubmeshList = matDict[m2];
+          //m2SubmeshList.Add(t0); m2SubmeshList.Add(t1); m2SubmeshList.Add(t2);
+        }
+        else if (m0 == m2) {
+          var m0m2SubmeshList = matDict[m0];
+          m0m2SubmeshList.Add(t0); m0m2SubmeshList.Add(t1); m0m2SubmeshList.Add(t2);
+          //var m1SubmeshList = matDict[m1];
+          //m1SubmeshList.Add(t0); m1SubmeshList.Add(t1); m1SubmeshList.Add(t2);
+        }
+        else if (m1 == m2) {
+          var m1m2SubmeshList = matDict[m1];
+          m1m2SubmeshList.Add(t0); m1m2SubmeshList.Add(t1); m1m2SubmeshList.Add(t2);
+          //var m0SubmeshList = matDict[m0];
+          //m0SubmeshList.Add(t0); m0SubmeshList.Add(t1); m0SubmeshList.Add(t2);
+        }
+        else {
+          // All materials are different
+          var m0SubmeshList = matDict[m0];
+          m0SubmeshList.Add(t0); m0SubmeshList.Add(t1); m0SubmeshList.Add(t2);
+          //var m1SubmeshList = matDict[m1];
+          //m1SubmeshList.Add(t0); m1SubmeshList.Add(t1); m1SubmeshList.Add(t2);
+          //var m2SubmeshList = matDict[m2];
+          //m2SubmeshList.Add(t0); m2SubmeshList.Add(t1); m2SubmeshList.Add(t2);
+        }
+      }
+
+    }
+
+    // Convert everything into arrays
+    var submeshTris = new int[matDict.Count][];
+    var submeshMats = new Material[matDict.Count];
+    int count = 0;
+    foreach (var matEntry in matDict) {
+      submeshMats[count] = matEntry.Key;
+      submeshTris[count] = matEntry.Value.ToArray();
+      count++;
+    }
+
+    return (submeshTris, submeshMats);
+  }
+
 
   public static float SignedVolumeOfTriangle(in Vector3 p1, in Vector3 p2, in Vector3 p3) {
     return Vector3.Dot(p1, Vector3.Cross(p2,p3)) / 6.0f;

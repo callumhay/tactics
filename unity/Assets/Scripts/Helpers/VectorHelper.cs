@@ -1,14 +1,6 @@
 ﻿using UnityEngine;
 
 public static class VectorHelper {
-
-  public static float angleTo(this Vector3 v1, in Vector3 v2) {
-    var denom = Mathf.Sqrt(v1.sqrMagnitude * v2.sqrMagnitude);
-    if (denom == 0) { return Mathf.PI / 2.0f; }
-    var theta = Vector3.Dot(v1,v2) / denom;
-    return Mathf.Acos(Mathf.Clamp(theta,-1,1));
-  }
-
   public static Vector3 perpendicularTo(this Vector3 v) {
     Vector3 perpendicularMH = new Vector3(v.x, v.y, v.z);
     int smallestIndex = 0;
