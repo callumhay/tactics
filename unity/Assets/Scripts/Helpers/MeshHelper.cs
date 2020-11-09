@@ -294,8 +294,9 @@ public static class MeshHelper {
     var multiMatDict = new Dictionary<HashSet<Material>, Material>(HashSet<Material>.CreateSetComparer());
     var matSet = new HashSet<Material>();
 
+    var perUVAmt = 3.0f;
     var uvs = new Vector3[mesh.vertices.Length];
-    for (int i = 0; i < uvs.Length; i++) { uvs[i] = new Vector3(0,0,0); }
+    for (int i = 0; i < uvs.Length; i++) { uvs[i] = new Vector3(perUVAmt,perUVAmt,perUVAmt); }
 
     for (int i = 0; i < triangles.Count; i += 3) {
       var t0 = triangles[i]; var t1 = triangles[i+1]; var t2 = triangles[i+2];
@@ -315,7 +316,7 @@ public static class MeshHelper {
         // a multi-material for rendering
         matSet.Clear(); matSet.Add(m0); matSet.Add(m1); matSet.Add(m2);
         Material multiMat = null;
-        var perUVAmt = 3.0f;
+        
         if (!multiMatDict.TryGetValue(matSet, out multiMat)) {
           multiMat = new Material(Resources.Load<Material>("Materials/TriplanarMultiBlendMat"));
 
