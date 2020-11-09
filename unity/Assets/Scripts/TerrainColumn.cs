@@ -96,12 +96,15 @@ public class TerrainColumn {
     mesh.vertices = vertices.ToArray();
 
     // Split the mesh triangles up into their respective material groups (i.e., submeshes)
+    MeshHelper.Submeshify(ref mesh, ref meshRenderer, triangles, materials, Resources.Load<Material>("Materials/DirtGrass1Mat"));
+    /*
     (var submeshTris, var submeshMats) = MeshHelper.Submeshify(triangles, materials, Resources.Load<Material>("Materials/DirtGrass1Mat"));
     meshRenderer.sharedMaterials = submeshMats;
     mesh.subMeshCount = submeshTris.GetLength(0);
     for (int i = 0; i < submeshTris.GetLength(0); i++) {
       mesh.SetTriangles(submeshTris[i], i);
     }
+    */
 
     mesh.RecalculateNormals(MeshHelper.defaultSmoothingAngle, MeshHelper.defaultTolerance, minXZPt, maxXZPt);
     mesh.RecalculateBounds();

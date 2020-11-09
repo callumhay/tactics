@@ -274,38 +274,30 @@ public static class MeshHelper {
     }
   }
 
-  /*
-  public static Material[] Submeshify(this Mesh mesh, in List<Material> materials, in Material defaultMat) {
-    Debug.Assert(mesh.triangles.Length == materials.Count);
+  public static void Submeshify(ref Mesh mesh, ref MeshRenderer meshRenderer, 
+    in List<int> triangles, in List<Material> materials, in Material defaultMat
+  ) {
 
-    // Find the first non-null material - this will be our fallback material
-    Material nonNullMat = null;
-    for (int i = 0; i < materials.Count; i++) {
-      if (materials[i] != null) {
-        nonNullMat = materials[i];
-        break;
-      }
-    }
+    Debug.Assert(triangles.Count == materials.Count);
 
     // Build a dictionary of all the unique materials with indices
     var matDict = new Dictionary<Material, List<int>>();
-    if (nonNullMat == null) {
-      matDict[defaultMat] = new List<int>();
-    }
-    else {
-      for (int i = 0; i < materials.Count; i++) {
-        var currMat = materials[i] == null ? defaultMat : materials[i];
-        if (!matDict.ContainsKey(currMat)) {
-          matDict[currMat] = new List<int>();
-        }
+    for (int i = 0; i < materials.Count; i++) {
+      var currMat = materials[i] == null ? defaultMat : materials[i];
+      if (!matDict.ContainsKey(currMat)) {
+        matDict[currMat] = new List<int>();
       }
     }
 
+    // For cases where there are multiple materials on a single triangle we
+    // need to build materials to support blending them
     var multiMatDict = new Dictionary<HashSet<Material>, Material>(HashSet<Material>.CreateSetComparer());
     var matSet = new HashSet<Material>();
 
-    var triangles = mesh.triangles;
-    for (int i = 0; i < triangles.Length; i += 3) {
+    var uvs = new Vector3[mesh.vertices.Length];
+    for (int i = 0; i < uvs.Length; i++) { uvs[i] = new Vector3(0,0,0); }
+
+    for (int i = 0; i < triangles.Count; i += 3) {
       var t0 = triangles[i]; var t1 = triangles[i+1]; var t2 = triangles[i+2];
       var m0 = materials[i]; var m1 = materials[i+1]; var m2 = materials[i+2];
 
@@ -314,46 +306,103 @@ public static class MeshHelper {
       m2 = m2 == null ? defaultMat : m2;
 
       // Do the materials all match?
+      List<int> submeshList = null;
       if (m0 == m1 && m0 == m2) {
-        var submeshList = matDict[m0];
-        submeshList.Add(t0); submeshList.Add(t1); submeshList.Add(t2);
+        submeshList = matDict[m0];
       }
       else {
-        // Materials don't match, adjust the UVs for material blending
-        matSet.Clear();
-        matSet.Add(m0); matSet.Add(m1); matSet.Add(m2);
+        // Materials don't match, adjust the UVs for material blending and introduce
+        // a multi-material for rendering
+        matSet.Clear(); matSet.Add(m0); matSet.Add(m1); matSet.Add(m2);
         Material multiMat = null;
+        var perUVAmt = 3.0f;
         if (!multiMatDict.TryGetValue(matSet, out multiMat)) {
-          multiMat = Resources.Load<Material>("Materials/TriplanarMultiBlendMat");
+          multiMat = new Material(Resources.Load<Material>("Materials/TriplanarMultiBlendMat"));
 
-          m0.GetTexture("")
+          var m0GndTex   = m0.GetTexture("GroundTex");
+          var m0GndNTex  = m0.GetTexture("GroundNormalTex");
+          var m0WallTex  = m0.GetTexture("WallTex");
+          var m0WallNTex = m0.GetTexture("WallNormalTex");
 
-          //multiMat.SetTexture("GroundTex1", )
-          //multiMat.SetTexture("GroundNormalTex1", )
-          //multiMat.SetTexture("WallTex1", )
-          //multiMat.SetTexture("WallNormalTex1", )
+          var m1GndTex   = m1.GetTexture("GroundTex");
+          var m1GndNTex  = m1.GetTexture("GroundNormalTex");
+          var m1WallTex  = m1.GetTexture("WallTex");
+          var m1WallNTex = m1.GetTexture("WallNormalTex");
 
-          //multiMat.SetTexture("GroundTex2", )
-          //multiMat.SetTexture("GroundNormalTex2", )
-          //multiMat.SetTexture("WallTex2", )
-          //multiMat.SetTexture("WallNormalTex2", )
+          var m2GndTex   = m2.GetTexture("GroundTex");
+          var m2GndNTex  = m2.GetTexture("GroundNormalTex");
+          var m2WallTex  = m2.GetTexture("WallTex");
+          var m2WallNTex = m2.GetTexture("WallNormalTex");
 
-          //multiMat.SetTexture("GroundTex3", )
-          //multiMat.SetTexture("GroundNormalTex3", )
-          //multiMat.SetTexture("WallTex3", )
-          //multiMat.SetTexture("WallNormalTex3", )
+          multiMat.SetTexture("GroundTex1", m0GndTex);
+          multiMat.SetTexture("GroundNormalTex1", m0GndNTex);
+          multiMat.SetTexture("WallTex1", m0WallTex);
+          multiMat.SetTexture("WallNormalTex1", m0WallNTex);
+
+          multiMat.SetTexture("GroundTex2", m1GndTex);
+          multiMat.SetTexture("GroundNormalTex2", m1GndNTex);
+          multiMat.SetTexture("WallTex2", m1WallTex);
+          multiMat.SetTexture("WallNormalTex2", m1WallNTex);
+
+          multiMat.SetTexture("GroundTex3", m2GndTex);
+          multiMat.SetTexture("GroundNormalTex3", m2GndNTex);
+          multiMat.SetTexture("WallTex3", m2WallTex);
+          multiMat.SetTexture("WallNormalTex3", m2WallNTex);
 
           multiMatDict[matSet] = multiMat;
+          submeshList = new List<int>();
+          matDict[multiMat] = submeshList;
+          uvs[t0].Set(perUVAmt,0,0); uvs[t1].Set(0,perUVAmt,0); uvs[t2].Set(0,0,perUVAmt);
         }
         else {
-          // Match up the different materials with the portions of the multi-material
-          // TODO
-        }
+          submeshList = matDict[multiMat];
 
+          // Match up the different materials with the portions of the multi-material
+          var gnd1Tex = multiMat.GetTexture("GroundTex1");
+          var gnd2Tex = multiMat.GetTexture("GroundTex2");
+          var gnd3Tex = multiMat.GetTexture("GroundTex3");
+
+          var m0GndTex = m0.GetTexture("GroundTex");
+          var m1GndTex = m1.GetTexture("GroundTex");
+          var m2GndTex = m2.GetTexture("GroundTex");
+          
+          if (m0GndTex.GetNativeTexturePtr() == gnd1Tex.GetNativeTexturePtr()) {
+            uvs[t0].Set(perUVAmt,0,0);
+            if (m1GndTex.GetNativeTexturePtr() == gnd2Tex.GetNativeTexturePtr()) { uvs[t1].Set(0,perUVAmt,0); uvs[t2].Set(0,0,perUVAmt); }
+            else { uvs[t1].Set(0,0,perUVAmt); uvs[t2].Set(0,perUVAmt,0); }
+          }
+          else if (m0GndTex.GetNativeTexturePtr() == gnd2Tex.GetNativeTexturePtr()) {
+            uvs[t0].Set(0,perUVAmt,0);
+            if (m1GndTex.GetNativeTexturePtr() == gnd1Tex.GetNativeTexturePtr()) { uvs[t1].Set(perUVAmt,0,0); uvs[t2].Set(0,0,perUVAmt); }
+            else { uvs[t1].Set(0,0,perUVAmt); uvs[t2].Set(perUVAmt,0,0); }
+          }
+          else {
+            // m0GndTex == gnd3Tex
+            uvs[t0].Set(0,0,perUVAmt);
+            if (m1GndTex.GetNativeTexturePtr() == gnd1Tex.GetNativeTexturePtr()) { uvs[t1].Set(perUVAmt,0,0); uvs[t2].Set(0,perUVAmt,0); }
+            else { uvs[t1].Set(0,perUVAmt,0); uvs[t2].Set(perUVAmt,0,0); }
+          }
+        }
       }
+      submeshList.Add(t0); submeshList.Add(t1); submeshList.Add(t2);
+    }
+
+    int count = 0;
+    var submeshMats = new Material[matDict.Count];
+    var submeshTris = new int[matDict.Count][];
+    foreach (var matEntry in matDict) {
+      submeshMats[count] = matEntry.Key;
+      submeshTris[count] = matEntry.Value.ToArray();
+      count++;
+    }
+    mesh.SetUVs(0, uvs);
+    meshRenderer.sharedMaterials = submeshMats;
+    mesh.subMeshCount = submeshMats.Length;
+
+    for (int i = 0; i < submeshTris.GetLength(0); i++) {
+      mesh.SetTriangles(submeshTris[i], i);
     }
   }
-  */
   
   public static (int[][], Material[]) Submeshify(in List<int> triangles, in List<Material> materials, in Material defaultMat) {
     Debug.Assert(triangles.Count == materials.Count);
