@@ -25,8 +25,16 @@ Material:
   m_SavedProperties:
     serializedVersion: 3
     m_TexEnvs:
+    - GroundNormalTex:
+        m_Texture: {fileID: 2800000, guid: 219386670151bc542a3b2fd69819e13e, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
     - GroundNormalTexture:
         m_Texture: {fileID: 2800000, guid: 7fa0035d52e52164dbe94df41517b0b7, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - GroundTex:
+        m_Texture: {fileID: 2800000, guid: 216e2729631e003468211108545a08f1, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - GroundTexture:
@@ -49,8 +57,16 @@ Material:
         m_Texture: {fileID: 2800000, guid: aeff12fbe9fe2384bae4d1b436607b55, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
+    - WallNormalTex:
+        m_Texture: {fileID: 2800000, guid: aeff12fbe9fe2384bae4d1b436607b55, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
     - WallNormalTexture:
         m_Texture: {fileID: 2800000, guid: aeff12fbe9fe2384bae4d1b436607b55, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - WallTex:
+        m_Texture: {fileID: 2800000, guid: eacec9cd0f31ea04b82121877a6cccaa, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - WallTexture:

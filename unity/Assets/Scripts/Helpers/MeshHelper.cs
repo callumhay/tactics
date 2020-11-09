@@ -65,12 +65,12 @@ public static class MeshHelper {
   private class VertexEntry {
     public Vector3 vertex;
     public Vector3 uv;
-
     public List<Vector3> normals = new List<Vector3>();
     public List<FaceEntry> faces = new List<FaceEntry>();
-    
-    public List<Vector3> externalNormals = new List<Vector3>();
     public bool isRemoved = false;
+
+    // Vertex/normal indices in the final mesh list
+    public List<int> smoothedNormalIndices = new List<int>(); 
   };
 
   private class NormalGroup {
@@ -138,24 +138,6 @@ public static class MeshHelper {
       }
     }
 
-    // Make sure we are accounting for normals on shared vertices across submeshes
-    for (var i = 0; i < mesh.subMeshCount; i++) {
-      var vertexMap1 = vertexMaps[i];
-      // Find matching vertices in other submeshes so that we can use their normals in the smoothing calculations as well
-      for (var j = 0; j < mesh.subMeshCount; j++) {
-        if (i == j) { continue; }
-        var vertexMap2 = vertexMaps[j];
-        foreach (var vertexEntry1 in vertexMap1) {
-          VertexEntry vertexEntry2 = null;
-          if (vertexMap2.TryGetValue(vertexEntry1.Key, out vertexEntry2)) {
-            foreach (var normal in vertexEntry2.normals) {
-              vertexEntry1.Value.externalNormals.Add(normal);
-            }
-          }
-        }
-      }
-    }
-
     var finalVertices = new List<Vector3>();
     var finalNormals  = new List<Vector3>();
     var finalUVs = new List<Vector3>();
@@ -172,7 +154,6 @@ public static class MeshHelper {
         }
     
         var uv = vertexEntry.uv;
-        var externalNormals = vertexEntry.externalNormals;
 
         // Put each normal into its own group
         var groupedNormals = new List<NormalGroup>();
@@ -238,21 +219,37 @@ public static class MeshHelper {
             faceEntry.face.indices[faceEntry.index] = finalVertices.Count;
             finalVertices.Add(vertex);
             finalUVs.Add(uv);
-
-            // One last thing to do is to make sure we average in any external normals from other submeshes
-            foreach (var extNormal in externalNormals) {
-              var angle = Vector3.Angle(currNormalGrp.avgNormal, extNormal);
-              if (angle <= smoothingAngle) {
-                currNormalGrp.avgNormal += extNormal;
-                //currNormalGrp.avgNormal.Normalize();
-              }
-            }
-
-
-            finalNormals.Add(currNormalGrp.avgNormal.normalized);
+            finalNormals.Add(currNormalGrp.avgNormal);
+            vertexEntry.smoothedNormalIndices.Add(finalNormals.Count-1);
           }
         }
       }
+    }
+
+    // Final pass is to resmooth any shared normals between mesh subgroups,
+    // these have all been stored in each VertexEntry (smoothedNormals)
+    var changedNormals = new HashSet<int>();
+    foreach (var vertexMap in vertexMaps) {
+      foreach (var vertexEntry in vertexMap.Values) {
+        var smoothedNormalIndices = vertexEntry.smoothedNormalIndices;
+        for (int i = 0; i < smoothedNormalIndices.Count; i++) {
+          var nIdx1 = smoothedNormalIndices[i];
+          var normal1 = finalNormals[nIdx1];
+          for (int j = i+1; j < smoothedNormalIndices.Count; j++) {
+            var nIdx2 = smoothedNormalIndices[j];
+            var normal2 = finalNormals[nIdx2];
+            if (Vector3.Angle(normal1, normal2) <= smoothingAngle) {
+              finalNormals[nIdx1] += normal2;
+              finalNormals[nIdx2] += normal1;
+              changedNormals.Add(nIdx1);
+              changedNormals.Add(nIdx2);
+            }
+          }
+        }
+      }
+    }
+    foreach (var nIdx in changedNormals) {
+      finalNormals[nIdx].Normalize();
     }
 
     mesh.Clear();
@@ -374,6 +371,7 @@ public static class MeshHelper {
     var matDict = new Dictionary<Material, List<int>>();
     if (nonNullMat == null) {
       matDict[defaultMat] = new List<int>();
+      nonNullMat = defaultMat;
     }
     else {
       for (int i = 0; i < materials.Count; i++) {
@@ -389,9 +387,9 @@ public static class MeshHelper {
       var m0 = materials[i]; var m1 = materials[i+1]; var m2 = materials[i+2];
 
 
-      m0 = m0 == null ? defaultMat : m0;
-      m1 = m1 == null ? defaultMat : m1;
-      m2 = m2 == null ? defaultMat : m2;
+      m0 = m0 == null ? nonNullMat : m0;
+      m1 = m1 == null ? nonNullMat : m1;
+      m2 = m2 == null ? nonNullMat : m2;
 
       // Do the materials all match?
       if (m0 == m1 && m0 == m2) {
