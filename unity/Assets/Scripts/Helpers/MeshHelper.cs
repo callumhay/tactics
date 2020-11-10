@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -318,7 +319,7 @@ public static class MeshHelper {
         Material multiMat = null;
         
         if (!multiMatDict.TryGetValue(matSet, out multiMat)) {
-          multiMat = new Material(Resources.Load<Material>("Materials/TriplanarMultiBlendMat"));
+          multiMat = new Material(Resources.Load<Material>("Materials/Triplanar3BlendMat"));
 
           var m0GndTex   = m0.GetTexture("GroundTex");
           var m0GndNTex  = m0.GetTexture("GroundNormalTex");
@@ -349,6 +350,9 @@ public static class MeshHelper {
           multiMat.SetTexture("GroundNormalTex3", m2GndNTex);
           multiMat.SetTexture("WallTex3", m2WallTex);
           multiMat.SetTexture("WallNormalTex3", m2WallNTex);
+
+          multiMat.SetFloat("TextureScale", (m0.GetFloat("TextureScale") + m1.GetFloat("TextureScale") + m2.GetFloat("TextureScale"))/3.0f);
+          multiMat.SetVector("TextureOffset", (m0.GetVector("TextureOffset") + m1.GetVector("TextureOffset") + m2.GetVector("TextureOffset"))/3.0f);
 
           multiMatDict[matSet] = multiMat;
           submeshList = new List<int>();
@@ -405,91 +409,213 @@ public static class MeshHelper {
     }
   }
   
-  public static (int[][], Material[]) Submeshify(in List<int> triangles, in List<Material> materials, in Material defaultMat) {
+  public static void Submeshify(
+    ref Mesh mesh, ref MeshRenderer meshRenderer, ref List<Tuple<Material[], float[]>> materials,
+    in List<int> triangles, in Material defaultMat
+  ) {
+
     Debug.Assert(triangles.Count == materials.Count);
 
-    // Find the first non-null material - this will be our fallback material
-    Material nonNullMat = null;
-    for (int i = 0; i < materials.Count; i++) {
-      if (materials[i] != null) {
-        nonNullMat = materials[i];
-        break;
-      }
-    }
-
-    // Build a dictionary of all the unique materials with indices
+    // Build a dictionary of all the unique materials with indices, also do some data massaging
+    // to the materials tuples to ensure we only have valid, existant material contributions.
     var matDict = new Dictionary<Material, List<int>>();
-    if (nonNullMat == null) {
-      matDict[defaultMat] = new List<int>();
-      nonNullMat = defaultMat;
-    }
-    else {
-      for (int i = 0; i < materials.Count; i++) {
-        var currMat = materials[i] == null ? defaultMat : materials[i];
+    for (int i = 0; i < materials.Count; i++) {
+      var currMatList = materials[i].Item1;
+      var currContribList = materials[i].Item2;
+
+      bool allMaterialsEmpty = true;
+      for (int j = 0; j < currMatList.Length; j++) {
+        if (currMatList[j] != null && currContribList[j] != 0) { allMaterialsEmpty = false; break; }
+      }
+
+      if (allMaterialsEmpty) {
+        // Special case where the material is null / non-existant
+        // In this case we set it to be full contribution of the default material
+        var currMat = defaultMat;
+        currMatList = new Material[1]; currMatList[0] = defaultMat;
+        currContribList = new float[1]; currContribList[0] = 1f;
         if (!matDict.ContainsKey(currMat)) {
           matDict[currMat] = new List<int>();
         }
+        materials[i] = new Tuple<Material[], float[]>(currMatList, currContribList);
       }
+      else {
+        // There's at least one material that's not null in the current list
+        var nonNullMatList = new List<Material>();
+        var nonNullContribList = new List<float>();
+        for (int j = 0; j < currMatList.Length; j++) {
+          var currMat = currMatList[j];
+          var currContrib = currContribList[j];
+          if (currMat == null || currContrib <= 0) { continue; }
+          if (currMat == null && currContrib > 0) { currMat = defaultMat; }
+          nonNullMatList.Add(currMat);
+          nonNullContribList.Add(currContrib);
+          if (!matDict.ContainsKey(currMat)) {
+            matDict[currMat] = new List<int>();
+          }
+        }
+        // Make sure that materials only contains items that are contributing to the appearance of each vertex
+        if (nonNullMatList.Count != currMatList.Length) {
+          materials[i] = new Tuple<Material[], float[]>(nonNullMatList.ToArray(), nonNullContribList.ToArray());
+        }
+      }
+    }
+
+    // For cases where there are multiple materials on a single triangle we
+    // need to build new materials to support blending them
+    var multiMatDict = new Dictionary<HashSet<Material>, Material>(HashSet<Material>.CreateSetComparer());
+
+    var m0Dict = new Dictionary<Material, float>();
+    var m1Dict = new Dictionary<Material, float>();
+    var m2Dict = new Dictionary<Material, float>();
+    var allMatSet = new HashSet<Material>();
+
+    var uv0s = new Vector3[mesh.vertices.Length];
+    for (int i = 0; i < uv0s.Length; i++) { uv0s[i] = new Vector3(1,1,1); }
+
+    List<int> threeTexMaterial(ref Vector3[] uvs, int t0, int t1, int t2) {
+      Debug.Assert(allMatSet.Count <= 3, "You shouldn't be calling this function with more than 3 materials.");
+      Material multiMat = null;
+      List<int> submeshList = null;
+
+      if (!multiMatDict.TryGetValue(allMatSet, out multiMat)) {
+        multiMat = new Material(Resources.Load<Material>("Materials/Triplanar3BlendMat"));
+        
+        float avgMetallic = 0;
+        float avgSmoothness = 0;
+        float avgScale = 0;
+        Vector4 avgOffset = new Vector4(0,0,0,0);
+
+        int matNum = 1;
+        foreach (var mat in allMatSet) {
+          avgMetallic   += mat.GetFloat("Metallic");
+          avgSmoothness += mat.GetFloat("Smoothness");
+          avgScale += mat.GetFloat("TextureScale");
+          avgOffset += mat.GetVector("TextureOffset");
+
+          var gndTex   = mat.GetTexture("GroundTex");
+          var gndNTex  = mat.GetTexture("GroundNormalTex");
+          var wallTex  = mat.GetTexture("WallTex");
+          var wallNTex = mat.GetTexture("WallNormalTex");
+
+          multiMat.SetTexture("GroundTex"+matNum, gndTex);
+          multiMat.SetTexture("GroundNormalTex"+matNum, gndNTex);
+          multiMat.SetTexture("WallTex"+matNum, wallTex);
+          multiMat.SetTexture("WallNormalTex"+matNum, wallNTex);
+          matNum++;
+        }
+
+        avgMetallic /= allMatSet.Count;
+        avgSmoothness /= allMatSet.Count;
+        avgScale /= allMatSet.Count;
+        avgOffset /= allMatSet.Count;
+        
+        multiMat.SetFloat("Metallic", avgMetallic);
+        multiMat.SetFloat("Smoothness", avgSmoothness);
+        multiMat.SetFloat("TextureScale", avgScale);
+        multiMat.SetVector("TextureOffset", avgOffset);
+
+        multiMatDict[allMatSet] = multiMat;
+        submeshList = new List<int>();
+        matDict[multiMat] = submeshList;
+      }
+      else { submeshList = matDict[multiMat]; }
+
+      // Match up the different materials with the portions of the multi-material
+      var gnd1TexPtr = multiMat.GetTexture("GroundTex1").GetNativeTexturePtr();
+      var gnd2TexPtr = multiMat.GetTexture("GroundTex2").GetNativeTexturePtr();
+      var gnd3TexPtr = multiMat.GetTexture("GroundTex3").GetNativeTexturePtr();
+
+      void setUVs(ref Vector3[] uvArr, in Dictionary<Material, float> matLookup, int tIdx) {
+        uvArr[tIdx].Set(0,0,0);
+        foreach (var entry in matLookup) {
+          var mat = entry.Key;
+          var contrib = entry.Value;
+          var currGndTexPtr = mat.GetTexture("GroundTex").GetNativeTexturePtr();
+          if (currGndTexPtr == gnd1TexPtr) { uvArr[tIdx].x = contrib; }
+          else if (currGndTexPtr == gnd2TexPtr) { uvArr[tIdx].y = contrib; }
+          else { uvArr[tIdx].z = contrib; }
+        }
+      }
+      setUVs(ref uv0s, m0Dict, t0);
+      setUVs(ref uv0s, m1Dict, t1);
+      setUVs(ref uv0s, m2Dict, t2);
+
+      return submeshList;
     }
 
     for (int i = 0; i < triangles.Count; i += 3) {
-      var t0 = triangles[i]; var t1 = triangles[i+1]; var t2 = triangles[i+2];
-      var m0 = materials[i]; var m1 = materials[i+1]; var m2 = materials[i+2];
+      var i1 = i+1; var i2 = i+2;
+      var t0 = triangles[i]; var t1 = triangles[i1]; var t2 = triangles[i2];
+      var m0List = materials[i].Item1; var m1List = materials[i1].Item1; var m2List = materials[i2].Item1;
+      var c0List = materials[i].Item2; var c1List = materials[i1].Item2; var c2List = materials[i2].Item2;
 
-
-      m0 = m0 == null ? nonNullMat : m0;
-      m1 = m1 == null ? nonNullMat : m1;
-      m2 = m2 == null ? nonNullMat : m2;
-
-      // Do the materials all match?
-      if (m0 == m1 && m0 == m2) {
-        var submeshList = matDict[m0];
-        submeshList.Add(t0); submeshList.Add(t1); submeshList.Add(t2);
+      m0Dict.Clear(); for (int j = 0; j < m0List.Length; j++) { m0Dict[m0List[j]] = c0List[j]; }
+      m1Dict.Clear(); for (int j = 0; j < m1List.Length; j++) { m1Dict[m1List[j]] = c1List[j]; }
+      m2Dict.Clear(); for (int j = 0; j < m2List.Length; j++) { m2Dict[m2List[j]] = c2List[j]; }
+      
+      List<int> submeshList = null;
+      if (m0Dict.Count == 1 && m1Dict.Count == 1 && m2Dict.Count == 1) {
+        var m0 = m0Dict.First().Key; var m1 = m1Dict.First().Key; var m2 = m2Dict.First().Key;
+        // Easy case: all vertices have a single material and each one is the same
+        if (m0 == m1 && m0 == m2) { submeshList = matDict[m0]; }
+        else {
+          // Materials don't match but we're only dealing with a single material per vertex, 
+          // adjust the UVs for material blending and introduce a multi-material for rendering
+          allMatSet.Clear();
+          allMatSet.Add(m0); allMatSet.Add(m1); allMatSet.Add(m2);
+          submeshList = threeTexMaterial(ref uv0s, t0, t1, t2);
+        }
       }
       else {
-        // ... If not then we need blend multiple triangles together
-        if (m0 == m1) {
-          var m0m1SubmeshList = matDict[m0];
-          m0m1SubmeshList.Add(t0); m0m1SubmeshList.Add(t1); m0m1SubmeshList.Add(t2); 
-          //var m2SubmeshList = matDict[m2];
-          //m2SubmeshList.Add(t0); m2SubmeshList.Add(t1); m2SubmeshList.Add(t2);
-        }
-        else if (m0 == m2) {
-          var m0m2SubmeshList = matDict[m0];
-          m0m2SubmeshList.Add(t0); m0m2SubmeshList.Add(t1); m0m2SubmeshList.Add(t2);
-          //var m1SubmeshList = matDict[m1];
-          //m1SubmeshList.Add(t0); m1SubmeshList.Add(t1); m1SubmeshList.Add(t2);
-        }
-        else if (m1 == m2) {
-          var m1m2SubmeshList = matDict[m1];
-          m1m2SubmeshList.Add(t0); m1m2SubmeshList.Add(t1); m1m2SubmeshList.Add(t2);
-          //var m0SubmeshList = matDict[m0];
-          //m0SubmeshList.Add(t0); m0SubmeshList.Add(t1); m0SubmeshList.Add(t2);
-        }
-        else {
-          // All materials are different
-          var m0SubmeshList = matDict[m0];
-          m0SubmeshList.Add(t0); m0SubmeshList.Add(t1); m0SubmeshList.Add(t2);
-          //var m1SubmeshList = matDict[m1];
-          //m1SubmeshList.Add(t0); m1SubmeshList.Add(t1); m1SubmeshList.Add(t2);
-          //var m2SubmeshList = matDict[m2];
-          //m2SubmeshList.Add(t0); m2SubmeshList.Add(t1); m2SubmeshList.Add(t2);
+        // Trickier - we have some (or all) vertices that have multiple materials applied to them
+        allMatSet.Clear();
+        allMatSet.UnionWith(m0Dict.Keys); allMatSet.UnionWith(m1Dict.Keys); allMatSet.UnionWith(m2Dict.Keys);
+        switch (allMatSet.Count) {
+          case 2: case 3: {
+            // We can still just use a 3-texture multi-material for this
+            submeshList = threeTexMaterial(ref uv0s, t0, t1, t2);
+            break;
+          }
+          case 4: case 5: case 6: {
+            // Need our super shader material for all these combinations
+            Debug.Assert(false, "No shader for this many materials - yet.");
+            //submeshList = manyTexMaterial(ref uv0s, ref uv1s, t0, t1, t2);
+            break;
+          }
+          default:
+            Debug.Assert(false, "Too few or too many materials found on triangle: " + allMatSet.Count);
+            break;
         }
       }
-
+      submeshList.Add(t0); submeshList.Add(t1); submeshList.Add(t2);
     }
 
-    // Convert everything into arrays
-    var submeshTris = new int[matDict.Count][];
-    var submeshMats = new Material[matDict.Count];
+    // Remove any empty material lists
+    var emptyMats = new List<Material>();
+    foreach (var matEntry in matDict) {
+      if (matEntry.Value.Count == 0) { emptyMats.Add(matEntry.Key); }
+    }
+    foreach (var emptyMat in emptyMats) {
+      matDict.Remove(emptyMat);
+    }
+
+    // Build the mesh information and set it on the given mesh
     int count = 0;
+    var submeshMats = new Material[matDict.Count];
+    var submeshTris = new int[matDict.Count][];
     foreach (var matEntry in matDict) {
       submeshMats[count] = matEntry.Key;
       submeshTris[count] = matEntry.Value.ToArray();
       count++;
     }
+    mesh.SetUVs(0, uv0s);
+    meshRenderer.sharedMaterials = submeshMats;
+    mesh.subMeshCount = submeshMats.Length;
 
-    return (submeshTris, submeshMats);
+    for (int i = 0; i < submeshTris.GetLength(0); i++) {
+      mesh.SetTriangles(submeshTris[i], i);
+    }
   }
 
 

@@ -1,8 +1,7 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Events;
-
-
 
 public class TerrainDebris {
   // TODO: Remove this and use materials to define the density!
@@ -69,7 +68,7 @@ public class TerrainDebris {
   public void build(CubeCorner[,,] lsNodes) {
     var vertices = new List<Vector3>();
     var triangles = new List<int>();
-    var materials = new List<Material>();
+    var materials = new List<Tuple<Material[],float[]>>();
 
     var corners = new CubeCorner[CubeCorner.numCorners];
     for (int i = 0; i < CubeCorner.numCorners; i++) { corners[i] = new CubeCorner(); }
@@ -93,15 +92,9 @@ public class TerrainDebris {
     var mesh = new Mesh();
     mesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
     mesh.vertices = vertices.ToArray();
-    mesh.triangles = triangles.ToArray();
 
     // Split the mesh triangles up into their respective material groups (i.e., submeshes)
-    (var submeshTris, var submeshMats) = MeshHelper.Submeshify(triangles, materials, Resources.Load<Material>("Materials/DirtGrass1Mat"));
-    meshRenderer.sharedMaterials = submeshMats;
-    mesh.subMeshCount = submeshTris.GetLength(0);
-    for (int i = 0; i < submeshTris.GetLength(0); i++) {
-      mesh.SetTriangles(submeshTris[i], i);
-    }
+    MeshHelper.Submeshify(ref mesh, ref meshRenderer, ref materials, triangles, Resources.Load<Material>("Materials/DirtGrass1Mat"));
 
     mesh.RecalculateNormals(MeshHelper.defaultSmoothingAngle, MeshHelper.defaultTolerance);
     mesh.RecalculateBounds();
@@ -114,7 +107,7 @@ public class TerrainDebris {
     meshFilter.sharedMesh = mesh;
     meshCollider.sharedMesh = mesh;
 
-    for (int i = 0; i < meshRenderer.materials.GetLength(0); i++) {
+    for (int i = 0; i < meshRenderer.materials.Length; i++) {
       meshRenderer.materials[i].SetInt("IsTerrain", 0);
     }
 

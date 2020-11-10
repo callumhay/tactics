@@ -45,7 +45,7 @@ public class TerrainGridToolWindow : EditorWindow {
     EditorGUILayout.PropertyField(gridSnapProp);
     EditorGUILayout.PropertyField(paintMatProp);
     EditorGUILayout.Space();
-    if (GUILayout.Button(new GUIContent(){text = "Fill Core Material", tooltip = "Paint core materials into all terrain interiors."})) {
+    if (GUILayout.Button(new GUIContent(){text = "Fill with Core Material", tooltip = "Paint core materials into all terrain interiors."})) {
       var terrainGameObj = GameObject.Find("Terrain");
       if (!terrainGameObj) { terrainGameObj = GameObject.FindWithTag("Terrain"); }
       if (terrainGameObj) {
@@ -93,7 +93,9 @@ public class TerrainGridToolWindow : EditorWindow {
   public void paintNodes(in List<TerrainGridNode> nodes, in TerrainGrid terrainGrid) {
 
     // Paint the material
-    foreach (var node in nodes) { node.material = settings.paintMaterial; }
+    if (settings.paintMaterial) {
+      foreach (var node in nodes) { node.material = settings.paintMaterial; }
+    }
 
     // If the mode also paints isovalues then we paint those too
     switch (paintType) {

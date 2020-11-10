@@ -1,4 +1,5 @@
-﻿using System.Linq;
+﻿using System;
+using System.Linq;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -29,11 +30,11 @@ public class MarchingCubes {
   /// geometry/mesh data that will be appended to the given referenced lists.
   /// </summary>
   /// <param name="corners">The corners that will be marched.</param>
-  /// <param name="materials">The materials appended to, corresponding to each index.</param>
+  /// <param name="materials">The materials appended to, a tuple of materials and their contribution amounts [0,1], corresponding to each vertex.</param>
   /// <param name="triangles">The triangles appended to, representing triangles (indices in the vertices list).</param>
   /// <param name="vertices">The vertices appended to, represents the generated vertexes of the mesh.</param>
   public static void polygonize(
-    in CubeCorner[] corners, ref List<Material> materials, ref List<int> triangles, ref List<Vector3> vertices
+    in CubeCorner[] corners, ref List<Tuple<Material[],float[]>> materials, ref List<int> triangles, ref List<Vector3> vertices
   ) {
 
     // Determine the index into the edge table which tells us which vertices are inside of the surface
@@ -43,23 +44,27 @@ public class MarchingCubes {
     if (edgeLookup == 0) { return; } // Early out: Cube is entirely in/out of the surface
     
     // Find the vertices where the surface intersects the cube
-    (var cubeVertices, var cubeMaterials) = calcEdgeLookupVertices(corners, edgeLookup);
+    (var cubeVertices, var cubeMaterials, var matContribList) = calcEdgeLookupVertices(corners, edgeLookup);
     var triLookup = triTable[cubeindex];
     
     // Build the triangles
     for (var i = 0; triLookup[i] != -1; i += 3) {
       var i1 = triLookup[i]; var i2 = triLookup[i+1]; var i3 = triLookup[i+2];
       var vertA = cubeVertices[i1]; var vertB = cubeVertices[i2]; var vertC = cubeVertices[i3];
-      var matA = cubeMaterials[i1]; var matB = cubeMaterials[i2]; var matC = cubeMaterials[i3];
+      var matsA = cubeMaterials[i1]; var matsB = cubeMaterials[i2]; var matsC = cubeMaterials[i3];
+      var contribsA = matContribList[i1]; var contribsB = matContribList[i2]; var contribsC = matContribList[i3];
+
 
       var currLen = vertices.Count();
-      triangles.Add(currLen); triangles.Add(currLen+1); triangles.Add(currLen+2); 
-      materials.Add(matA); materials.Add(matB); materials.Add(matC);
+      triangles.Add(currLen); triangles.Add(currLen+1); triangles.Add(currLen+2);
       vertices.Add(vertA); vertices.Add(vertB); vertices.Add(vertC);
+      materials.Add(new Tuple<Material[],float[]>(matsA, contribsA)); 
+      materials.Add(new Tuple<Material[],float[]>(matsB, contribsB)); 
+      materials.Add(new Tuple<Material[],float[]>(matsC, contribsC));
     }
   }
 
-  private static Vector3 interpolateVertex(in CubeCorner[] corners, int idx1, int idx2) {
+  private static Vector3 interpolateVertex(in CubeCorner[] corners, int idx1, int idx2, ref float lerpAmt) {
     var i1 = idx1; var i2 = idx2;
     if (positionLessThan(corners[i2].position, corners[i1].position)) {
       i1 = idx2; i2 = idx1;
@@ -67,9 +72,12 @@ public class MarchingCubes {
     var p1 = corners[i1].position; var iv1 = corners[i1].isoVal;
     var p2 = corners[i2].position; var iv2 = corners[i2].isoVal;
     var point = new Vector3(p1.x, p1.y, p1.z);
+    
     if (Mathf.Abs(iv2-iv1) > 1e-6f) {
-      point += (p2-p1) * ((isoValCutoff-iv1) / (iv2-iv1));
+      lerpAmt = ((isoValCutoff-iv1) / (iv2-iv1));
+      point += (p2-p1) * lerpAmt;
     }
+    else { lerpAmt = 0; }
     return point;
   }
 
@@ -95,23 +103,73 @@ public class MarchingCubes {
     return cubeindex;
   }
 
-  private static (Vector3[], Material[]) calcEdgeLookupVertices(in CubeCorner[] corners, int edgeLookup) {
+  private static (Vector3[], Material[][], float[][]) calcEdgeLookupVertices(in CubeCorner[] corners, int edgeLookup) {
     // Find the vertices where the surface intersects the cube
-    Vector3[] vertexList = new Vector3[12];
-    Material[] materialList = new Material[12];
-    if ((edgeLookup & 1) != 0)    { vertexList[0]  = interpolateVertex(corners, 0, 1); materialList[0]  = corners[0].material ?? corners[1].material; }
-    if ((edgeLookup & 2) != 0)    { vertexList[1]  = interpolateVertex(corners, 1, 2); materialList[1]  = corners[1].material ?? corners[2].material; }
-    if ((edgeLookup & 4) != 0)    { vertexList[2]  = interpolateVertex(corners, 2, 3); materialList[2]  = corners[2].material ?? corners[3].material; }
-    if ((edgeLookup & 8) != 0)    { vertexList[3]  = interpolateVertex(corners, 3, 0); materialList[3]  = corners[3].material ?? corners[0].material; }
-    if ((edgeLookup & 16) != 0)   { vertexList[4]  = interpolateVertex(corners, 4, 5); materialList[4]  = corners[4].material ?? corners[5].material; }
-    if ((edgeLookup & 32) != 0)   { vertexList[5]  = interpolateVertex(corners, 5, 6); materialList[5]  = corners[5].material ?? corners[6].material; }
-    if ((edgeLookup & 64) != 0)   { vertexList[6]  = interpolateVertex(corners, 6, 7); materialList[6]  = corners[6].material ?? corners[7].material; }
-    if ((edgeLookup & 128) != 0)  { vertexList[7]  = interpolateVertex(corners, 7, 4); materialList[7]  = corners[7].material ?? corners[4].material; }
-    if ((edgeLookup & 256) != 0)  { vertexList[8]  = interpolateVertex(corners, 0, 4); materialList[8]  = corners[0].material ?? corners[4].material; }
-    if ((edgeLookup & 512) != 0)  { vertexList[9]  = interpolateVertex(corners, 1, 5); materialList[9]  = corners[1].material ?? corners[5].material; }
-    if ((edgeLookup & 1024) != 0) { vertexList[10] = interpolateVertex(corners, 2, 6); materialList[10] = corners[2].material ?? corners[6].material; }
-    if ((edgeLookup & 2048) != 0) { vertexList[11] = interpolateVertex(corners, 3, 7); materialList[11] = corners[3].material ?? corners[7].material; }
-    return (vertexList, materialList);
+    var vertexList = new Vector3[12];
+    var materialList = new Material[12][];
+    var matContribList = new float[12][];
+    float lerpAmt = 0f;
+    if ((edgeLookup & 1) != 0)    {
+      vertexList[0]  = interpolateVertex(corners, 0, 1, ref lerpAmt); 
+      matContribList[0] = new float[2]; matContribList[0][0] = lerpAmt; matContribList[0][1] = 1-lerpAmt;
+      materialList[0] = new Material[2]; materialList[0][0]  = corners[0].material;  materialList[0][1]  = corners[1].material;
+    }
+    if ((edgeLookup & 2) != 0)    {
+      vertexList[1] = interpolateVertex(corners, 1, 2, ref lerpAmt); 
+      matContribList[1] = new float[2]; matContribList[1][0] = lerpAmt; matContribList[1][1] = 1-lerpAmt;
+      materialList[1] = new Material[2]; materialList[1][0]  = corners[1].material; materialList[1][1]  = corners[2].material;
+    }
+    if ((edgeLookup & 4) != 0)    {
+      vertexList[2]  = interpolateVertex(corners, 2, 3, ref lerpAmt);
+      matContribList[2] = new float[2]; matContribList[2][0] = lerpAmt; matContribList[2][1] = 1-lerpAmt;
+      materialList[2] = new Material[2]; materialList[2][0]  = corners[2].material; materialList[2][1]  = corners[3].material;
+    }
+    if ((edgeLookup & 8) != 0)    {
+      vertexList[3]  = interpolateVertex(corners, 3, 0, ref lerpAmt);
+      matContribList[3] = new float[2]; matContribList[3][0] = lerpAmt; matContribList[3][1] = 1-lerpAmt;
+      materialList[3] = new Material[2]; materialList[3][0]  = corners[3].material; materialList[3][0]  = corners[0].material;
+    }
+    if ((edgeLookup & 16) != 0)   {
+      vertexList[4]  = interpolateVertex(corners, 4, 5, ref lerpAmt);
+      matContribList[4] = new float[2]; matContribList[4][0] = lerpAmt; matContribList[4][1] = 1-lerpAmt;
+      materialList[4] = new Material[2]; materialList[4][0]  = corners[4].material; materialList[4][1]  = corners[5].material;
+    }
+    if ((edgeLookup & 32) != 0)   {
+      vertexList[5]  = interpolateVertex(corners, 5, 6, ref lerpAmt);
+      matContribList[5] = new float[2]; matContribList[5][0] = lerpAmt; matContribList[5][1] = 1-lerpAmt;
+      materialList[5] = new Material[2]; materialList[5][0]  = corners[5].material; materialList[5][1]  = corners[6].material;
+    }
+    if ((edgeLookup & 64) != 0)   {
+      vertexList[6]  = interpolateVertex(corners, 6, 7, ref lerpAmt);
+      matContribList[6] = new float[2]; matContribList[6][0] = lerpAmt; matContribList[6][1] = 1-lerpAmt;
+      materialList[6] = new Material[2]; materialList[6][0]  = corners[6].material; materialList[6][1]  = corners[7].material;
+    }
+    if ((edgeLookup & 128) != 0)  {
+      vertexList[7]  = interpolateVertex(corners, 7, 4, ref lerpAmt);
+      matContribList[7] = new float[2]; matContribList[7][0] = lerpAmt; matContribList[7][1] = 1-lerpAmt;
+      materialList[7] = new Material[2]; materialList[7][0]  = corners[7].material; materialList[7][1]  = corners[4].material;
+    }
+    if ((edgeLookup & 256) != 0)  {
+      vertexList[8]  = interpolateVertex(corners, 0, 4, ref lerpAmt);
+      matContribList[8] = new float[2]; matContribList[8][0] = lerpAmt; matContribList[8][1] = 1-lerpAmt;
+      materialList[8] = new Material[2]; materialList[8][0]  = corners[0].material; materialList[8][1]  = corners[4].material;
+    }
+    if ((edgeLookup & 512) != 0)  {
+      vertexList[9]  = interpolateVertex(corners, 1, 5, ref lerpAmt);
+      matContribList[9] = new float[2]; matContribList[9][0] = lerpAmt; matContribList[9][1] = 1-lerpAmt;
+      materialList[9] = new Material[2]; materialList[9][0]  = corners[1].material; materialList[9][1]  = corners[5].material;
+    }
+    if ((edgeLookup & 1024) != 0) {
+      vertexList[10] = interpolateVertex(corners, 2, 6, ref lerpAmt);
+      matContribList[10] = new float[2]; matContribList[10][0] = lerpAmt; matContribList[10][1] = 1-lerpAmt;
+      materialList[10] = new Material[2]; materialList[10][0] = corners[2].material; materialList[10][1] = corners[6].material;
+    }
+    if ((edgeLookup & 2048) != 0) {
+      vertexList[11] = interpolateVertex(corners, 3, 7, ref lerpAmt);
+      matContribList[11] = new float[2]; matContribList[11][0] = lerpAmt; matContribList[11][1] = 1-lerpAmt;
+      materialList[11] = new Material[2]; materialList[11][0] = corners[3].material; materialList[11][1] = corners[7].material;
+    }
+    return (vertexList, materialList, matContribList);
   }
   private static int[] edgeTable = new int[]{
     0x0  , 0x109, 0x203, 0x30a, 0x406, 0x50f, 0x605, 0x70c,
