@@ -11,12 +11,18 @@ using UnityEngine;
 [Serializable]
 public class NodeMaterialContrib {
   public Material material;
-  public float contribution; // Quantity in [0,1] for the contribution of the material
-}
+  public float contribution = 0f; // Quantity in [0,1] for the contribution of the material
 
+  public NodeMaterialContrib(Material mat, float contrib) {
+    material = mat;
+    contribution = contrib;
+  }
+}
 
 [Serializable]
 public class TerrainGridNode {
+
+  public static int maxMaterialsPerNode = 2;
 
   [NonSerialized]
   public Vector3 position;
@@ -26,7 +32,7 @@ public class TerrainGridNode {
   public List<Vector3Int> columnIndices = new List<Vector3Int>();
 
   public float isoVal = 0f;
-  public Material material;
+  public List<NodeMaterialContrib> materials = new List<NodeMaterialContrib>(); // Currently we only allow a maximum of 2 materials on a node
 
   private bool _isTraversalGrounded = false; // Used during terrain traversal to flag whether this is grounded or not
   public bool isTraversalGrounded {

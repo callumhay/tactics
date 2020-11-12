@@ -7,12 +7,12 @@ public class CubeCorner {
   public static int numCorners = 8;
   public Vector3 position;
   public float isoVal;
-  public Material material;
+  public List<NodeMaterialContrib> materials = new List<NodeMaterialContrib>();
 
   public void setFromNode(in TerrainGridNode node, in Vector3 translation) {
     position = node.position + translation;
     isoVal = node.isoVal;
-    material = node.material;
+    materials = node.materials;
   }
 }
 
@@ -69,20 +69,23 @@ public class MarchingCubes {
     }
   }
 
-  private static Vector3 interpolateVertex(in CubeCorner[] corners, int idx1, int idx2, ref float lerpAmt) {
+  private static Vector3 interpolateVertex(in CubeCorner[] corners, int idx1, int idx2, ref float lerpAmt1, ref float lerpAmt2) {
     var i1 = idx1; var i2 = idx2;
+    ref var l1 = ref lerpAmt1; ref var l2 = ref lerpAmt2;
     if (positionLessThan(corners[i2].position, corners[i1].position)) {
       i1 = idx2; i2 = idx1;
+      l2 = lerpAmt1; l1 = lerpAmt2;
     }
     var p1 = corners[i1].position; var iv1 = corners[i1].isoVal;
     var p2 = corners[i2].position; var iv2 = corners[i2].isoVal;
     var point = new Vector3(p1.x, p1.y, p1.z);
     
     if (Mathf.Abs(iv2-iv1) > 1e-6f) {
-      lerpAmt = ((isoValCutoff-iv1) / (iv2-iv1));
-      point += (p2-p1) * lerpAmt;
+      l2 = ((isoValCutoff-iv1) / (iv2-iv1));
+      point += (p2-p1) * l2;
+      l1 = 1-l2;
     }
-    else { lerpAmt = 0; }
+    else { l1 = 1; l2 = 0; }
     return point;
   }
 
@@ -108,72 +111,45 @@ public class MarchingCubes {
     return cubeindex;
   }
 
-  private static (Vector3[], Material[][], float[][]) calcEdgeLookupVertices(in CubeCorner[] corners, int edgeLookup) {
+  private static (Vector3[], Material[][], float[][]) calcEdgeLookupVertices(CubeCorner[] corners, int edgeLookup) {
+    
     // Find the vertices where the surface intersects the cube
     var vertexList = new Vector3[12];
     var materialList = new Material[12][];
     var matContribList = new float[12][];
-    float lerpAmt = 0f;
-    if ((edgeLookup & 1) != 0)    {
-      vertexList[0]  = interpolateVertex(corners, 0, 1, ref lerpAmt); 
-      matContribList[0] = new float[2]; matContribList[0][0] = lerpAmt; matContribList[0][1] = 1-lerpAmt;
-      materialList[0] = new Material[2]; materialList[0][0]  = corners[0].material;  materialList[0][1]  = corners[1].material;
+    float lerpAmtA = 0f; float lerpAmtB = 0f;
+    float tempContrib = 0f;
+    var tempMatContribs = new Dictionary<Material, float>();
+
+    void buildVertexAndMaterials(int idx, int cornerAIdx, int cornerBIdx) {
+      vertexList[idx] = interpolateVertex(corners, cornerAIdx, cornerBIdx, ref lerpAmtA, ref lerpAmtB);
+      var materialsA = corners[cornerAIdx].materials; var materialsB = corners[cornerBIdx].materials;
+      tempMatContribs.Clear();
+      foreach (var m in materialsA) { tempMatContribs[m.material] = lerpAmtA*m.contribution; }
+      foreach (var m in materialsB) {
+        if (tempMatContribs.TryGetValue(m.material, out tempContrib)) { 
+          tempMatContribs[m.material] = Mathf.Clamp(tempContrib + lerpAmtB*m.contribution, 0f, 1f);
+        }
+        else {
+          tempMatContribs[m.material] = lerpAmtB*m.contribution;
+        }
+      }
+      materialList[idx] = tempMatContribs.Keys.ToArray(); matContribList[idx] = tempMatContribs.Values.ToArray();
     }
-    if ((edgeLookup & 2) != 0)    {
-      vertexList[1] = interpolateVertex(corners, 1, 2, ref lerpAmt); 
-      matContribList[1] = new float[2]; matContribList[1][0] = lerpAmt; matContribList[1][1] = 1-lerpAmt;
-      materialList[1] = new Material[2]; materialList[1][0]  = corners[1].material; materialList[1][1]  = corners[2].material;
-    }
-    if ((edgeLookup & 4) != 0)    {
-      vertexList[2]  = interpolateVertex(corners, 2, 3, ref lerpAmt);
-      matContribList[2] = new float[2]; matContribList[2][0] = lerpAmt; matContribList[2][1] = 1-lerpAmt;
-      materialList[2] = new Material[2]; materialList[2][0]  = corners[2].material; materialList[2][1]  = corners[3].material;
-    }
-    if ((edgeLookup & 8) != 0)    {
-      vertexList[3]  = interpolateVertex(corners, 3, 0, ref lerpAmt);
-      matContribList[3] = new float[2]; matContribList[3][0] = lerpAmt; matContribList[3][1] = 1-lerpAmt;
-      materialList[3] = new Material[2]; materialList[3][0]  = corners[3].material; materialList[3][0]  = corners[0].material;
-    }
-    if ((edgeLookup & 16) != 0)   {
-      vertexList[4]  = interpolateVertex(corners, 4, 5, ref lerpAmt);
-      matContribList[4] = new float[2]; matContribList[4][0] = lerpAmt; matContribList[4][1] = 1-lerpAmt;
-      materialList[4] = new Material[2]; materialList[4][0]  = corners[4].material; materialList[4][1]  = corners[5].material;
-    }
-    if ((edgeLookup & 32) != 0)   {
-      vertexList[5]  = interpolateVertex(corners, 5, 6, ref lerpAmt);
-      matContribList[5] = new float[2]; matContribList[5][0] = lerpAmt; matContribList[5][1] = 1-lerpAmt;
-      materialList[5] = new Material[2]; materialList[5][0]  = corners[5].material; materialList[5][1]  = corners[6].material;
-    }
-    if ((edgeLookup & 64) != 0)   {
-      vertexList[6]  = interpolateVertex(corners, 6, 7, ref lerpAmt);
-      matContribList[6] = new float[2]; matContribList[6][0] = lerpAmt; matContribList[6][1] = 1-lerpAmt;
-      materialList[6] = new Material[2]; materialList[6][0]  = corners[6].material; materialList[6][1]  = corners[7].material;
-    }
-    if ((edgeLookup & 128) != 0)  {
-      vertexList[7]  = interpolateVertex(corners, 7, 4, ref lerpAmt);
-      matContribList[7] = new float[2]; matContribList[7][0] = lerpAmt; matContribList[7][1] = 1-lerpAmt;
-      materialList[7] = new Material[2]; materialList[7][0]  = corners[7].material; materialList[7][1]  = corners[4].material;
-    }
-    if ((edgeLookup & 256) != 0)  {
-      vertexList[8]  = interpolateVertex(corners, 0, 4, ref lerpAmt);
-      matContribList[8] = new float[2]; matContribList[8][0] = lerpAmt; matContribList[8][1] = 1-lerpAmt;
-      materialList[8] = new Material[2]; materialList[8][0]  = corners[0].material; materialList[8][1]  = corners[4].material;
-    }
-    if ((edgeLookup & 512) != 0)  {
-      vertexList[9]  = interpolateVertex(corners, 1, 5, ref lerpAmt);
-      matContribList[9] = new float[2]; matContribList[9][0] = lerpAmt; matContribList[9][1] = 1-lerpAmt;
-      materialList[9] = new Material[2]; materialList[9][0]  = corners[1].material; materialList[9][1]  = corners[5].material;
-    }
-    if ((edgeLookup & 1024) != 0) {
-      vertexList[10] = interpolateVertex(corners, 2, 6, ref lerpAmt);
-      matContribList[10] = new float[2]; matContribList[10][0] = lerpAmt; matContribList[10][1] = 1-lerpAmt;
-      materialList[10] = new Material[2]; materialList[10][0] = corners[2].material; materialList[10][1] = corners[6].material;
-    }
-    if ((edgeLookup & 2048) != 0) {
-      vertexList[11] = interpolateVertex(corners, 3, 7, ref lerpAmt);
-      matContribList[11] = new float[2]; matContribList[11][0] = lerpAmt; matContribList[11][1] = 1-lerpAmt;
-      materialList[11] = new Material[2]; materialList[11][0] = corners[3].material; materialList[11][1] = corners[7].material;
-    }
+
+    if ((edgeLookup & 1) != 0)    { buildVertexAndMaterials(0, 0, 1); }
+    if ((edgeLookup & 2) != 0)    { buildVertexAndMaterials(1, 1, 2); }
+    if ((edgeLookup & 4) != 0)    { buildVertexAndMaterials(2, 2, 3); }
+    if ((edgeLookup & 8) != 0)    { buildVertexAndMaterials(3, 3, 0); }
+    if ((edgeLookup & 16) != 0)   { buildVertexAndMaterials(4, 4, 5); }
+    if ((edgeLookup & 32) != 0)   { buildVertexAndMaterials(5, 5, 6); }
+    if ((edgeLookup & 64) != 0)   { buildVertexAndMaterials(6, 6, 7); }
+    if ((edgeLookup & 128) != 0)  { buildVertexAndMaterials(7, 7, 4); }
+    if ((edgeLookup & 256) != 0)  { buildVertexAndMaterials(8, 0, 4); }
+    if ((edgeLookup & 512) != 0)  { buildVertexAndMaterials(9, 1, 5); }
+    if ((edgeLookup & 1024) != 0) { buildVertexAndMaterials(10, 2, 6); }
+    if ((edgeLookup & 2048) != 0) { buildVertexAndMaterials(11, 3, 7); }
+
     return (vertexList, materialList, matContribList);
   }
   private static int[] edgeTable = new int[]{

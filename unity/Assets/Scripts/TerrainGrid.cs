@@ -469,7 +469,7 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
       var idx = node.gridIndex;
       var corner = nodeCorners[idx.x-boxBounds.min.x, idx.y-boxBounds.min.y, idx.z-boxBounds.min.z];
       corner.isoVal = node.isoVal;
-      corner.material = node.material;
+      corner.materials = node.materials;
     }
 
     // TODO: Feed in the material for the debris here as well
@@ -506,7 +506,7 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
             // use this to determine what the original material was
             var origCorner = debrisNodeMapper.mapFromWorldspace(nodeWSPos, this);
             node.isoVal = 1;
-            node.material = origCorner.material;
+            node.materials = origCorner.materials;
             affectedNodes.Add(node);
           }
         }
@@ -561,6 +561,59 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     }
   }
 
+  public void addIsoValuesAndMaterialToNodes(float isoVal, float matAmt, Material mat, in List<TerrainGridNode> nodes) {
+    var changedNodes = new HashSet<TerrainGridNode>();
+    foreach (var node in nodes) {
+      var prevIsoVal = node.isoVal;
+      node.isoVal = Mathf.Clamp(node.isoVal + isoVal, 0, 1);
+      if (node.isoVal != prevIsoVal) { 
+        // If the node just came into existance (was just painted from 0 to 1) then only paint the given material
+        if (node.isoVal >= 0 && prevIsoVal <= 0) {
+          node.materials.Clear();
+          node.materials.Add(new NodeMaterialContrib(mat, 1.0f));
+        }
+        changedNodes.Add(node); 
+      }
+    }
+    // Go through all the changed nodes and adjust materials accordingly
+    var clampedMatAmt = Mathf.Clamp(matAmt, 0f, 1f);    
+    foreach (var node in changedNodes) {
+      // If the node has been fully "erased", then remove all its materials
+      if (node.isoVal <= 0) { node.materials.Clear(); }
+      else {
+        bool foundMat = false;
+        foreach (var matContrib in node.materials) {
+          if (matContrib.material == mat) {
+            matContrib.contribution = Mathf.Clamp(matContrib.contribution + matAmt, 0.0f, 1.0f);
+            foundMat = true;
+            if (matContrib.contribution == 0f) { node.materials.Remove(matContrib); }
+            break;
+          }
+        }
+        if (!foundMat) {
+          if (node.materials.Count >= TerrainGridNode.maxMaterialsPerNode) {
+            Debug.LogWarning("A node already has the maximum number of materials, erase those materials first.");
+          }
+          else {
+            node.materials.Add(new NodeMaterialContrib(mat, clampedMatAmt));
+          }
+        }
+      }
+    }
+
+    #if UNITY_EDITOR
+    var appIsPlaying = Application.IsPlaying(gameObject);
+    if (!appIsPlaying) {
+      updateNodesInEditor(changedNodes);
+    }
+    else 
+    #endif
+    {
+      var affectedTCs = findAllAffectedTCs(changedNodes);
+      terrainPhysicsCleanup(affectedTCs);
+    }
+  }
+
   // Editor-Only Stuff ----------------------------------------------
   #if UNITY_EDITOR
 
@@ -594,7 +647,7 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
       var flatIdx = LevelData.node3DIndexToFlatIndex(gridIdx.x, gridIdx.y, gridIdx.z, numNodesX(), numNodesY());
       var ldNode = levelData.nodes[flatIdx];
       ldNode.isoVal = node.isoVal;
-      ldNode.material = node.material;
+      ldNode.materials = node.materials;
     }
     EditorUtility.SetDirty(levelData);
     AssetDatabase.SaveAssets();

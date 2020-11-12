@@ -91,19 +91,16 @@ public class TerrainGridToolWindow : EditorWindow {
   }
 
   public void paintNodes(in List<TerrainGridNode> nodes, in TerrainGrid terrainGrid) {
-
-    // Paint the material
-    if (settings.paintMaterial) {
-      foreach (var node in nodes) { node.material = settings.paintMaterial; }
-    }
-
-    // If the mode also paints isovalues then we paint those too
     switch (paintType) {
       case TGTWSettings.PaintType.IsoValues:
-        terrainGrid?.addIsoValuesToNodes(1f, nodes);
+        if (settings.paintMaterial) { terrainGrid?.addIsoValuesAndMaterialToNodes(1f, 0.25f, settings.paintMaterial, nodes); }
+        else { terrainGrid?.addIsoValuesToNodes(1f, nodes); }
+        break;
+      case TGTWSettings.PaintType.MaterialsOnly:
+        paintMaterial(nodes, 0.25f);
+        terrainGrid?.updateNodesInEditor(nodes);
         break;
       default:
-        terrainGrid?.updateNodesInEditor(nodes);
         break;
     }
   }
@@ -111,10 +108,40 @@ public class TerrainGridToolWindow : EditorWindow {
   public void eraseNodes(in List<TerrainGridNode> nodes, in TerrainGrid terrainGrid) {
     switch (paintType) {
       case TGTWSettings.PaintType.IsoValues:
-        terrainGrid?.addIsoValuesToNodes(-1, nodes);
+        if (settings.paintMaterial) { terrainGrid?.addIsoValuesAndMaterialToNodes(-1f, -0.25f, settings.paintMaterial, nodes); }
+        else { terrainGrid?.addIsoValuesToNodes(-1f, nodes); }
+        break;
+      case TGTWSettings.PaintType.MaterialsOnly:
+        paintMaterial(nodes, -0.25f);
+        terrainGrid?.updateNodesInEditor(nodes);
         break;
       default:
         break;
     }
   }
+
+  private void paintMaterial(in List<TerrainGridNode> nodes, float paintAmount) {
+    if (!settings.paintMaterial) { return; }
+
+    var clampedPaintAmt = Mathf.Clamp(paintAmount, 0f, 1f);    
+    foreach (var node in nodes) { 
+      bool foundMat = false;
+      foreach (var matContrib in node.materials) {
+        if (matContrib.material == settings.paintMaterial) {
+          matContrib.contribution = Mathf.Clamp(matContrib.contribution + paintAmount, 0.0f, 1.0f);
+          foundMat = true;
+          break;
+        }
+      }
+      if (!foundMat) {
+        if (node.materials.Count >= TerrainGridNode.maxMaterialsPerNode) {
+          Debug.LogWarning("A node already has the maximum number of materials, erase those materials first.");
+        }
+        else {
+          node.materials.Add(new NodeMaterialContrib(settings.paintMaterial, clampedPaintAmt));
+        }
+      }
+    }
+  }
+
 }

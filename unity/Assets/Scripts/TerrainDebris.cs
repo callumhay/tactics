@@ -82,7 +82,7 @@ public class TerrainDebris {
             var cornerNode = lsNodes[x+cornerInc.x, y+cornerInc.y, z+cornerInc.z];
             corners[i].position = cornerNode.position;
             corners[i].isoVal = cornerNode.isoVal;
-            corners[i].material = cornerNode.material;
+            corners[i].materials = cornerNode.materials;
           }
           MarchingCubes.polygonize(corners, ref materials, ref triangles, ref vertices);
         }
