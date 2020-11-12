@@ -51,9 +51,14 @@ public class MarchingCubes {
     for (var i = 0; triLookup[i] != -1; i += 3) {
       var i1 = triLookup[i]; var i2 = triLookup[i+1]; var i3 = triLookup[i+2];
       var vertA = cubeVertices[i1]; var vertB = cubeVertices[i2]; var vertC = cubeVertices[i3];
+
+      // Remove triangles below y=0
+      if (vertA.y < 1e-6 && vertB.y < 1e-6 && vertC.y < 1e-6) { //&& Mathf.Approximately(vertA.y,vertB.y) && Mathf.Approximately(vertA.y,vertC.y)) {
+        continue;
+      }
+
       var matsA = cubeMaterials[i1]; var matsB = cubeMaterials[i2]; var matsC = cubeMaterials[i3];
       var contribsA = matContribList[i1]; var contribsB = matContribList[i2]; var contribsC = matContribList[i3];
-
 
       var currLen = vertices.Count();
       triangles.Add(currLen); triangles.Add(currLen+1); triangles.Add(currLen+2);
