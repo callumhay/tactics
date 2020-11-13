@@ -534,7 +534,7 @@ public static class MeshHelper {
           var currGndTexPtr = mat.GetTexture("GroundTex").GetNativeTexturePtr();
           if (currGndTexPtr == gnd1TexPtr) { uvArr[tIdx].x = contrib; }
           else if (currGndTexPtr == gnd2TexPtr) { uvArr[tIdx].y = contrib; }
-          else { uvArr[tIdx].z = contrib; }
+          else if (currGndTexPtr == gnd3TexPtr) { uvArr[tIdx].z = contrib; }
         }
       }
       setUVs(ref uv0s, m0Dict, t0);
@@ -562,8 +562,7 @@ public static class MeshHelper {
         else {
           // Materials don't match but we're only dealing with a single material per vertex, 
           // adjust the UVs for material blending and introduce a multi-material for rendering
-          allMatSet.Clear();
-          allMatSet.Add(m0); allMatSet.Add(m1); allMatSet.Add(m2);
+          allMatSet.Clear(); allMatSet.Add(m0); allMatSet.Add(m1); allMatSet.Add(m2);
           submeshList = threeTexMaterial(ref uv0s, t0, t1, t2);
         }
       }
@@ -579,8 +578,25 @@ public static class MeshHelper {
           }
           case 4: case 5: case 6: {
             // Need our super shader material for all these combinations
-            Debug.Assert(false, "No shader for this many materials - yet.");
-            //submeshList = manyTexMaterial(ref uv0s, ref uv1s, t0, t1, t2);
+            Debug.LogWarning("Too many materials, choosing the top three contributors.");
+
+            // Use the three materials with the highest contributions:
+
+            // Gather up all the unique material contributions into a single dictionary where the key
+            // is the material and the value is the sum of all contributions towards that material
+            var totalContribDict = new Dictionary<Material, float>();
+            foreach (var m in allMatSet) { totalContribDict[m] = 0; }
+            foreach (var entry in m0Dict) { totalContribDict[entry.Key] += entry.Value; }
+            foreach (var entry in m1Dict) { totalContribDict[entry.Key] += entry.Value; }
+            foreach (var entry in m2Dict) { totalContribDict[entry.Key] += entry.Value; }
+            // Sort the entries in the dictionary into descending order of their summed contribution values
+            var sortedMatList = totalContribDict.ToList();
+            sortedMatList.Sort((a,b) => (b.Value.CompareTo(a.Value)));
+
+            // Now pick the top three materials
+            var m0Entry = sortedMatList[0]; var m1Entry = sortedMatList[1]; var m2Entry = sortedMatList[2];
+            allMatSet.Clear(); allMatSet.Add(m0Entry.Key); allMatSet.Add(m1Entry.Key); allMatSet.Add(m2Entry.Key);
+            submeshList = threeTexMaterial(ref uv0s, t0, t1, t2);
             break;
           }
           default:

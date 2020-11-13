@@ -12,7 +12,7 @@ public class CubeCorner {
   public void setFromNode(in TerrainGridNode node, in Vector3 translation) {
     position = node.position + translation;
     isoVal = node.isoVal;
-    materials = node.materials;
+    materials = new List<NodeMaterialContrib>(node.materials);
   }
 }
 
@@ -33,8 +33,10 @@ public class MarchingCubes {
   /// <param name="materials">The materials appended to, a tuple of materials and their contribution amounts [0,1], corresponding to each vertex.</param>
   /// <param name="triangles">The triangles appended to, representing triangles (indices in the vertices list).</param>
   /// <param name="vertices">The vertices appended to, represents the generated vertexes of the mesh.</param>
+  /// <param name="removeNegYTris">If true any triangles with y-coordinate vertices < 0 will be removed. </param>
   public static void polygonize(
-    in CubeCorner[] corners, ref List<Tuple<Material[],float[]>> materials, ref List<int> triangles, ref List<Vector3> vertices
+    in CubeCorner[] corners, ref List<Tuple<Material[],float[]>> materials, 
+    ref List<int> triangles, ref List<Vector3> vertices, bool removeNegYTris = true
   ) {
 
     // Determine the index into the edge table which tells us which vertices are inside of the surface
@@ -53,7 +55,7 @@ public class MarchingCubes {
       var vertA = cubeVertices[i1]; var vertB = cubeVertices[i2]; var vertC = cubeVertices[i3];
 
       // Remove triangles below y=0
-      if (vertA.y < 1e-6 && vertB.y < 1e-6 && vertC.y < 1e-6) { //&& Mathf.Approximately(vertA.y,vertB.y) && Mathf.Approximately(vertA.y,vertC.y)) {
+      if (removeNegYTris && vertA.y < 1e-6 && vertB.y < 1e-6 && vertC.y < 1e-6) { //&& Mathf.Approximately(vertA.y,vertB.y) && Mathf.Approximately(vertA.y,vertC.y)) {
         continue;
       }
 

@@ -84,7 +84,7 @@ public class TerrainDebris {
             corners[i].isoVal = cornerNode.isoVal;
             corners[i].materials = cornerNode.materials;
           }
-          MarchingCubes.polygonize(corners, ref materials, ref triangles, ref vertices);
+          MarchingCubes.polygonize(corners, ref materials, ref triangles, ref vertices, false);
         }
       }
     }

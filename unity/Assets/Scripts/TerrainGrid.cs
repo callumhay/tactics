@@ -469,7 +469,7 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
       var idx = node.gridIndex;
       var corner = nodeCorners[idx.x-boxBounds.min.x, idx.y-boxBounds.min.y, idx.z-boxBounds.min.z];
       corner.isoVal = node.isoVal;
-      corner.materials = node.materials;
+      corner.materials = new List<NodeMaterialContrib>(node.materials);
     }
 
     // TODO: Feed in the material for the debris here as well
@@ -668,8 +668,37 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
   }
 
   public void fillCoreMaterial() {
-    // TODO
-    Debug.LogWarning("Not implemented yet!");
+    // This is similar to a rasterization algorithm - we trace along each line of nodes, when we encounter a node
+    // that is inside the terrain we begin filling nodes with the core material until we find a node that is no
+    // longer inside the terrain.
+    int numXNodes = numNodesX(); int numYNodes = numNodesY(); int numZNodes = numNodesZ();
+    bool inTerrainOnZ = false;
+    for (int x = 0; x < numXNodes; x++) {
+      for (int y = 0; y < numYNodes; y++) {
+        inTerrainOnZ = false;
+        for (int z = 0; z < numZNodes; z++) {
+          var currNode = nodes[x,y,z];
+          if (currNode.isTerrain()) {
+            if (!inTerrainOnZ) { inTerrainOnZ = true; }
+            else {
+              // We're already inside the terrain along the z-axis, check to see if any of the nodes surrounding this one are not inside the terrain
+              if (x == 0 || x == numXNodes-1 || !nodes[x+1,y,z].isTerrain() || !nodes[x-1,y,z].isTerrain() ||
+                  y == numYNodes-1 || !nodes[x,y+1,z].isTerrain() ||
+                  z == numZNodes-1 || !nodes[x,y,z+1].isTerrain()) { 
+                continue; 
+              }
+              else { 
+                currNode.materials.Clear(); 
+                currNode.materials.Add(new NodeMaterialContrib(Resources.Load<Material>("Materials/DefaultCoreMat"), 1f));
+              }
+            }
+          }
+          else {
+            inTerrainOnZ = false;
+          }
+        }
+      }
+    }
   }
 
   // Intersect the given ray with this grid, returns the closest relevant edit point

@@ -18,6 +18,7 @@ public class TerrainGridToolWindow : EditorWindow {
   public TGTWSettings.PaintMode paintMode { get { return settings.paintMode; } }
   public TGTWSettings.BrushType brushType { get { return settings.brushType; } }
   public float brushSize { get { return settings.brushSize; } }
+  public float matPaintIntensity { get { return settings.matPaintIntensity; } }
   public bool gridSnaping { get { return settings.gridSnaping; } }
 
   [MenuItem("Window/Terrain Grid Tool")]
@@ -35,6 +36,7 @@ public class TerrainGridToolWindow : EditorWindow {
     var paintModeProp = serializedObj.FindProperty("paintMode");
     var brushTypeProp = serializedObj.FindProperty("brushType");
     var brushSizeProp = serializedObj.FindProperty("brushSize");
+    var matIntensityProp = serializedObj.FindProperty("matPaintIntensity");
     var gridSnapProp  = serializedObj.FindProperty("gridSnaping");
     var paintMatProp = serializedObj.FindProperty("paintMaterial");
 
@@ -43,6 +45,7 @@ public class TerrainGridToolWindow : EditorWindow {
     EditorGUILayout.PropertyField(brushTypeProp);
     brushSizeProp.floatValue = EditorGUILayout.Slider("Brush Size", brushSizeProp.floatValue, 0.25f, 5.0f);
     EditorGUILayout.PropertyField(gridSnapProp);
+    matIntensityProp.floatValue = EditorGUILayout.Slider("Material Intensity", matIntensityProp.floatValue, 0.01f, 1.0f);
     EditorGUILayout.PropertyField(paintMatProp);
     EditorGUILayout.Space();
     if (GUILayout.Button(new GUIContent(){text = "Fill with Core Material", tooltip = "Paint core materials into all terrain interiors."})) {
@@ -93,11 +96,11 @@ public class TerrainGridToolWindow : EditorWindow {
   public void paintNodes(in List<TerrainGridNode> nodes, in TerrainGrid terrainGrid) {
     switch (paintType) {
       case TGTWSettings.PaintType.IsoValues:
-        if (settings.paintMaterial) { terrainGrid?.addIsoValuesAndMaterialToNodes(1f, 0.25f, settings.paintMaterial, nodes); }
+        if (settings.paintMaterial) { terrainGrid?.addIsoValuesAndMaterialToNodes(1f, matPaintIntensity, settings.paintMaterial, nodes); }
         else { terrainGrid?.addIsoValuesToNodes(1f, nodes); }
         break;
       case TGTWSettings.PaintType.MaterialsOnly:
-        paintMaterial(nodes, 0.25f);
+        paintMaterial(nodes, matPaintIntensity);
         terrainGrid?.updateNodesInEditor(nodes);
         break;
       default:
@@ -108,11 +111,11 @@ public class TerrainGridToolWindow : EditorWindow {
   public void eraseNodes(in List<TerrainGridNode> nodes, in TerrainGrid terrainGrid) {
     switch (paintType) {
       case TGTWSettings.PaintType.IsoValues:
-        if (settings.paintMaterial) { terrainGrid?.addIsoValuesAndMaterialToNodes(-1f, -0.25f, settings.paintMaterial, nodes); }
+        if (settings.paintMaterial) { terrainGrid?.addIsoValuesAndMaterialToNodes(-1f, -matPaintIntensity, settings.paintMaterial, nodes); }
         else { terrainGrid?.addIsoValuesToNodes(-1f, nodes); }
         break;
       case TGTWSettings.PaintType.MaterialsOnly:
-        paintMaterial(nodes, -0.25f);
+        paintMaterial(nodes, -matPaintIntensity);
         terrainGrid?.updateNodesInEditor(nodes);
         break;
       default:

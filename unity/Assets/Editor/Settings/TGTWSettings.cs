@@ -8,6 +8,7 @@ public class TGTWSettings : ScriptableObject {
   public enum BrushType { Sphere = 0, Cube = 1 };
   
   public float brushSize = 1.0f;
+  public float matPaintIntensity = 0.25f;
   public PaintType paintType = PaintType.IsoValues;
   public PaintMode paintMode = PaintMode.Projection;
   public BrushType brushType = BrushType.Cube;
