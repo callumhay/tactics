@@ -129,9 +129,27 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     return neighbours;
   }
 
-  public List<TerrainGridNode> getNodesInsideBox(in Bounds box) {
+  public List<TerrainGridNode> getNodesInsideBox(in Bounds box, bool groundFirst, float setLevelUnits) {
     var result = new List<TerrainGridNode>();
     var indices = getIndexRangeForBox(box);
+    var maxYIdx = unitsToNodeIndex(setLevelUnits);
+    indices.yStartIdx = Math.Min(maxYIdx, indices.yStartIdx);
+    indices.yEndIdx = Math.Min(maxYIdx, indices.yEndIdx);
+
+    if (groundFirst) {
+      int startY = indices.yStartIdx;
+      for (int y = 0; y < indices.yStartIdx && startY == indices.yStartIdx; y++) {
+        for (int x = indices.xStartIdx; x <= indices.xEndIdx && startY == indices.yStartIdx; x++) {
+          for (int z = indices.zStartIdx; z <= indices.zEndIdx; z++) {
+            if (!this.nodes[x,y,z].isTerrain()) { startY = y; break; }
+          }
+        }
+      }
+      var yDiff = indices.yStartIdx - startY;
+      indices.yStartIdx = startY;
+      indices.yEndIdx -= yDiff;
+    }
+
     for (int x = indices.xStartIdx; x <= indices.xEndIdx; x++) {
       for (int y = indices.yStartIdx; y <= indices.yEndIdx; y++) {
         for (int z = indices.zStartIdx; z <= indices.zEndIdx; z++) {
@@ -139,15 +157,16 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
         }
       }
     }
+
     return result;
   }  
 
-  public List<TerrainGridNode> getNodesInsideSphere(in Vector3 center, float radius) {
+  public List<TerrainGridNode> getNodesInsideSphere(in Vector3 center, float radius, bool groundFirst, float setLevelUnits) {
     var lsCenter = center - transform.position; // Get the center in localspace
 
     // Narrow the search down to the nodes inside the sphere's bounding box
     var dia = 2*radius;
-    var nodesInBox = getNodesInsideBox(new Bounds(lsCenter, new Vector3(dia, dia, dia)));
+    var nodesInBox = getNodesInsideBox(new Bounds(lsCenter, new Vector3(dia, dia, dia)), groundFirst, setLevelUnits);
 
     // Go through the list and only take the nodes inside the sphere
     var sqrRadius = radius*radius;
@@ -160,13 +179,31 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     return result;
   }
 
-  public List<TerrainGridNode> getNodesInsideProjXZCircle(in Vector3 center, float radius) {
+  public List<TerrainGridNode> getNodesInsideProjXZCircle(in Vector3 center, float radius, bool groundFirst, float setLevelUnits) {
     var lsCenter = center - transform.position; // Get the center in localspace
     
     // Find the highest y node in the xz coordinates with an isovalue
     var isCenter = unitsToNodeIndexVec3(lsCenter); isCenter.y++;
-    while (isCenter.y > 1 && !nodes[isCenter.x,isCenter.y-1,isCenter.z].isTerrain()) { isCenter.y--; }
-    while (isCenter.y < nodes.GetLength(1)-1 && nodes[isCenter.x,isCenter.y,isCenter.z].isTerrain()) { isCenter.y++; }
+    if (groundFirst) {
+      int startY = isCenter.y;
+      var startXIdx = Mathf.FloorToInt(isCenter.x-radius);
+      var endXIdx = Mathf.FloorToInt(isCenter.x+radius);
+      var startZIdx = Mathf.FloorToInt(isCenter.z-radius);
+      var endZIdx = Mathf.FloorToInt(isCenter.z+radius);
+      for (int y = 0; y < isCenter.y && startY == isCenter.y; y++) {
+        for (int x = startXIdx; x <= endXIdx && startY == isCenter.y; x++) {
+          for (int z = startZIdx; z <= endZIdx  && startY == isCenter.y; z++) {
+            if (!this.nodes[x,y,z].isTerrain()) { startY = y; break; }
+          }
+        }
+      }
+      isCenter.y = startY;
+    }
+    else {
+      while (isCenter.y > 1 && !nodes[isCenter.x,isCenter.y-1,isCenter.z].isTerrain()) { isCenter.y--; }
+      while (isCenter.y < nodes.GetLength(1)-1 && nodes[isCenter.x,isCenter.y,isCenter.z].isTerrain()) { isCenter.y++; }
+    }
+    isCenter.y = Mathf.Min(Mathf.Max(0, unitsToNodeIndex(setLevelUnits-radius)), isCenter.y);
 
     // Get the nodes in a square box that encloses the circle
     var dia = 2*radius;
@@ -184,7 +221,7 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     }
     return result;
   }
-  public List<TerrainGridNode> getNodesInsideProjXZSquare(in Bounds box) {
+  public List<TerrainGridNode> getNodesInsideProjXZSquare(in Bounds box, bool groundFirst, float setLevelUnits) {
     var lsCenter = box.center - transform.position; // Get the center in localspace
     // Find the highest y node in the xz coordinates with an isovalue
     var isCenter = unitsToNodeIndexVec3(lsCenter); isCenter.y++;
@@ -192,7 +229,7 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     while (isCenter.y < nodes.GetLength(1)-1 && nodes[isCenter.x,isCenter.y,isCenter.z].isTerrain()) { isCenter.y++; }
 
     var projBox = new Bounds(nodeIndexToUnitsVec3(isCenter), new Vector3(box.size.x, 1.5f*halfUnitsPerNode(), box.size.z));
-    return getNodesInsideBox(projBox);
+    return getNodesInsideBox(projBox, groundFirst, setLevelUnits);
   }
 
 

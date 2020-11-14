@@ -14,5 +14,7 @@ public class TGTWSettings : ScriptableObject {
   public BrushType brushType = BrushType.Cube;
   public bool gridSnaping = false;
   public bool showGridOverlay = false;
+  public bool groundUpOnly = false;
+  public float setLevelValue = 1.0f;
   public Material paintMaterial;
 }

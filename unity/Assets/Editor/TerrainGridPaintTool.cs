@@ -109,7 +109,7 @@ public class TerrainGridTool : EditorTool {
         redraw = nodes.Count > 0;
         foreach (var node in nodes) {
           var currColour = node.editorUnselectedColour();
-          currColour.a = 0.25f;
+          currColour.a = 0.5f;
           Handles.color = currColour;
           Handles.CubeHandleCap(GUIUtility.GetControlID(FocusType.Passive), node.position, rot, terrainGrid.halfUnitsPerNode(), EventType.Repaint);
         }
