@@ -20,6 +20,7 @@ public class TerrainGridToolWindow : EditorWindow {
   public float brushSize { get { return settings.brushSize; } }
   public float matPaintIntensity { get { return settings.matPaintIntensity; } }
   public bool gridSnaping { get { return settings.gridSnaping; } }
+  public bool showGridOverlay { get { return settings.showGridOverlay; }}
 
   [MenuItem("Window/Terrain Grid Tool")]
   static void Open() {
@@ -37,17 +38,26 @@ public class TerrainGridToolWindow : EditorWindow {
     var brushTypeProp = serializedObj.FindProperty("brushType");
     var brushSizeProp = serializedObj.FindProperty("brushSize");
     var matIntensityProp = serializedObj.FindProperty("matPaintIntensity");
-    var gridSnapProp  = serializedObj.FindProperty("gridSnaping");
+    var gridSnapProp = serializedObj.FindProperty("gridSnaping");
+    var showGridProp = serializedObj.FindProperty("showGridOverlay");
     var paintMatProp = serializedObj.FindProperty("paintMaterial");
 
     EditorGUILayout.PropertyField(paintTypeProp);
     EditorGUILayout.PropertyField(paintModeProp);
     EditorGUILayout.PropertyField(brushTypeProp);
     brushSizeProp.floatValue = EditorGUILayout.Slider("Brush Size", brushSizeProp.floatValue, 0.25f, 5.0f);
+
+    EditorGUILayout.BeginHorizontal();
     EditorGUILayout.PropertyField(gridSnapProp);
+    //EditorGUI.BeginChangeCheck();
+    EditorGUILayout.PropertyField(showGridProp);
+    //if (EditorGUI.EndChangeCheck()) { if (showGridProp.boolValue) { } }
+    EditorGUILayout.EndHorizontal();
+
     matIntensityProp.floatValue = EditorGUILayout.Slider("Material Intensity", matIntensityProp.floatValue, 0.01f, 1.0f);
     EditorGUILayout.PropertyField(paintMatProp);
     EditorGUILayout.Space();
+
     if (GUILayout.Button(new GUIContent(){text = "Fill with Core Material", tooltip = "Paint core materials into all terrain interiors."})) {
       var terrainGameObj = GameObject.Find("Terrain");
       if (!terrainGameObj) { terrainGameObj = GameObject.FindWithTag("Terrain"); }

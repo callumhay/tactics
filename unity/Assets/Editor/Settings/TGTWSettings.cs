@@ -13,5 +13,6 @@ public class TGTWSettings : ScriptableObject {
   public PaintMode paintMode = PaintMode.Projection;
   public BrushType brushType = BrushType.Cube;
   public bool gridSnaping = false;
+  public bool showGridOverlay = false;
   public Material paintMaterial;
 }

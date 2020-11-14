@@ -639,6 +639,20 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     );
   }
 
+  public float fastSampleHeight(int terrainColX, int terrainColZ) {
+    if (nodes == null) { return 0f; }
+    int nodeIdxX = terrainColX*TerrainColumn.size*(nodesPerUnit-1) + (nodesPerUnit/2)*TerrainColumn.size;
+    int nodeIdxZ = terrainColZ*TerrainColumn.size*(nodesPerUnit-1) + (nodesPerUnit/2)*TerrainColumn.size;
+    //Debug.Log("X: " + nodeIdxX + ", Z: " + nodeIdxZ + " Grid size: " + nodes.GetLength(0) + ", " + nodes.GetLength(1) + ", " + nodes.GetLength(2));
+    int numYNodes = numNodesY();
+    int finalYNodeIdx = 0;
+    for (int y = 0; y < numYNodes-1; y++) {
+      if (!nodes[nodeIdxX, y+1, nodeIdxZ].isTerrain()) { break; }
+      finalYNodeIdx++;
+    }
+    return finalYNodeIdx*unitsPerNode();
+  }
+
   public void updateNodesInEditor(in IEnumerable<TerrainGridNode> nodes) {
     if (Application.IsPlaying(gameObject)) { return; }
     var affectedTCs = regenerateMeshes(nodes);

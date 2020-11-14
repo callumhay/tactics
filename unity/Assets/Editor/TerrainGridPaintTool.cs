@@ -100,38 +100,46 @@ public class TerrainGridTool : EditorTool {
     var terrainGrid = target as TerrainGrid;
     if (!InternalEditorUtility.isApplicationActive || !terrainGrid || !settingsWindow) { return; }
 
+    bool redraw = false;
+    var rot = new Quaternion(0,0,0,1);
     if (editPtActive) {
-      var rot = new Quaternion(0,0,0,1);
-      /*
-      if (settingsWindow.paintMode == TGTWSettings.PaintMode.Floating) {
-        // Draw the brush shape
-        Handles.color = new Color(0.0f, 0.8f, 1.0f, 0.25f);
-        switch (settingsWindow.brushType) {
-          case TGTWSettings.BrushType.Sphere:
-            Handles.SphereHandleCap(GUIUtility.GetControlID(FocusType.Passive), lastEditPt, rot, settingsWindow.brushSize, EventType.Repaint);
-            break;
-          case TGTWSettings.BrushType.Cube:
-            Handles.CubeHandleCap(GUIUtility.GetControlID(FocusType.Passive), lastEditPt, rot, settingsWindow.brushSize, EventType.Repaint);
-            break;
-          default:
-            return;
-        }
-      }
-      */
-
-
       // Draw all the nodes that the tool is colliding with / affecting
       List<TerrainGridNode> nodes = settingsWindow.getAffectedNodesAtPoint(lastEditPt, terrainGrid);
       if (nodes != null) {
+        redraw = nodes.Count > 0;
         foreach (var node in nodes) {
           var currColour = node.editorUnselectedColour();
           currColour.a = 0.25f;
           Handles.color = currColour;
           Handles.CubeHandleCap(GUIUtility.GetControlID(FocusType.Passive), node.position, rot, terrainGrid.halfUnitsPerNode(), EventType.Repaint);
         }
-        if (nodes.Count > 0) { sceneView.Repaint(); }
       }
     }
-    
+    if (settingsWindow.showGridOverlay) {
+      redraw = true;
+      Handles.color = new Color(0.4f, 0.4f, 1.0f, 0.25f);
+      Handles.zTest = UnityEngine.Rendering.CompareFunction.LessEqual;
+      
+      var faceColour = new Color(0.5f, 0.5f, 1.0f, 0.5f);
+      var outlineColour = new Color(1, 1, 1, 0.75f);
+      var halfUnitsPerNode = terrainGrid.halfUnitsPerNode();
+      for (int x = 0; x < terrainGrid.xSize; x++) {
+        var xPos = x*TerrainColumn.size;
+        for (int z = 0; z < terrainGrid.zSize; z++) {
+          if ((x+z) % 2 == 0) {
+            var zPos = z*TerrainColumn.size;
+            var yPos = terrainGrid.fastSampleHeight(x,z) + halfUnitsPerNode;
+            var quadVerts = new Vector3[4];
+            quadVerts[0] = new Vector3(xPos, yPos, zPos);
+            quadVerts[1] = new Vector3(xPos+TerrainColumn.size, yPos, zPos);
+            quadVerts[2] = new Vector3(xPos+TerrainColumn.size, yPos, zPos+TerrainColumn.size);
+            quadVerts[3] = new Vector3(xPos, yPos, zPos+TerrainColumn.size);
+            Handles.DrawSolidRectangleWithOutline(quadVerts, faceColour, outlineColour);
+          }
+        }
+      }
+    }
+
+    if (redraw) { sceneView.Repaint(); }
   }
 }
