@@ -1,0 +1,89 @@
+﻿#pragma kernel CSMarchingCubes
+#include "CommonCS.compute"
+#include "MarchingCubesTableCS.compute"
+
+struct Vert {
+  float3 position;
+  float3 normal;
+};
+
+uint numNodesPerSide;
+float unitsPerNode;
+float isoLevel;
+
+AppendStructuredBuffer<Vert> vertices;
+RWStructuredBuffer<float> isoValues;
+
+bool positionLessThan(float3 left, float3 right) {
+  if (left.x < right.x) { return true; }
+  else if (left.x > right.x) { return false; }
+  if (left.y < right.y) { return true; }
+  else if (left.y > right.y) { return false; }
+  if (left.z < right.z) { return true; }
+  return false;
+}
+
+float3 interpolate(float4 a, float4 b) {
+  float4 p1 = a;
+  float4 p2 = b;
+  if (positionLessThan(a.xyz, b.xyz)) { p1 = b; p2 = a; }
+
+  float3 result = p1.xyz;
+  if (abs(p2.w-p1.w) > 1e-6f) {
+    float lerpAmt = ((isoLevel-p1.w) / (p2.w-p1.w));
+    result = result + (p2.xyz-p1.xyz) * lerpAmt;
+  }
+  return result;
+}
+
+[numthreads(8,8,8)]
+void CSMarchingCubes (uint3 id : SV_DispatchThreadID) {
+
+  // Make sure we don't march corners that don't exist!
+  if (id.x >= numNodesPerSide - 1 || id.y >= numNodesPerSide - 1 || id.z >= numNodesPerSide - 1) { return; }
+
+  float3 originPos = float3(id.x*unitsPerNode, id.y*unitsPerNode, id.z*unitsPerNode);
+  float4 corners[8] = {
+		float4(originPos,                                                    isoValues[index(id.x, id.y, id.z, numNodesPerSide)]),
+		float4(originPos + float3(unitsPerNode,0,0),                         isoValues[index(id.x + 1, id.y, id.z, numNodesPerSide)]),
+		float4(originPos + float3(unitsPerNode, 0, unitsPerNode),            isoValues[index(id.x + 1, id.y, id.z + 1, numNodesPerSide)]),
+		float4(originPos + float3(0, 0, unitsPerNode),                       isoValues[index(id.x, id.y, id.z + 1, numNodesPerSide)]),
+		float4(originPos + float3(0, unitsPerNode, 0),                       isoValues[index(id.x, id.y + 1, id.z, numNodesPerSide)]),
+		float4(originPos + float3(unitsPerNode, unitsPerNode, 0),            isoValues[index(id.x + 1, id.y + 1, id.z, numNodesPerSide)]),
+		float4(originPos + float3(unitsPerNode, unitsPerNode, unitsPerNode), isoValues[index(id.x + 1, id.y + 1, id.z + 1, numNodesPerSide)]),
+		float4(originPos + float3(0, unitsPerNode, unitsPerNode),            isoValues[index(id.x, id.y + 1, id.z + 1, numNodesPerSide)]),
+	};
+
+	int cube = 0;
+	if (corners[0].w >= isoLevel) { cube |= 1;   }
+	if (corners[1].w >= isoLevel) { cube |= 2;   }
+	if (corners[2].w >= isoLevel) { cube |= 4;   }
+	if (corners[3].w >= isoLevel) { cube |= 8;   }
+	if (corners[4].w >= isoLevel) { cube |= 16;  }
+	if (corners[5].w >= isoLevel) { cube |= 32;  }
+	if (corners[6].w >= isoLevel) { cube |= 64;  }
+	if (corners[7].w >= isoLevel) { cube |= 128; }
+
+  for (int i = 0; triangulation[cube][i] != -1; i += 3) {
+		int a0 = cornerIndexFromEdge[triangulation[cube][i]][0];
+		int a1 = cornerIndexFromEdge[triangulation[cube][i]][1];
+		int b0 = cornerIndexFromEdge[triangulation[cube][i+1]][0];
+		int b1 = cornerIndexFromEdge[triangulation[cube][i+1]][1];
+		int c0 = cornerIndexFromEdge[triangulation[cube][i+2]][0];
+		int c1 = cornerIndexFromEdge[triangulation[cube][i+2]][1];
+
+		Vert v0; Vert v1; Vert v2;
+		v0.position = interpolate(corners[a0], corners[a1]);
+		v1.position = interpolate(corners[b0], corners[b1]);
+		v2.position = interpolate(corners[c0], corners[c1]);
+
+    float3 normal = normalize(cross(v1.position-v0.position, v2.position-v0.position));
+    v0.normal = normal;
+    v1.normal = normal;
+    v2.normal = normal;
+
+		vertices.Append(v0);
+    vertices.Append(v1);
+    vertices.Append(v2);
+	}
+}

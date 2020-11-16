@@ -128,7 +128,7 @@ public class TerrainGridTool : EditorTool {
         for (int z = 0; z < terrainGrid.zSize; z++) {
           if ((x+z) % 2 == 0) {
             var zPos = z*TerrainColumn.size;
-            var yPos = terrainGrid.fastSampleHeight(x,z) + halfUnitsPerNode;
+            var yPos = terrainGrid.fastSampleHeight(x,z) + halfUnitsPerNode + 1e-4f;
             var quadVerts = new Vector3[4];
             quadVerts[0] = new Vector3(xPos, yPos, zPos);
             quadVerts[1] = new Vector3(xPos+TerrainColumn.size, yPos, zPos);

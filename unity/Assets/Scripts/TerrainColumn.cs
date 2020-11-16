@@ -32,7 +32,6 @@ public class TerrainColumn {
       meshFilter   = gameObj.AddComponent<MeshFilter>();
       meshCollider = gameObj.AddComponent<MeshCollider>();
       meshRenderer = gameObj.AddComponent<MeshRenderer>();
-      //meshRenderer.sharedMaterial = Resources.Load<Material>("Materials/DirtGrass1Mat");
     }
     gameObj.transform.position = TerrainColumn.size * (Vector3)_index;
   }
@@ -96,7 +95,7 @@ public class TerrainColumn {
     mesh.vertices = vertices.ToArray();
 
     // Split the mesh triangles up into their respective material groups (i.e., submeshes)
-    MeshHelper.Submeshify(ref mesh, ref meshRenderer, ref materials, triangles, Resources.Load<Material>("Materials/DirtGrass1Mat"));
+    MeshHelper.Submeshify(ref mesh, ref meshRenderer, ref materials, triangles, MaterialHelper.defaultMaterial);
 
     mesh.RecalculateNormals(MeshHelper.defaultSmoothingAngle, MeshHelper.defaultTolerance, minXZPt, maxXZPt);
     mesh.RecalculateBounds();

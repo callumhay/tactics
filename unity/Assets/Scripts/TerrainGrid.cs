@@ -453,6 +453,7 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
   private HashSet<TerrainColumn> findAllAffectedTCs(in IEnumerable<TerrainGridNode> changedNodes) {
     var terrainCols = new HashSet<TerrainColumn>();
     foreach (var node in changedNodes) {
+      Debug.Assert(node != null);
       foreach (var tcIndex in node.columnIndices) { terrainCols.Add(terrainColumns[tcIndex]); }
       // We also need to add TerrainColumns associated with any adjacent nodes to avoid seams and other artifacts
       // caused by the node/cube dependancies that exist at the edges of each TerrainColumn mesh
@@ -600,6 +601,7 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
 
   public void addIsoValuesAndMaterialToNodes(float isoVal, float matAmt, Material mat, in List<TerrainGridNode> nodes) {
     var changedNodes = new HashSet<TerrainGridNode>();
+    var matToPaint = mat ? mat : MaterialHelper.defaultMaterial;
     foreach (var node in nodes) {
       var prevIsoVal = node.isoVal;
       node.isoVal = Mathf.Clamp(node.isoVal + isoVal, 0, 1);
@@ -607,9 +609,9 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
         // If the node just came into existance (was just painted from 0 to 1) then only paint the given material
         if (node.isoVal >= 0 && prevIsoVal <= 0) {
           node.materials.Clear();
-          node.materials.Add(new NodeMaterialContrib(mat, 1.0f));
+          node.materials.Add(new NodeMaterialContrib(matToPaint, 1.0f));
         }
-        changedNodes.Add(node); 
+        changedNodes.Add(node);
       }
     }
     // Go through all the changed nodes and adjust materials accordingly
@@ -620,7 +622,7 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
       else {
         bool foundMat = false;
         foreach (var matContrib in node.materials) {
-          if (matContrib.material == mat) {
+          if (matContrib.material == matToPaint) {
             matContrib.contribution = Mathf.Clamp(matContrib.contribution + matAmt, 0.0f, 1.0f);
             foundMat = true;
             if (matContrib.contribution == 0f) { node.materials.Remove(matContrib); }
@@ -632,7 +634,7 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
             Debug.LogWarning("A node already has the maximum number of materials, erase those materials first.");
           }
           else {
-            node.materials.Add(new NodeMaterialContrib(mat, clampedMatAmt));
+            node.materials.Add(new NodeMaterialContrib(matToPaint, clampedMatAmt));
           }
         }
       }

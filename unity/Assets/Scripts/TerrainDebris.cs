@@ -94,7 +94,7 @@ public class TerrainDebris {
     mesh.vertices = vertices.ToArray();
 
     // Split the mesh triangles up into their respective material groups (i.e., submeshes)
-    MeshHelper.Submeshify(ref mesh, ref meshRenderer, ref materials, triangles, Resources.Load<Material>("Materials/DirtGrass1Mat"));
+    MeshHelper.Submeshify(ref mesh, ref meshRenderer, ref materials, triangles, MaterialHelper.defaultMaterial);
 
     mesh.RecalculateNormals(MeshHelper.defaultSmoothingAngle, MeshHelper.defaultTolerance);
     mesh.RecalculateBounds();

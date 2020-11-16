@@ -1,0 +1,29 @@
+﻿#pragma kernel CSSmoothNormals
+
+RWStructuredBuffer<float3> vertices;
+RWStructuredBuffer<float3> normals;
+RWStructuredBuffer<float3> smoothedNormals;
+int numVertices;
+float smoothingAngleRads;
+
+bool equals(float3 a, float3 b) {
+	bool3 v = a == b;
+	return v.x & v.y & v.z;
+}
+
+[numthreads(8,1,1)]
+void CSSmoothNormals (uint3 id : SV_DispatchThreadID) {
+  if (id.x >= (uint)numVertices) { return; } // This is necessary since the number of vertices is likely not a multiple of the thread group size
+  
+  float3 normal = float3(0, 0, 0);
+	float denominator = 0;
+
+	for (int i = 0; i < numVertices; i++) {
+		if (equals(vertices[i], vertices[id.x]) && acos(dot(normals[i], normals[id.x])) <= smoothingAngleRads) {
+			normal += normals[i];
+			denominator++;
+		}
+  }
+
+	smoothedNormals[id.x] = normalize(normal / denominator);
+}

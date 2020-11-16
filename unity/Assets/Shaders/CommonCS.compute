@@ -1,0 +1,3 @@
+﻿uint index(uint x, uint y, uint z, uint size) {
+	return x + y * size + z * size * size;
+}

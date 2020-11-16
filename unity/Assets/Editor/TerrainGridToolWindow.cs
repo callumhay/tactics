@@ -35,7 +35,6 @@ public class TerrainGridToolWindow : EditorWindow {
     var terrainGrid = TerrainGridToolWindow.findTerrainGrid();
     if (!terrainGrid) {
       EditorGUILayout.LabelField("Could not find TerrainGrid!");
-      Debug.LogWarning("Could not find component 'TerrainGrid'");
       return;
     }
 
@@ -57,26 +56,18 @@ public class TerrainGridToolWindow : EditorWindow {
     EditorGUILayout.PropertyField(paintModeProp);
     EditorGUILayout.PropertyField(brushTypeProp);
     EditorGUILayout.Slider(brushSizeProp, 0.25f, 5.0f,  "Brush Size");
+    EditorGUILayout.PropertyField(gridSnapProp);
+    EditorGUILayout.PropertyField(showGridProp);
 
     EditorGUILayout.Space();
-
     EditorGUILayout.PropertyField(groundUpOnlyProp);
     EditorGUILayout.Slider(setLevelValProp, 1.0f, terrainGrid.ySize*TerrainColumn.size, "Set Level", GUILayout.ExpandWidth(true));
     
     EditorGUILayout.Space();
-
-    EditorGUILayout.BeginHorizontal();
-    EditorGUILayout.PropertyField(gridSnapProp);
-    //EditorGUI.BeginChangeCheck();
-    EditorGUILayout.PropertyField(showGridProp);
-    //if (EditorGUI.EndChangeCheck()) { if (showGridProp.boolValue) { } }
-    EditorGUILayout.EndHorizontal();
-
     EditorGUILayout.Slider(matIntensityProp, 0.01f, 1.0f, "Material Intensity");
     EditorGUILayout.PropertyField(paintMatProp);
 
     EditorGUILayout.Space();
-
     if (GUILayout.Button(new GUIContent(){text = "Fill with Core Material", tooltip = "Paint core materials into all terrain interiors."})) {
       terrainGrid.fillCoreMaterial();
     }
