@@ -11,7 +11,7 @@ uint numNodesPerSide;
 float unitsPerNode;
 float isoLevel;
 
-AppendStructuredBuffer<Vert> vertices;
+RWStructuredBuffer<Vert> meshData;
 RWStructuredBuffer<float> isoValues;
 
 bool positionLessThan(float3 left, float3 right) {
@@ -64,6 +64,16 @@ void CSMarchingCubes (uint3 id : SV_DispatchThreadID) {
 	if (corners[6].w >= isoLevel) { cube |= 64;  }
 	if (corners[7].w >= isoLevel) { cube |= 128; }
 
+  int idx = index(id.x, id.y, id.z, numNodesPerSide);
+  int count = 0;
+  Vert nullVert;
+  nullVert.position = float3(-1,-1,-1);
+  nullVert.normal = float3(-1,-1,-1);
+  for (int j = 0; j < 5; j++) { 
+    meshData[idx*15 + (3*j + 0)] = nullVert;
+    meshData[idx*15 + (3*j + 1)] = nullVert;
+    meshData[idx*15 + (3*j + 2)] = nullVert;
+  }
   for (int i = 0; triangulation[cube][i] != -1; i += 3) {
 		int a0 = cornerIndexFromEdge[triangulation[cube][i]][0];
 		int a1 = cornerIndexFromEdge[triangulation[cube][i]][1];
@@ -72,7 +82,7 @@ void CSMarchingCubes (uint3 id : SV_DispatchThreadID) {
 		int c0 = cornerIndexFromEdge[triangulation[cube][i+2]][0];
 		int c1 = cornerIndexFromEdge[triangulation[cube][i+2]][1];
 
-		Vert v0; Vert v1; Vert v2;
+    Vert v0; Vert v1; Vert v2;
 		v0.position = interpolate(corners[a0], corners[a1]);
 		v1.position = interpolate(corners[b0], corners[b1]);
 		v2.position = interpolate(corners[c0], corners[c1]);
@@ -82,8 +92,15 @@ void CSMarchingCubes (uint3 id : SV_DispatchThreadID) {
     v1.normal = normal;
     v2.normal = normal;
 
-		vertices.Append(v0);
-    vertices.Append(v1);
-    vertices.Append(v2);
+    meshData[idx * 15 + (3 * count + 0)] = v0;
+    meshData[idx * 15 + (3 * count + 1)] = v1;
+    meshData[idx * 15 + (3 * count + 2)] = v2;
+    count++;
+
+    //Triangle t;
+    //t.a = interpolate(corners[a0], corners[a1]);
+    //t.b = interpolate(corners[b0], corners[b1]);
+		//t.c = interpolate(corners[c0], corners[c1]);
+    //triangles.Append(t);
 	}
 }

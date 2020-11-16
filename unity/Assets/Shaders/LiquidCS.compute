@@ -17,5 +17,5 @@ float pNoise(float2 co) {
 
 [numthreads(8,8,8)]
 void CSTest(uint3 id : SV_DispatchThreadID) {
-    isoValues[index(id.x, id.y, id.z, resolutionSize)] = float(id.y) < 5*pNoise(float2(id.x + time, id.z + time)/(float)resolutionSize) ? 1.0 : 0.0; //
+    isoValues[index(id.x, id.y, id.z, resolutionSize)] = float(id.y) < 5*pNoise(float2(id.x + time*0.01f, id.z + time*0.01f)/(float)resolutionSize) ? 1.0 : 0.0; //
 }
