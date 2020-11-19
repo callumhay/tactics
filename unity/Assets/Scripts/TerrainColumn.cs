@@ -78,7 +78,7 @@ public class TerrainColumn {
 
     // If we're at the near or far extents of the grid then we include one layer of the outside coordinates.
     // We do this to avoid culling the triangles that make up the outer walls of the terrain.
-    var outerLayerAmt = terrain.unitsPerNode();
+    var outerLayerAmt = TerrainGrid.unitsPerNode();
     var minXZPt = new Vector2(Mathf.Min(index.x-outerLayerAmt,0), Mathf.Min(index.z-outerLayerAmt,0));
     var maxXZPt = Vector2.zero + (new Vector2(TerrainColumn.size,TerrainColumn.size));
     var extentNodeIdx = terrain.terrainColumnNodeIndex(this, new Vector3Int(_numNodesX, _numNodesY, _numNodesZ));

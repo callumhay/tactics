@@ -1,21 +1,19 @@
 ﻿#pragma kernel CSTest
-#include "CommonCS.compute"
-//#include "UnityCG.cginc"
+#include "SimplexNoise.compute"
 
-RWStructuredBuffer<float> isoValues;
-uint resolutionSize;
+RWTexture3D<float4> isoValues;
+uint3 borderBack;
+uint3 borderFront;
 float time;
-
-float pNoise(float2 co) {
-  float a = 12.9898;
-  float b = 78.233;
-  float c = 43758.5453;
-  float dt = dot(co.xy, float2(a,b));
-  float sn = dt % 3.14;
-  return frac(sin(sn) * c);
-}
+int resolution;
 
 [numthreads(8,8,8)]
 void CSTest(uint3 id : SV_DispatchThreadID) {
-    isoValues[index(id.x, id.y, id.z, resolutionSize)] = float(id.y) < 5*pNoise(float2(id.x + time*0.01f, id.z + time*0.01f)/(float)resolutionSize) ? 1.0 : 0.0; //
+  
+  float noiseVal = snoise(float4(10*id.x/(float)resolution, 10*id.y/(float)resolution, 10*id.z/(float)resolution, time));
+  /*(id.x < borderFront.x || id.y < borderFront.y || id.z < borderFront.z ||
+      id.x >= resolution-borderBack.x || id.y >= resolution-borderBack.y || id.z >= resolution-borderBack.z) ?
+      0 : snoise(float4(id.x/(float)resolution, id.y/(float)resolution, id.z/(float)resolution, time));
+  */
+  isoValues[id.xyz] = float4(noiseVal,noiseVal,noiseVal,noiseVal);
 }

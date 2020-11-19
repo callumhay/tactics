@@ -4,7 +4,11 @@ using System.Collections.Generic;
 using UnityEngine;
 
 public static class MeshHelper {
-  public static void BuildCubeData(in Vector3 pos, in Vector3 size, out int[] tris, out Vector3[] vertices) {
+
+  /// <summary>
+  /// Creates vertices and triangles for a cube positioned at (0,0,0).
+  /// </summary>
+  public static void BuildCubeData(in Vector3 size, out int[] tris, out Vector3[] vertices) {
     tris = new int[3*12]{
       0, 2, 1, //face front
       0, 3, 2,

@@ -24,12 +24,12 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
   public int numNodesZ() { return LevelData.sizeToNumNodes(zSize); }
   public int numNodes()  { return numNodesX()*numNodesY()*numNodesZ(); }
 
-  public float unitsPerNode() { return (((float)TerrainColumn.size) / ((float)TerrainGrid.nodesPerUnit-1)); }
+  public static float unitsPerNode() { return (((float)TerrainColumn.size) / ((float)TerrainGrid.nodesPerUnit-1)); }
   public float halfUnitsPerNode() { return (0.5f * unitsPerNode()); }
   public Vector3 unitsPerNodeVec3() { var u = unitsPerNode(); return new Vector3(u,u,u); }
   public Vector3 halfUnitsPerNodeVec3() { var v = unitsPerNodeVec3(); return 0.5f*v; }
 
-  public int unitsToNodeIndex(float unitVal) { return Mathf.FloorToInt(unitVal / unitsPerNode()); }
+  public static int unitsToNodeIndex(float unitVal) { return Mathf.FloorToInt(unitVal / unitsPerNode()); }
   public Vector3Int unitsToNodeIndexVec3(float x, float y, float z) { 
     return new Vector3Int(
       Mathf.Clamp(unitsToNodeIndex(x), 0, nodes.GetLength(0)-1), 
@@ -542,7 +542,7 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
           if (debrisCollider.IsPointInside(nodeWSPos, closenessEpsilon)) {
             // Map the world space position into the local space node index of the debris (via DebrisNodeMapper)
             // use this to determine what the original material was
-            var origCorner = debrisNodeMapper.mapFromWorldspace(nodeWSPos, this);
+            var origCorner = debrisNodeMapper.mapFromWorldspace(nodeWSPos);
             node.isoVal = 1;
             node.materials = origCorner.materials;
             affectedNodes.Add(node);

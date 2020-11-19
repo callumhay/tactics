@@ -22,13 +22,18 @@ public class LevelData : ScriptableObject {
     }
   }
 
-
   public static int node3DIndexToFlatIndex(int x, int y, int z, int numNodesX, int numNodesY) {
     return z + (y*numNodesX) + (x*numNodesX*numNodesY);
   }
   public static int numNodesToSize(int numNodes) {
     return (numNodes - 1)/(TerrainGrid.nodesPerUnit*TerrainColumn.size - 1);
   }
+  
+  /// <summary>
+  /// Convert a size in terrain columns to the total number of nodes spanning that size.
+  /// </summary>
+  /// <param name="size">Number of terrain columns.</param>
+  /// <returns>Number of nodes spanning the given number of terrain columns.</returns>
   public static int sizeToNumNodes(int size) {
     return (size*TerrainGrid.nodesPerUnit*TerrainColumn.size) + 1 - size;
   }

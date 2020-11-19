@@ -14,7 +14,7 @@ Shader "Tactics/Shaders/DrawVertStructBuffer" {
 		CGPROGRAM
     
     //#pragma surface surf Standard vertex:vert addshadow
-    #pragma target 3.5
+    #pragma target 5.0
     #pragma vertex vert
     #pragma fragment frag
     #include "UnityCG.cginc"

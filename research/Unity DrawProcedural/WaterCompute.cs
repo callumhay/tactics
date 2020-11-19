@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 
 public class WaterCompute : MonoBehaviour {
-  public static int waterResolution = 32;
+  public static int waterResolution = 128;
   public static int numThreadsPerBlock = 8;
   public static int numThreadGroups = waterResolution / numThreadsPerBlock;
 
