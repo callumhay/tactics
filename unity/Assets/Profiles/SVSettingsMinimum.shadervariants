@@ -1,0 +1,1005 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!200 &20000000
+ShaderVariantCollection:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: SVSettingsMinimum
+  m_Shaders:
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 13
+      - keywords: DECALS_3RT
+        passType: 13
+      - keywords: DECALS_3RT SHADOW_MEDIUM
+        passType: 13
+      - keywords: _BLENDMODE_ALPHA _SURFACE_TYPE_TRANSPARENT
+        passType: 13
+      - keywords: DECALS_3RT _BLENDMODE_ALPHA _SURFACE_TYPE_TRANSPARENT
+        passType: 13
+      - keywords: DECALS_3RT SHADOW_MEDIUM _BLENDMODE_ALPHA _SURFACE_TYPE_TRANSPARENT
+        passType: 13
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 13
+      - keywords: DECALS_3RT
+        passType: 13
+      - keywords: DECALS_3RT SHADOW_MEDIUM
+        passType: 13
+      - keywords: _BLENDMODE_ALPHA _SURFACE_TYPE_TRANSPARENT
+        passType: 13
+      - keywords: DECALS_3RT _BLENDMODE_ALPHA _SURFACE_TYPE_TRANSPARENT
+        passType: 13
+      - keywords: DECALS_3RT SHADOW_MEDIUM _BLENDMODE_ALPHA _SURFACE_TYPE_TRANSPARENT
+        passType: 13
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 13
+      - keywords: DECALS_3RT
+        passType: 13
+      - keywords: DECALS_3RT SHADOW_MEDIUM
+        passType: 13
+      - keywords: DECALS_3RT SHADOW_MEDIUM _BLENDMODE_ALPHA _SURFACE_TYPE_TRANSPARENT
+        passType: 13
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 13
+      - keywords: DECALS_3RT
+        passType: 13
+      - keywords: DECALS_3RT SHADOW_MEDIUM
+        passType: 13
+      - keywords: DECALS_3RT SHADOW_MEDIUM _BLENDMODE_ALPHA _SURFACE_TYPE_TRANSPARENT
+        passType: 13
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 13
+      - keywords: DECALS_3RT
+        passType: 13
+      - keywords: DECALS_3RT SHADOW_MEDIUM
+        passType: 13
+      - keywords: _BLENDMODE_ALPHA _SURFACE_TYPE_TRANSPARENT
+        passType: 13
+      - keywords: DECALS_3RT _BLENDMODE_ALPHA _SURFACE_TYPE_TRANSPARENT
+        passType: 13
+      - keywords: DECALS_3RT SHADOW_MEDIUM _BLENDMODE_ALPHA _SURFACE_TYPE_TRANSPARENT
+        passType: 13
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 13
+      - keywords: DECALS_3RT
+        passType: 13
+      - keywords: DECALS_3RT SHADOW_MEDIUM
+        passType: 13
+      - keywords: DECALS_3RT SHADOW_MEDIUM _BLENDMODE_ALPHA _SURFACE_TYPE_TRANSPARENT
+        passType: 13
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 13
+      - keywords: DECALS_3RT
+        passType: 13
+      - keywords: DECALS_3RT SHADOW_MEDIUM
+        passType: 13
+      - keywords: DECALS_3RT SHADOW_MEDIUM _BLENDMODE_ALPHA _SURFACE_TYPE_TRANSPARENT
+        passType: 13
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 13
+      - keywords: DECALS_3RT
+        passType: 13
+      - keywords: DECALS_3RT SHADOW_MEDIUM
+        passType: 13
+      - keywords: _BLENDMODE_ALPHA _SURFACE_TYPE_TRANSPARENT
+        passType: 13
+      - keywords: DECALS_3RT _BLENDMODE_ALPHA _SURFACE_TYPE_TRANSPARENT
+        passType: 13
+      - keywords: DECALS_3RT SHADOW_MEDIUM _BLENDMODE_ALPHA _SURFACE_TYPE_TRANSPARENT
+        passType: 13
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 13
+      - keywords: DECALS_3RT
+        passType: 13
+      - keywords: DECALS_3RT SHADOW_MEDIUM
+        passType: 13
+      - keywords: _BLENDMODE_ALPHA _SURFACE_TYPE_TRANSPARENT
+        passType: 13
+      - keywords: DECALS_3RT _BLENDMODE_ALPHA _SURFACE_TYPE_TRANSPARENT
+        passType: 13
+      - keywords: DECALS_3RT SHADOW_MEDIUM _BLENDMODE_ALPHA _SURFACE_TYPE_TRANSPARENT
+        passType: 13
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 13
+      - keywords: DECALS_3RT
+        passType: 13
+      - keywords: DECALS_3RT SHADOW_MEDIUM
+        passType: 13
+      - keywords: DECALS_3RT SHADOW_MEDIUM _BLENDMODE_ALPHA _SURFACE_TYPE_TRANSPARENT
+        passType: 13
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 13
+      - keywords: DECALS_3RT
+        passType: 13
+      - keywords: DECALS_3RT SHADOW_MEDIUM
+        passType: 13
+      - keywords: DECALS_3RT SHADOW_MEDIUM _BLENDMODE_ALPHA _SURFACE_TYPE_TRANSPARENT
+        passType: 13
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: DECALS_3RT SHADOW_MEDIUM _BLENDMODE_ALPHA _SURFACE_TYPE_TRANSPARENT
+        passType: 13
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: _BLENDMODE_ALPHA _SURFACE_TYPE_TRANSPARENT
+        passType: 13
+      - keywords: DECALS_3RT _BLENDMODE_ALPHA _SURFACE_TYPE_TRANSPARENT
+        passType: 13
+      - keywords: DECALS_3RT SHADOW_MEDIUM _BLENDMODE_ALPHA _SURFACE_TYPE_TRANSPARENT
+        passType: 13
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 13
+      - keywords: DECALS_3RT
+        passType: 13
+      - keywords: DECALS_3RT SHADOW_MEDIUM
+        passType: 13
+      - keywords: DECALS_3RT SHADOW_MEDIUM _BLENDMODE_ALPHA _SURFACE_TYPE_TRANSPARENT
+        passType: 13
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 13
+      - keywords: DECALS_3RT
+        passType: 13
+      - keywords: DECALS_3RT SHADOW_MEDIUM
+        passType: 13
+      - keywords: DECALS_3RT SHADOW_MEDIUM _BLENDMODE_ALPHA _SURFACE_TYPE_TRANSPARENT
+        passType: 13
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+      - keywords: DECALS_3RT SHADOW_MEDIUM
+        passType: 13
+      - keywords: _BLENDMODE_ALPHA _SURFACE_TYPE_TRANSPARENT
+        passType: 13
+      - keywords: DECALS_3RT _BLENDMODE_ALPHA _SURFACE_TYPE_TRANSPARENT
+        passType: 13
+      - keywords: DECALS_3RT SHADOW_MEDIUM _BLENDMODE_ALPHA _SURFACE_TYPE_TRANSPARENT
+        passType: 13
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 13
+      - keywords: DECALS_3RT
+        passType: 13
+      - keywords: DECALS_3RT SHADOW_MEDIUM
+        passType: 13
+      - keywords: _BLENDMODE_ALPHA _SURFACE_TYPE_TRANSPARENT
+        passType: 13
+      - keywords: DECALS_3RT _BLENDMODE_ALPHA _SURFACE_TYPE_TRANSPARENT
+        passType: 13
+      - keywords: DECALS_3RT SHADOW_MEDIUM _BLENDMODE_ALPHA _SURFACE_TYPE_TRANSPARENT
+        passType: 13
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 13
+      - keywords: DECALS_3RT
+        passType: 13
+      - keywords: DECALS_3RT SHADOW_MEDIUM
+        passType: 13
+      - keywords: _BLENDMODE_ALPHA _SURFACE_TYPE_TRANSPARENT
+        passType: 13
+      - keywords: DECALS_3RT _BLENDMODE_ALPHA _SURFACE_TYPE_TRANSPARENT
+        passType: 13
+      - keywords: DECALS_3RT SHADOW_MEDIUM _BLENDMODE_ALPHA _SURFACE_TYPE_TRANSPARENT
+        passType: 13
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 10770, guid: 0000000000000000f000000000000000, type: 0}
+    second:
+      variants:
+      - keywords: BILLBOARD_FACE_CAMERA_POS DECALS_3RT MATERIAL_QUALITY_HIGH SHADOW_MEDIUM
+          USE_CLUSTERED_LIGHTLIST
+        passType: 0
+  - first: {fileID: 66, guid: 0000000000000000f000000000000000, type: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 9000, guid: 0000000000000000f000000000000000, type: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 9001, guid: 0000000000000000f000000000000000, type: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 9002, guid: 0000000000000000f000000000000000, type: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 9003, guid: 0000000000000000f000000000000000, type: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 9004, guid: 0000000000000000f000000000000000, type: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 9007, guid: 0000000000000000f000000000000000, type: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 9101, guid: 0000000000000000f000000000000000, type: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 9103, guid: 0000000000000000f000000000000000, type: 0}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+      - keywords: BILLBOARD_FACE_CAMERA_POS DECALS_3RT MATERIAL_QUALITY_HIGH SHADOW_MEDIUM
+          USE_CLUSTERED_LIGHTLIST
+        passType: 0
+      - keywords: BILLBOARD_FACE_CAMERA_POS DECALS_3RT MATERIAL_QUALITY_HIGH SHADOW_MEDIUM
+          UNITY_HDR_ON USE_CLUSTERED_LIGHTLIST
+        passType: 0
+  - first: {fileID: 9104, guid: 0000000000000000f000000000000000, type: 0}
+    second:
+      variants:
+      - keywords: BILLBOARD_FACE_CAMERA_POS DECALS_3RT MATERIAL_QUALITY_HIGH SHADOW_MEDIUM
+          USE_CLUSTERED_LIGHTLIST
+        passType: 0
+      - keywords: BILLBOARD_FACE_CAMERA_POS DECALS_3RT MATERIAL_QUALITY_HIGH SHADOW_MEDIUM
+          UNITY_HDR_ON USE_CLUSTERED_LIGHTLIST
+        passType: 0
+  - first: {fileID: 4800000, guid: 6e4ae4064600d784cac1e41a9e6f2e59, type: 3}
+    second:
+      variants:
+      - keywords: _NORMALMAP_TANGENT_SPACE
+        passType: 8
+      - keywords: _DOUBLESIDED_ON _HEIGHTMAP _MAPPING_TRIPLANAR _NORMALMAP _NORMALMAP_TANGENT_SPACE
+        passType: 8
+      - keywords: BILLBOARD_FACE_CAMERA_POS DECALS_3RT MATERIAL_QUALITY_HIGH SHADOW_MEDIUM
+          UNITY_HDR_ON USE_CLUSTERED_LIGHTLIST _NORMALMAP_TANGENT_SPACE
+        passType: 13
+      - keywords: BILLBOARD_FACE_CAMERA_POS DECALS_3RT MATERIAL_QUALITY_HIGH SHADOW_MEDIUM
+          _DOUBLESIDED_ON _HEIGHTMAP _MAPPING_TRIPLANAR _NORMALMAP _NORMALMAP_TANGENT_SPACE
+        passType: 13
+      - keywords: BILLBOARD_FACE_CAMERA_POS DECALS_3RT MATERIAL_QUALITY_HIGH SHADOW_MEDIUM
+          USE_CLUSTERED_LIGHTLIST _DOUBLESIDED_ON _HEIGHTMAP _MAPPING_TRIPLANAR _NORMALMAP
+          _NORMALMAP_TANGENT_SPACE
+        passType: 13
+  - first: {fileID: 4800000, guid: 2fcfb8d92f45e4549b3f0bad5d0654bf, type: 3}
+    second:
+      variants:
+      - keywords: BILLBOARD_FACE_CAMERA_POS DECALS_3RT MATERIAL_QUALITY_HIGH SHADOW_MEDIUM
+          USE_CLUSTERED_LIGHTLIST
+        passType: 0
+  - first: {fileID: 4800000, guid: 02ae56f4306413c4a96dcf005cde1971, type: 3}
+    second:
+      variants:
+      - keywords: BILLBOARD_FACE_CAMERA_POS DECALS_3RT MATERIAL_QUALITY_HIGH SHADOW_MEDIUM
+          USE_CLUSTERED_LIGHTLIST
+        passType: 0
+  - first: {fileID: 4800000, guid: 2e37131331fbdca449b1a2bc47a639ca, type: 3}
+    second:
+      variants:
+      - keywords: BILLBOARD_FACE_CAMERA_POS DECALS_3RT MATERIAL_QUALITY_HIGH SHADOW_MEDIUM
+          USE_FPTL_LIGHTLIST
+        passType: 0
+      - keywords: BILLBOARD_FACE_CAMERA_POS DECALS_3RT MATERIAL_QUALITY_HIGH SHADOW_MEDIUM
+          UNITY_HDR_ON USE_FPTL_LIGHTLIST
+        passType: 0
+  - first: {fileID: 4800000, guid: 035941b63024d1943af48811c1db20d9, type: 3}
+    second:
+      variants:
+      - keywords: BILLBOARD_FACE_CAMERA_POS DECALS_3RT MATERIAL_QUALITY_HIGH SHADOW_MEDIUM
+        passType: 0
+      - keywords: BILLBOARD_FACE_CAMERA_POS DECALS_3RT MATERIAL_QUALITY_HIGH SHADOW_MEDIUM
+          USE_CLUSTERED_LIGHTLIST
+        passType: 0
+  - first: {fileID: 4800000, guid: 8ea49ef16606acd489439e676ab84040, type: 3}
+    second:
+      variants:
+      - keywords: BILLBOARD_FACE_CAMERA_POS DECALS_3RT MATERIAL_QUALITY_HIGH SHADOW_MEDIUM
+          USE_FPTL_LIGHTLIST
+        passType: 0
+      - keywords: BILLBOARD_FACE_CAMERA_POS DECALS_3RT MATERIAL_QUALITY_HIGH SHADOW_MEDIUM
+          UNITY_HDR_ON USE_FPTL_LIGHTLIST
+        passType: 0
+  - first: {fileID: 4800000, guid: 42dfcc8fe803ece4096c58630689982f, type: 3}
+    second:
+      variants:
+      - keywords: BILLBOARD_FACE_CAMERA_POS DECALS_3RT MATERIAL_QUALITY_HIGH SHADOW_MEDIUM
+          USE_CLUSTERED_LIGHTLIST
+        passType: 0
+      - keywords: BILLBOARD_FACE_CAMERA_POS DECALS_3RT MATERIAL_QUALITY_HIGH SHADOW_MEDIUM
+          UNITY_HDR_ON USE_CLUSTERED_LIGHTLIST
+        passType: 0
+  - first: {fileID: 4800000, guid: 370f7a9cc4e362d488af024d371091e8, type: 3}
+    second:
+      variants:
+      - keywords: BILLBOARD_FACE_CAMERA_POS DECALS_3RT MATERIAL_QUALITY_HIGH SHADOW_MEDIUM
+          USE_CLUSTERED_LIGHTLIST
+        passType: 0
+      - keywords: BILLBOARD_FACE_CAMERA_POS DECALS_3RT MATERIAL_QUALITY_HIGH SHADOW_MEDIUM
+          UNITY_HDR_ON USE_CLUSTERED_LIGHTLIST
+        passType: 0
+  - first: {fileID: 4800000, guid: 67d6171b0acc6554aad48c845ec7e67f, type: 3}
+    second:
+      variants:
+      - keywords: BILLBOARD_FACE_CAMERA_POS CHECKERBOARD_DOWNSAMPLE DECALS_3RT MATERIAL_QUALITY_HIGH
+          SHADOW_MEDIUM USE_CLUSTERED_LIGHTLIST
+        passType: 0
+      - keywords: BILLBOARD_FACE_CAMERA_POS CHECKERBOARD_DOWNSAMPLE DECALS_3RT MATERIAL_QUALITY_HIGH
+          SHADOW_MEDIUM UNITY_HDR_ON USE_CLUSTERED_LIGHTLIST
+        passType: 0
+  - first: {fileID: 4800000, guid: 2ad7ce40f0dbaf64dadef1f58d8524d3, type: 3}
+    second:
+      variants:
+      - keywords: BILLBOARD_FACE_CAMERA_POS DECALS_3RT MATERIAL_QUALITY_HIGH NEAREST_DEPTH
+          SHADOW_MEDIUM USE_CLUSTERED_LIGHTLIST
+        passType: 0
+      - keywords: BILLBOARD_FACE_CAMERA_POS DECALS_3RT MATERIAL_QUALITY_HIGH NEAREST_DEPTH
+          SHADOW_MEDIUM UNITY_HDR_ON USE_CLUSTERED_LIGHTLIST
+        passType: 0
+  - first: {fileID: 4800000, guid: 123ed592ad5c2494b8aed301fd609e7b, type: 3}
+    second:
+      variants:
+      - keywords: BILLBOARD_FACE_CAMERA_POS DECALS_3RT MATERIAL_QUALITY_HIGH SHADOW_MEDIUM
+        passType: 0
+      - keywords: BILLBOARD_FACE_CAMERA_POS DECALS_3RT MATERIAL_QUALITY_HIGH SHADOW_MEDIUM
+          USE_CLUSTERED_LIGHTLIST
+        passType: 0
+      - keywords: BILLBOARD_FACE_CAMERA_POS DECALS_3RT MATERIAL_QUALITY_HIGH SHADOW_MEDIUM
+          UNITY_HDR_ON USE_CLUSTERED_LIGHTLIST
+        passType: 0
+  - first: {fileID: 4800000, guid: 9bd32a6ece529fd4f9408b8d7e00c10d, type: 3}
+    second:
+      variants:
+      - keywords: BILLBOARD_FACE_CAMERA_POS DECALS_3RT MATERIAL_QUALITY_HIGH SHADOW_MEDIUM
+          USE_CLUSTERED_LIGHTLIST
+        passType: 0
+      - keywords: BILLBOARD_FACE_CAMERA_POS DECALS_3RT MATERIAL_QUALITY_HIGH SHADOW_MEDIUM
+          UNITY_HDR_ON USE_CLUSTERED_LIGHTLIST
+        passType: 0
+  - first: {fileID: 4800000, guid: 123f13d52852ef547b2962de4bd9eaad, type: 3}
+    second:
+      variants:
+      - keywords: BILLBOARD_FACE_CAMERA_POS SHADOW_MEDIUM
+        passType: 0
+      - keywords: BILLBOARD_FACE_CAMERA_POS DECALS_3RT MATERIAL_QUALITY_HIGH SHADOW_MEDIUM
+          USE_CLUSTERED_LIGHTLIST
+        passType: 0
+  - first: {fileID: 4800000, guid: 3b3bf235775cf8b4baae7f3306787ab0, type: 3}
+    second:
+      variants:
+      - keywords: BILLBOARD_FACE_CAMERA_POS SHADOW_MEDIUM
+        passType: 0
+      - keywords: BILLBOARD_FACE_CAMERA_POS DECALS_3RT MATERIAL_QUALITY_HIGH SHADOW_MEDIUM
+          USE_CLUSTERED_LIGHTLIST
+        passType: 0
+  - first: {fileID: 4800000, guid: d279c46a545b0af4f9f0c4fa82cd489e, type: 3}
+    second:
+      variants:
+      - keywords: BILLBOARD_FACE_CAMERA_POS SHADOW_MEDIUM
+        passType: 0
+      - keywords: BILLBOARD_FACE_CAMERA_POS DECALS_3RT MATERIAL_QUALITY_HIGH SHADOW_MEDIUM
+          USE_CLUSTERED_LIGHTLIST
+        passType: 0
+  - first: {fileID: 4800000, guid: a6402c19b020b4a4fb7073aaa2e26aba, type: 3}
+    second:
+      variants:
+      - keywords: BILLBOARD_FACE_CAMERA_POS SHADOW_MEDIUM
+        passType: 0
+      - keywords: BILLBOARD_FACE_CAMERA_POS DECALS_3RT MATERIAL_QUALITY_HIGH SHADOW_MEDIUM
+          USE_CLUSTERED_LIGHTLIST
+        passType: 0
+  - first: {fileID: 4800000, guid: e3cab24f27741f44d8af1e94d006267c, type: 3}
+    second:
+      variants:
+      - keywords: BILLBOARD_FACE_CAMERA_POS DECALS_3RT MATERIAL_QUALITY_HIGH SHADOW_MEDIUM
+        passType: 0
+      - keywords: BILLBOARD_FACE_CAMERA_POS DECALS_3RT MATERIAL_QUALITY_HIGH SHADOW_MEDIUM
+          USE_CLUSTERED_LIGHTLIST
+        passType: 0
+  - first: {fileID: 4800000, guid: fd532bf1795188c4daaa66ea798b8b0a, type: 3}
+    second:
+      variants:
+      - keywords: BILLBOARD_FACE_CAMERA_POS DECALS_3RT MATERIAL_QUALITY_HIGH SHADOW_MEDIUM
+        passType: 0
+      - keywords: BILLBOARD_FACE_CAMERA_POS DECALS_3RT MATERIAL_QUALITY_HIGH SHADOW_MEDIUM
+          USE_CLUSTERED_LIGHTLIST
+        passType: 0
+  - first: {fileID: 4800000, guid: 5ac9ef0c50282754b93c7692488e7ee7, type: 3}
+    second:
+      variants:
+      - keywords: APPLY_AFTER_POST BILLBOARD_FACE_CAMERA_POS DECALS_3RT MATERIAL_QUALITY_HIGH
+          SHADOW_MEDIUM USE_CLUSTERED_LIGHTLIST
+        passType: 0
+      - keywords: APPLY_AFTER_POST BILLBOARD_FACE_CAMERA_POS DECALS_3RT MATERIAL_QUALITY_HIGH
+          SHADOW_MEDIUM UNITY_HDR_ON USE_CLUSTERED_LIGHTLIST
+        passType: 0
+      - keywords: APPLY_AFTER_POST BILLBOARD_FACE_CAMERA_POS DECALS_3RT FXAA MATERIAL_QUALITY_HIGH
+          SHADOW_MEDIUM USE_CLUSTERED_LIGHTLIST
+        passType: 0
+  - first: {fileID: 4800000, guid: 3330c1503ea8c6d4d9408df3f64227eb, type: 3}
+    second:
+      variants:
+      - keywords: BILLBOARD_FACE_CAMERA_POS DECALS_3RT MATERIAL_QUALITY_HIGH SHADOW_MEDIUM
+          USE_CLUSTERED_LIGHTLIST
+        passType: 0
+  - first: {fileID: 4800000, guid: 50b406436c6214c49aaaa6011b71dde8, type: 3}
+    second:
+      variants:
+      - keywords: BILLBOARD_FACE_CAMERA_POS DECALS_3RT MATERIAL_QUALITY_HIGH SHADOW_MEDIUM
+          USE_CLUSTERED_LIGHTLIST
+        passType: 0
+  - first: {fileID: 4800000, guid: 5caf62d8bd7c44596ace77ef9eb8ea31, type: 3}
+    second:
+      variants:
+      - keywords: BILLBOARD_FACE_CAMERA_POS DECALS_3RT MATERIAL_QUALITY_HIGH SHADOW_MEDIUM
+          USE_CLUSTERED_LIGHTLIST
+        passType: 0
+      - keywords: BILLBOARD_FACE_CAMERA_POS DECALS_3RT MATERIAL_QUALITY_HIGH SHADOW_MEDIUM
+          UNITY_HDR_ON USE_CLUSTERED_LIGHTLIST
+        passType: 0
+  - first: {fileID: 4800000, guid: ec63f47fd265df243a7b1d40f9ef7fe7, type: 3}
+    second:
+      variants:
+      - keywords: BILLBOARD_FACE_CAMERA_POS DECALS_3RT MATERIAL_QUALITY_HIGH SHADOW_MEDIUM
+          _ENABLE_SUN_DISK
+        passType: 0
+      - keywords: BILLBOARD_FACE_CAMERA_POS DECALS_3RT MATERIAL_QUALITY_HIGH SHADOW_MEDIUM
+          USE_CLUSTERED_LIGHTLIST _ENABLE_SUN_DISK
+        passType: 0
+      - keywords: BILLBOARD_FACE_CAMERA_POS DECALS_3RT MATERIAL_QUALITY_HIGH SHADOW_MEDIUM
+          USE_FPTL_LIGHTLIST _ENABLE_SUN_DISK
+        passType: 0
+  - first: {fileID: -6465566751694194690, guid: b65e538cad96c442cbccd576fde24959,
+      type: 3}
+    second:
+      variants:
+      - keywords: 
+        passType: 8
+      - keywords: BILLBOARD_FACE_CAMERA_POS DECALS_3RT MATERIAL_QUALITY_HIGH SHADOW_MEDIUM
+        passType: 13
+      - keywords: BILLBOARD_FACE_CAMERA_POS DECALS_3RT MATERIAL_QUALITY_HIGH SHADOW_MEDIUM
+          USE_CLUSTERED_LIGHTLIST
+        passType: 13
+      - keywords: BILLBOARD_FACE_CAMERA_POS DECALS_3RT MATERIAL_QUALITY_HIGH SHADOW_MEDIUM
+          UNITY_HDR_ON USE_CLUSTERED_LIGHTLIST
+        passType: 13
+  - first: {fileID: 4800000, guid: 960cdae31f78e49f0901dfa104bfe418, type: 3}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: -6465566751694194690, guid: 03de152d5177d4c838d5e2bb79ccde9f,
+      type: 3}
+    second:
+      variants:
+      - keywords: 
+        passType: 8
+      - keywords: _BLENDMODE_ALPHA _SURFACE_TYPE_TRANSPARENT
+        passType: 8
+      - keywords: _BLENDMODE_ALPHA _ENABLE_FOG_ON_TRANSPARENT _SURFACE_TYPE_TRANSPARENT
+        passType: 8
+      - keywords: DECALS_3RT
+        passType: 13
+      - keywords: DECALS_3RT SHADOW_MEDIUM _BLENDMODE_ALPHA _SURFACE_TYPE_TRANSPARENT
+        passType: 13
+      - keywords: _BLENDMODE_ALPHA _ENABLE_FOG_ON_TRANSPARENT _SURFACE_TYPE_TRANSPARENT
+        passType: 13
+      - keywords: DECALS_3RT _BLENDMODE_ALPHA _ENABLE_FOG_ON_TRANSPARENT _SURFACE_TYPE_TRANSPARENT
+        passType: 13
+      - keywords: DECALS_3RT SHADOW_MEDIUM _BLENDMODE_ALPHA _ENABLE_FOG_ON_TRANSPARENT
+          _SURFACE_TYPE_TRANSPARENT
+        passType: 13

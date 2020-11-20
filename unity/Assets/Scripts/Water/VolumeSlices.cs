@@ -22,6 +22,9 @@ public class VolumeSlices : MonoBehaviour {
   private int liquidCSKernel;
   private RenderTexture volRenderTex;
 
+  private static int defaultJitterTexSize = 256;
+  public Texture2D jitterTexture;
+
 
   private float maxHypVolUnitSize() { 
     var halfSize = 0.5f * volumeUnitSize;
@@ -35,7 +38,7 @@ public class VolumeSlices : MonoBehaviour {
     if (!meshFilter) { meshFilter = gameObject.AddComponent<MeshFilter>(); }
     meshRenderer = GetComponent<MeshRenderer>();
     if (!meshRenderer) { meshRenderer = gameObject.AddComponent<MeshRenderer>(); }
-
+    if (!jitterTexture) { jitterTexture = TextureHelper.buildJitterTexture2D(defaultJitterTexSize); }
 
     // Calculate the resolution of the 3D texture for rendering into the slices
     var numNodesVec = TerrainGrid.nodesPerUnit * volumeUnitSize - 
@@ -71,10 +74,10 @@ public class VolumeSlices : MonoBehaviour {
       //var halfBoundSize = 0.5f* new Vector4(volumeUnitSize.x, volumeUnitSize.y, volumeUnitSize.z, 0);
       meshRenderer.material.SetVector("boundsMax", volumeUnitSize);
       meshRenderer.material.SetVector("boundsMin", new Vector3(0,0,0));
-      meshRenderer.material.SetVector("borderFront", new Vector4(resBorderFrontInt.x, resBorderFrontInt.y, resBorderFrontInt.z, 0));
-      meshRenderer.material.SetVector("borderBack", new Vector4(resBorderBackInt.x, resBorderBackInt.y, resBorderBackInt.z, 0));
-      meshRenderer.material.SetInt("resolution", volResolution);
-
+      meshRenderer.material.SetVector("borderFront", new Vector3(resBorderFrontInt.x, resBorderFrontInt.y, resBorderFrontInt.z));
+      meshRenderer.material.SetVector("borderBack", new Vector3(resBorderBackInt.x, resBorderBackInt.y, resBorderBackInt.z));
+      meshRenderer.material.SetFloat("resolution", volResolution);
+      meshRenderer.material.SetTexture("jitterTex", jitterTexture);
     }
 
     var mesh = new Mesh();
@@ -83,30 +86,12 @@ public class VolumeSlices : MonoBehaviour {
     Vector3[] vertices = null;
     MeshHelper.BuildCubeData(volumeUnitSize, out triangles, out vertices);
     
-    /*
-    var size = maxHypVolUnitSize();
-
-    float unitsPerSlice = volumeUnitSize.z / (numSlices-1f);
-    float startZPos = -(halfUnitSize().z + 1e-10f);
-
-    // TODO: Just render one slice close to the camera if it's inside the volume?
-
-    // Start at the back of the volume and draw quads along the z-axis all the way up to the front
-    // we start and end at points outside the volume to account for diagonal size
-    Debug.Log("Number of slices: " + numSlices);
-    for (int i = 0; i < numSlices; i++) {
-      float zPos = startZPos + i*unitsPerSlice;
-      appendQuad(zPos, size, size, ref vertices, ref triangles);
-    }
-    */
-
     mesh.SetVertices(vertices);
     mesh.SetTriangles(triangles, 0);
     meshFilter.mesh = mesh;
   }
 
   void Update() {
-
     liquidComputeShader.SetTexture(liquidCSKernel, "isoValues", volRenderTex);
     liquidComputeShader.SetFloat("time", Time.time);
     liquidComputeShader.SetInt("resolution", volResolution);
@@ -114,35 +99,11 @@ public class VolumeSlices : MonoBehaviour {
     liquidComputeShader.SetInts("borderBack", new int[]{resBorderBackInt.x, resBorderBackInt.y, resBorderBackInt.z});
     liquidComputeShader.Dispatch(liquidCSKernel, numThreadGroups, numThreadGroups, numThreadGroups);
     meshRenderer.material.SetTexture("isovalTex", volRenderTex);
-
-
-    //transform.LookAt(Camera.main.transform.position, Vector3.up);
-    //transform.forward = -Camera.main.transform.forward;
-
-    //transform. *= Camera.main.worldToCameraMatrix;
   }
-
-  /*
-  private void appendQuad(float zPos, float xSize, float ySize, ref List<Vector3> vertices, ref List<int> triangles) {
-    var size = new Vector3(xSize, ySize, 0);
-    var halfSize = 0.5f * size;
-
-    var currVertCount = vertices.Count;
-
-    vertices.Add(-halfSize + new Vector3(0, 0, zPos));
-    vertices.Add(-halfSize + new Vector3(size.x, 0, zPos));
-    vertices.Add(-halfSize + new Vector3(0, size.y, zPos));
-    vertices.Add(halfSize  + new Vector3(0, 0, zPos));
-    
-    triangles.Add(currVertCount+1); triangles.Add(currVertCount+2); triangles.Add(currVertCount);  
-    triangles.Add(currVertCount+1);  triangles.Add(currVertCount+3); triangles.Add(currVertCount+2);
-  }
-  */
-
 
   void OnDrawGizmosSelected() {
-    
     Gizmos.DrawWireCube(halfUnitSize(), volumeUnitSize);
   }
+
 
 }

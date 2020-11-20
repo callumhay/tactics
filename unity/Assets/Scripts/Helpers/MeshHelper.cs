@@ -57,6 +57,24 @@ public static class MeshHelper {
     };
   }
 
+    /*
+  private void appendQuad(float zPos, float xSize, float ySize, ref List<Vector3> vertices, ref List<int> triangles) {
+    var size = new Vector3(xSize, ySize, 0);
+    var halfSize = 0.5f * size;
+
+    var currVertCount = vertices.Count;
+
+    vertices.Add(-halfSize + new Vector3(0, 0, zPos));
+    vertices.Add(-halfSize + new Vector3(size.x, 0, zPos));
+    vertices.Add(-halfSize + new Vector3(0, size.y, zPos));
+    vertices.Add(halfSize  + new Vector3(0, 0, zPos));
+    
+    triangles.Add(currVertCount+1); triangles.Add(currVertCount+2); triangles.Add(currVertCount);  
+    triangles.Add(currVertCount+1);  triangles.Add(currVertCount+3); triangles.Add(currVertCount+2);
+  }
+  */
+
+
   private class Face {
     public int[] indices;
     public bool isRemoved = false;

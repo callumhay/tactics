@@ -9,7 +9,6 @@ int resolution;
 
 [numthreads(8,8,8)]
 void CSTest(uint3 id : SV_DispatchThreadID) {
-  
   float noiseVal = snoise(float4(10*id.x/(float)resolution, 10*id.y/(float)resolution, 10*id.z/(float)resolution, time));
   /*(id.x < borderFront.x || id.y < borderFront.y || id.z < borderFront.z ||
       id.x >= resolution-borderBack.x || id.y >= resolution-borderBack.y || id.z >= resolution-borderBack.z) ?
