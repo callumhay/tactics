@@ -2,12 +2,13 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-public class VolumeSlices : MonoBehaviour {
+public class VolumeRaymarcher : MonoBehaviour {
   private static int numThreadsPerBlock = 8;
 
   public Vector3 volumeUnitSize = new Vector3(20,20,20);
-  //[Range(3,32)]
-  //public int numSlices = 8;
+
+  private static int defaultJitterTexSize = 256;
+  public Texture2D jitterTexture;
 
   // Assigned in Start()
   private int volResolution;
@@ -22,10 +23,6 @@ public class VolumeSlices : MonoBehaviour {
   private int liquidCSKernel;
   private RenderTexture volRenderTex;
 
-  private static int defaultJitterTexSize = 256;
-  public Texture2D jitterTexture;
-
-
   private float maxHypVolUnitSize() { 
     var halfSize = 0.5f * volumeUnitSize;
     return 2*halfSize.magnitude;
@@ -38,7 +35,10 @@ public class VolumeSlices : MonoBehaviour {
     if (!meshFilter) { meshFilter = gameObject.AddComponent<MeshFilter>(); }
     meshRenderer = GetComponent<MeshRenderer>();
     if (!meshRenderer) { meshRenderer = gameObject.AddComponent<MeshRenderer>(); }
-    if (!jitterTexture) { jitterTexture = TextureHelper.buildJitterTexture2D(defaultJitterTexSize); }
+    meshRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+    meshRenderer.allowOcclusionWhenDynamic = false;
+    meshRenderer.motionVectorGenerationMode = MotionVectorGenerationMode.ForceNoMotion;
+    if (!jitterTexture) { jitterTexture = TextureHelper.buildJitterTexture2D(defaultJitterTexSize, true); }
 
     // Calculate the resolution of the 3D texture for rendering into the slices
     var numNodesVec = TerrainGrid.nodesPerUnit * volumeUnitSize - 
@@ -46,7 +46,7 @@ public class VolumeSlices : MonoBehaviour {
     // Calculate the maximum resolution (there must be at least one voxel per node on each axis 
     // plus 2 voxels for a border of 1 voxel on either side)
     var maxRes = Mathf.CeilToInt(Math.Max(numNodesVec.x, Math.Max(numNodesVec.y, numNodesVec.z)));
-    volResolution = Mathf.NextPowerOfTwo(maxRes+2);
+    volResolution = MathHelper.nextMultipleOf(maxRes+2, numThreadsPerBlock);//Mathf.NextPowerOfTwo(maxRes+2);
     numThreadGroups = volResolution / numThreadsPerBlock;
 
     // Calculate the border based on the final resolution and the resolution we actually need to hold all the nodes
