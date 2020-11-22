@@ -18,7 +18,7 @@ public static class TextureHelper {
       };
       for (int i = 0; i < size; i++) {
         for (int j = 0; j < size; j++) {
-          float dither = ditherPattern[i%4,j%4];
+          float dither = ditherPattern[i%4,j%4] * Random.Range(0.5f,1.0f);
           texData[i*size + j] = (byte)(dither*256);
         }
       }

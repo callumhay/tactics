@@ -66,11 +66,11 @@ public class VolumeRaymarcher : MonoBehaviour {
     volRenderTex.volumeDepth = volResolution;
     volRenderTex.enableRandomWrite = true;
     volRenderTex.Create();
-    liquidCSKernel = liquidComputeShader.FindKernel("CSTest");
+    liquidCSKernel = liquidComputeShader.FindKernel("CSNoise");
     
     // Set the raycasting material
     if (meshRenderer.sharedMaterial == null) {
-      meshRenderer.sharedMaterial = Resources.Load<Material>("Materials/VolumeSliceMat"); // "Materials/DebugDiffuseMat"
+      meshRenderer.sharedMaterial = Resources.Load<Material>("Materials/VolumeRaymarchMat"); // "Materials/DebugDiffuseMat"
       //var halfBoundSize = 0.5f* new Vector4(volumeUnitSize.x, volumeUnitSize.y, volumeUnitSize.z, 0);
       meshRenderer.material.SetVector("boundsMax", volumeUnitSize);
       meshRenderer.material.SetVector("boundsMin", new Vector3(0,0,0));

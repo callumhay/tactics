@@ -1,4 +1,4 @@
-﻿#pragma kernel CSTest
+﻿#pragma kernel CSNoise
 #include "SimplexNoise.compute"
 
 RWTexture3D<float4> isoValues;
@@ -8,7 +8,7 @@ float time;
 int resolution;
 
 [numthreads(8,8,8)]
-void CSTest(uint3 id : SV_DispatchThreadID) {
+void CSNoise(uint3 id : SV_DispatchThreadID) {
   float noiseVal = (id.x < borderFront.x || id.y < borderFront.y || id.z < borderFront.z ||
       id.x >= resolution-borderBack.x || id.y >= resolution-borderBack.y || id.z >= resolution-borderBack.z) ?
       0 : snoise(float4(5*id.x/(float)resolution, 5*id.y/(float)resolution, 5*id.z/(float)resolution, time));

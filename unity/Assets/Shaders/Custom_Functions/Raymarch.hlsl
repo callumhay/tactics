@@ -2,8 +2,8 @@
 #define RAYMARCH_HLSL_INCLUDED
 
 #include "IntersectBox.hlsl"
-#define MIN_ITERATIONS 8
-#define MAX_ITERATIONS 256
+#define MIN_ITERATIONS 3
+#define MAX_ITERATIONS 32
 
 void DoSample(Texture3D volumeTex, SamplerState volumeSampler, float3 uvw, float weight, float opacityMultiplier, inout float4 colour) {
   float4 sampleColour = weight * SAMPLE_TEXTURE3D(volumeTex, volumeSampler, uvw);
@@ -17,16 +17,25 @@ float3 calcUVW(int3 borderFront, float resolution, float3 currPos, float3 boxMin
   return borderFront / resolution + (currPos-boxMin) / boxMinMaxLen;
 }
 
+float3 calcIsoNormal(Texture3D volumeTex, SamplerState volumeSampler, float3 uvwCenter, float resolution) {
+  float cellSize = 1.0 / resolution;
+  return float3(
+    SAMPLE_TEXTURE3D(volumeTex, volumeSampler, uvwCenter - float3(cellSize, 0.0, 0.0)).r - SAMPLE_TEXTURE3D(volumeTex, volumeSampler, uvwCenter + float3(cellSize, 0.0, 0.0)).r,
+    SAMPLE_TEXTURE3D(volumeTex, volumeSampler, uvwCenter - float3(0.0, cellSize, 0.0)).r - SAMPLE_TEXTURE3D(volumeTex, volumeSampler, uvwCenter + float3(0.0, cellSize, 0.0)).r,
+    SAMPLE_TEXTURE3D(volumeTex, volumeSampler, uvwCenter - float3(0.0, 0.0, cellSize)).r - SAMPLE_TEXTURE3D(volumeTex, volumeSampler, uvwCenter + float3(0.0, 0.0, cellSize)).r
+  );
+}
+
 void Raymarch_float(
   Texture3D volumeTex, SamplerState volumeSampler, 
   Texture2D jitterTex, SamplerState jitterSampler,
   float eyeDepth, float2 pos, float3 rayOrigin, float3 rayDir, float3 boxMin, float3 boxMax, 
   int3 borderFront, int3 borderBack, float resolution, float opacityMultiplier,
-  out float4 colour
-) {
-
-  float tNear = 0; float tFar = 0;
+  out float4 colour, out float depthOffset, out float3 nNormal) {
+  
+  float tNear = 0.0; float tFar = 0.0;
   IntersectBox_float(rayOrigin, rayDir, boxMin, boxMax, tNear, tFar);
+  depthOffset = 0;
   
   tNear = max(0, tNear); // If the camera is inside the volume then just start/end at the camera
   tFar = min(tFar, eyeDepth); // We only march as far as the end of the volume or the front of the closest object in the depth buffer
@@ -61,21 +70,30 @@ void Raymarch_float(
   
   // March back-to-front along the ray, sample and accumulate color at each step
   colour = float4(0,0,0,0);
+  float3 uvw;
   [unroll(MAX_ITERATIONS)]
   for (int i = 0; i < nSamples; i++) {
-    float3 uvw = calcUVW(borderFront, resolution, currPos, boxMin, boxMinMaxLen);
+    uvw = calcUVW(borderFront, resolution, currPos, boxMin, boxMinMaxLen);
     DoSample(volumeTex, volumeSampler, uvw, 1, opacityMultiplier, colour);
     currPos += stepVec;
     if (colour.a > 0.99) { break; }
   }
+
+  depthOffset = tNear-tFar;
   float remainingSample = frac(fSamples);
   if (i == nSamples && remainingSample > 0) {
-    float3 uvw = calcUVW(borderFront, resolution, currPos, boxMin, boxMinMaxLen);
+    uvw = calcUVW(borderFront, resolution, currPos, boxMin, boxMinMaxLen);
     DoSample(volumeTex, volumeSampler, uvw, remainingSample, opacityMultiplier, colour);
   }
-  colour.a = saturate(colour.a);
+  else {
+    depthOffset = max(depthOffset, -length(currPos));
+  }
+  colour = saturate(colour);
+
+  // Calculate the current normal
+  float3 currPosNoJitter = currPos+stepVec*jitterOffset;
+  uvw = calcUVW(borderFront, resolution, currPosNoJitter, boxMin, boxMinMaxLen);
+  nNormal = normalize(calcIsoNormal(volumeTex, volumeSampler, uvw, resolution));
 }
-
-
 
 #endif // RAYMARCH_HLSL_INCLUDED
