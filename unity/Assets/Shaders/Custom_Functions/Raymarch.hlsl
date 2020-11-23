@@ -1,7 +1,10 @@
 #ifndef RAYMARCH_HLSL_INCLUDED
 #define RAYMARCH_HLSL_INCLUDED
 
+#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
 #include "IntersectBox.hlsl"
+
+
 #define MIN_ITERATIONS 3
 #define MAX_ITERATIONS 32
 
@@ -29,19 +32,19 @@ float3 calcIsoNormal(Texture3D volumeTex, SamplerState volumeSampler, float3 uvw
 void Raymarch_float(
   Texture3D volumeTex, SamplerState volumeSampler, 
   Texture2D jitterTex, SamplerState jitterSampler,
-  float eyeDepth, float2 pos, float3 rayOrigin, float3 rayDir, float3 boxMin, float3 boxMax, 
+  float eyeDepth, float cameraFarPlane, float2 pos, float3 rayOrigin, float3 rayDir, float3 boxMin, float3 boxMax, 
   int3 borderFront, int3 borderBack, float resolution, float opacityMultiplier,
   out float4 colour, out float depthOffset, out float3 nNormal) {
   
+  depthOffset = 0;
   float tNear = 0.0; float tFar = 0.0;
   IntersectBox_float(rayOrigin, rayDir, boxMin, boxMax, tNear, tFar);
-  depthOffset = 0;
-  
+
   tNear = max(0, tNear); // If the camera is inside the volume then just start/end at the camera
   tFar = min(tFar, eyeDepth); // We only march as far as the end of the volume or the front of the closest object in the depth buffer
 
   clip(tFar - tNear); // Check for an intersection hit (negative values mean there was no hit so we clip them)
-  
+
   // Calculate the intersection points of the eye ray to the box
   float3 pNear = rayOrigin + rayDir*tNear;
   float3 pFar  = rayOrigin + rayDir*tFar;
@@ -72,21 +75,22 @@ void Raymarch_float(
   colour = float4(0,0,0,0);
   float3 uvw;
   [unroll(MAX_ITERATIONS)]
-  for (int i = 0; i < nSamples; i++) {
+  int i = 0;
+  for (; i < nSamples; i++) {
     uvw = calcUVW(borderFront, resolution, currPos, boxMin, boxMinMaxLen);
     DoSample(volumeTex, volumeSampler, uvw, 1, opacityMultiplier, colour);
     currPos += stepVec;
     if (colour.a > 0.99) { break; }
   }
 
-  depthOffset = tNear-tFar;
   float remainingSample = frac(fSamples);
   if (i == nSamples && remainingSample > 0) {
     uvw = calcUVW(borderFront, resolution, currPos, boxMin, boxMinMaxLen);
     DoSample(volumeTex, volumeSampler, uvw, remainingSample, opacityMultiplier, colour);
+    depthOffset = tNear-tFar;
   }
   else {
-    depthOffset = max(depthOffset, -length(currPos));
+    depthOffset = -length(i*stepVec);
   }
   colour = saturate(colour);
 

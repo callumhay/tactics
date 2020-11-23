@@ -72,8 +72,8 @@ public class VolumeRaymarcher : MonoBehaviour {
     if (meshRenderer.sharedMaterial == null) {
       meshRenderer.sharedMaterial = Resources.Load<Material>("Materials/VolumeRaymarchMat"); // "Materials/DebugDiffuseMat"
       //var halfBoundSize = 0.5f* new Vector4(volumeUnitSize.x, volumeUnitSize.y, volumeUnitSize.z, 0);
-      meshRenderer.material.SetVector("boundsMax", volumeUnitSize);
-      meshRenderer.material.SetVector("boundsMin", new Vector3(0,0,0));
+      meshRenderer.material.SetVector("boundsMax", transform.localToWorldMatrix * volumeUnitSize);
+      meshRenderer.material.SetVector("boundsMin", transform.localToWorldMatrix * new Vector3(0,0,0));
       meshRenderer.material.SetVector("borderFront", new Vector3(resBorderFrontInt.x, resBorderFrontInt.y, resBorderFrontInt.z));
       meshRenderer.material.SetVector("borderBack", new Vector3(resBorderBackInt.x, resBorderBackInt.y, resBorderBackInt.z));
       meshRenderer.material.SetFloat("resolution", volResolution);
