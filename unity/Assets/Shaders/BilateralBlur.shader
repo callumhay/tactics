@@ -31,13 +31,16 @@
   // There are also a lot of utility function you can use inside Common.hlsl and Color.hlsl,
   // you can check them out in the source code of the core SRP package.
 
-  #define KERNEL_SIZE 6
+  #define KERNEL_SIZE 4
   #define KERNEL_TAPS (2*KERNEL_SIZE+1)
 
   TEXTURE2D_X(_Source);
   TEXTURE2D_X(_ColorBufferCopy);
   TEXTURE2D_X_HALF(_Mask);
   TEXTURE2D_X_HALF(_MaskDepth);
+  float4 _ViewPortSize; // We need the viewport size because we have a non fullscreen render target (blur buffers are downsampled in half res)
+  float _Radius;
+  float _InvertMask;
   float _Sigma;
   float _BSigma;
 
@@ -58,13 +61,15 @@
 
   float2 GetSampleUVs(Varyings varyings) {
     float depth = LoadCameraDepth(varyings.positionCS.xy);
-    PositionInputs posInput = GetPositionInput(varyings.positionCS.xy, _ScreenSize.zw, depth, UNITY_MATRIX_I_VP, UNITY_MATRIX_V);
+    PositionInputs posInput = GetPositionInput(varyings.positionCS.xy, _ViewPortSize.zw, depth, UNITY_MATRIX_I_VP, UNITY_MATRIX_V);
     return posInput.positionNDC.xy * _RTHandleScale.xy;
   }
 
   float4 HorizontalBlur(Varyings varyings) : SV_Target {
     float2 texcoord = GetSampleUVs(varyings);
+    float2 offset = _ScreenSize.zw * _Radius;
     float3 colour = SAMPLE_TEXTURE2D_X_LOD(_Source, s_linear_clamp_sampler, texcoord, 0).rgb;
+    float depth = LoadCameraDepth(varyings.positionCS.xy);
 
     float kernel[KERNEL_TAPS];
     float3 finalColour = float3(0,0,0);
@@ -80,9 +85,10 @@
     float bZ = 1.0 / normPdf(0.0, _BSigma);
     float factorSum = 0.0;
     for (int i = -KERNEL_SIZE; i <= KERNEL_SIZE; i++) {
-      uv = ClampUVs(texcoord + float2(i, 0)*_ScreenSize.zw);
+      uv = ClampUVs(texcoord + float2(i, 0) * offset);
       sampleColour = SAMPLE_TEXTURE2D_X_LOD(_Source, s_linear_clamp_sampler, uv, 0).rgb;
-      factor = normPdf3(sampleColour-colour, _BSigma) * bZ * kernel[KERNEL_SIZE+i];
+      sampleDepth = LoadCameraDepth(uv);
+      factor = normPdf3(sampleColour-colour, _BSigma) * normPdf(sampleDepth-depth, _Sigma) * bZ * kernel[KERNEL_SIZE+i];
       factorSum += factor;
       finalColour += factor*sampleColour;
     }
@@ -92,7 +98,9 @@
 
   float4 VerticalBlur(Varyings varyings) : SV_Target {
     float2 texcoord = GetSampleUVs(varyings);
+    float2 offset = _ScreenSize.zw * _Radius;
     float3 colour = SAMPLE_TEXTURE2D_X_LOD(_Source, s_linear_clamp_sampler, texcoord, 0).rgb;
+    float depth = LoadCameraDepth(varyings.positionCS.xy);
 
     float kernel[KERNEL_TAPS];
     float3 finalColour = float3(0,0,0);
@@ -108,9 +116,10 @@
     float bZ = 1.0 / normPdf(0.0, _BSigma);
     float factorSum = 0.0;
     for (int i = -KERNEL_SIZE; i <= KERNEL_SIZE; i++) {
-      uv = ClampUVs(texcoord + float2(0, i) * _ScreenSize.zw);
+      uv = ClampUVs(texcoord + float2(0, i) * offset);
       sampleColour = SAMPLE_TEXTURE2D_X_LOD(_Source, s_linear_clamp_sampler, uv, 0).rgb;
-      factor = normPdf3(sampleColour-colour, _BSigma) * bZ * kernel[KERNEL_SIZE+i];
+      sampleDepth = LoadCameraDepth(uv);
+      factor = normPdf3(sampleColour-colour, _BSigma) * normPdf(sampleDepth-depth, _Sigma) * bZ * kernel[KERNEL_SIZE+i];
       factorSum += factor;
       finalColour += factor*sampleColour;
     }
@@ -127,7 +136,7 @@
     float4 mask = SAMPLE_TEXTURE2D_X_LOD(_Mask, s_linear_clamp_sampler, uv, 0);
     float maskDepth = SAMPLE_TEXTURE2D_X_LOD(_MaskDepth, s_linear_clamp_sampler, uv, 0).r;
     float maskValue = any(mask.rgb > 0.01) || (maskDepth > depth - 1e-4 && maskDepth != 0);
-
+    if (_InvertMask > 0.5) { maskValue = !maskValue; }
     return float4(lerp(blurredBuffer.rgb, colorBuffer.rgb, maskValue*mask.a), colorBuffer.a);
   }
 

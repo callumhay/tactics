@@ -4,15 +4,20 @@ using UnityEngine.Rendering;
 using UnityEngine.Experimental.Rendering;
 
 class BilateralBlur : CustomPass {
+  [Range(1,10)]
+  public float radius = 4.0f;
   [Range(1, 30)]
   public float sigma = 10.0f;
   [Range(0.1f, 1)]
   public float bSigma = 0.1f;
   public bool useMask = false;
   public LayerMask maskLayer = 0;
+  public bool invertMask = false;
+
+  private static readonly int KERNEL_SIZE = 6;
 
   Material blurMaterial;
-  RTHandle intermediateBuffer;
+  RTHandle intermediateBuffer; // Downsample buffer
   RTHandle blurBuffer;
   RTHandle maskBuffer;
   RTHandle maskDepthBuffer;
@@ -29,6 +34,7 @@ class BilateralBlur : CustomPass {
     public static readonly int _BlitTexture = Shader.PropertyToID("_BlitTexture");
     public static readonly int _BlitScaleBias = Shader.PropertyToID("_BlitScaleBias");
     public static readonly int _BlitMipLevel = Shader.PropertyToID("_BlitMipLevel");
+    public static readonly int _Radius = Shader.PropertyToID("_Radius");
     public static readonly int _Sigma = Shader.PropertyToID("_Sigma");
     public static readonly int _BSigma = Shader.PropertyToID("_BSigma");
     public static readonly int _Source = Shader.PropertyToID("_Source");
@@ -36,6 +42,7 @@ class BilateralBlur : CustomPass {
     public static readonly int _Mask = Shader.PropertyToID("_Mask");
     public static readonly int _MaskDepth = Shader.PropertyToID("_MaskDepth");
     public static readonly int _InvertMask = Shader.PropertyToID("_InvertMask");
+    public static readonly int _ViewPortSize = Shader.PropertyToID("_ViewPortSize");
   }
 
   // It can be used to configure render targets and their clear state. Also to create temporary render target textures.
@@ -48,7 +55,7 @@ class BilateralBlur : CustomPass {
 
     // Allocate the buffers used for the blur in half resolution to save some memory
     intermediateBuffer = RTHandles.Alloc(
-      Vector2.one, TextureXR.slices, dimension: TextureXR.dimension,
+      Vector2.one * 0.5f, TextureXR.slices, dimension: TextureXR.dimension,
       colorFormat: GraphicsFormat.B10G11R11_UFloatPack32, // We don't need alpha in the blur
       useDynamicScale: true, name: "IntermediateBuffer"
     );
@@ -122,6 +129,13 @@ class BilateralBlur : CustomPass {
     HDUtils.DrawRendererList(renderContext, cmd, RendererList.Create(result));
   }
 
+      // We need the viewport size in our shader because we're using half resolution render targets (and so the _ScreenSize
+    // variable in the shader does not match the viewport).
+    void SetViewPortSize(CommandBuffer cmd, MaterialPropertyBlock block, RTHandle target) {
+        Vector2Int scaledViewportSize = target.GetScaledSize(target.rtHandleProperties.currentViewportSize);
+        block.SetVector(ShaderID._ViewPortSize, new Vector4(scaledViewportSize.x, scaledViewportSize.y, 1.0f / scaledViewportSize.x, 1.0f / scaledViewportSize.y));
+    }
+
   void GenerateGaussianMips(CommandBuffer cmd, HDCamera hdCam) {
     RTHandle source;
 
@@ -133,7 +147,7 @@ class BilateralBlur : CustomPass {
     if (useMask) { cmd.CopyTexture(source, colorCopy); }
 
     // Downsample
-    using (new ProfilingScope(cmd, new ProfilingSampler("Downsample"))) {
+    using (new ProfilingScope(cmd, new ProfilingSampler("Downsample/Intermediate Blit"))) {
       // This Blit will automatically downsample the color because our target buffer have been allocated in half resolution
       HDUtils.BlitCameraTexture(cmd, source, intermediateBuffer, 0);
     }
@@ -141,9 +155,11 @@ class BilateralBlur : CustomPass {
     // Horizontal Blur
     using (new ProfilingScope(cmd, new ProfilingSampler("H Blur"))) {
       var hBlurProperties = new MaterialPropertyBlock();
+      hBlurProperties.SetFloat(ShaderID._Radius, radius / (float)KERNEL_SIZE); // The blur is 4 pixel wide in the shader
       hBlurProperties.SetFloat(ShaderID._Sigma, sigma);
       hBlurProperties.SetFloat(ShaderID._BSigma, bSigma);
       hBlurProperties.SetTexture(ShaderID._Source, intermediateBuffer); // The blur is 4 pixel wide in the shader
+      SetViewPortSize(cmd, hBlurProperties, blurBuffer);
       HDUtils.DrawFullScreen(cmd, blurMaterial, blurBuffer, hBlurProperties, shaderPassId: 0); // Do not forget the shaderPassId: ! or it won't work
     }
 
@@ -153,10 +169,12 @@ class BilateralBlur : CustomPass {
       // When we use a mask, we do the vertical blur into the downsampling buffer instead of the camera buffer
       // We need that because we're going to write to the color buffer and read from this blured buffer which we can't do
       // if they are in the same buffer
+      vBlurProperties.SetFloat(ShaderID._Radius, radius / (float)KERNEL_SIZE); // The blur is 4 pixel wide in the shader
       vBlurProperties.SetFloat(ShaderID._Sigma, sigma);
       vBlurProperties.SetFloat(ShaderID._BSigma, bSigma);
       vBlurProperties.SetTexture(ShaderID._Source, blurBuffer);
       var targetBuffer = (useMask) ? intermediateBuffer : source;
+      SetViewPortSize(cmd, vBlurProperties, targetBuffer);
       HDUtils.DrawFullScreen(cmd, blurMaterial, targetBuffer, vBlurProperties, shaderPassId: 1); // Do not forget the shaderPassId: ! or it won't work
     }
 
@@ -164,12 +182,15 @@ class BilateralBlur : CustomPass {
       // Merge the non blur copy and the blurred version using the mask buffers
       using (new ProfilingScope(cmd, new ProfilingSampler("Compose Mask Blur"))) {
         var compositingProperties = new MaterialPropertyBlock();
+        compositingProperties.SetFloat(ShaderID._Radius, radius / (float)KERNEL_SIZE); // The blur is 4 pixel wide in the shader
         compositingProperties.SetFloat(ShaderID._Sigma, sigma);
         compositingProperties.SetFloat(ShaderID._BSigma, bSigma);
         compositingProperties.SetTexture(ShaderID._Source, intermediateBuffer);
         compositingProperties.SetTexture(ShaderID._ColorBufferCopy, colorCopy);
         compositingProperties.SetTexture(ShaderID._Mask, maskBuffer);
         compositingProperties.SetTexture(ShaderID._MaskDepth, maskDepthBuffer);
+        compositingProperties.SetFloat(ShaderID._InvertMask, invertMask ? 1 : 0);
+        SetViewPortSize(cmd, compositingProperties, source);
         HDUtils.DrawFullScreen(cmd, blurMaterial, source, compositingProperties, shaderPassId: 2); // Do not forget the shaderPassId: ! or it won't work
       }
     }

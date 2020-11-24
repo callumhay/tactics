@@ -358,7 +358,7 @@ Transform:
   m_GameObject: {fileID: 255979247}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 4.069668, y: 19.16, z: 3.8398614}
-  m_LocalScale: {x: 4.5198, y: 4.5198, z: 4.5198}
+  m_LocalScale: {x: 4.5198, y: 38.590687, z: 4.5198}
   m_Children: []
   m_Father: {fileID: 0}
   m_RootOrder: 4
@@ -468,6 +468,7 @@ GameObject:
   m_Component:
   - component: {fileID: 736164559}
   - component: {fileID: 736164558}
+  - component: {fileID: 736164560}
   m_Layer: 4
   m_Name: Volume Render Test
   m_TagString: Untagged
@@ -505,6 +506,24 @@ Transform:
   m_Father: {fileID: 0}
   m_RootOrder: 3
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &736164560
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 736164557}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9c4bfe8c0002f4bc2ba1f17c72b07859, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  liquidDensity: 1000
+  atmosphericPressure: 101325
+  maxGravityVelocity: 11
+  maxPressureVelocity: 8
+  maxPressureHeight: 5
+  numPressureIters: 10
 --- !u!1 &1169957086
 GameObject:
   m_ObjectHideFlags: 0
@@ -755,7 +774,7 @@ Camera:
   m_Depth: 0
   m_CullingMask:
     serializedVersion: 2
-    m_Bits: 4294967295
+    m_Bits: 823
   m_RenderingPath: -1
   m_TargetTexture: {fileID: 0}
   m_TargetDisplay: 0
@@ -1734,12 +1753,14 @@ MonoBehaviour:
         clearFlags: 0
         passFoldout: 0
         m_Version: 0
-        sigma: 20
-        bSigma: 0.25
+        radius: 4
+        sigma: 10
+        bSigma: 0.2
         useMask: 1
         maskLayer:
           serializedVersion: 2
-          m_Bits: 807
+          m_Bits: 16
+        invertMask: 1
         blurShader: {fileID: 4800000, guid: 867c4649678ce41e88063d7331b17e5c, type: 3}
         whiteRenderersShader: {fileID: 0}
 --- !u!4 &1903527713

@@ -9,9 +9,11 @@ float time;
 
 [numthreads(8,8,8)]
 void CSNoise(uint3 id : SV_DispatchThreadID) {
-  float noiseVal = (id.x < borderFront.x || id.y < borderFront.y || id.z < borderFront.z ||
-      id.x >= resolution-borderBack.x || id.y >= resolution-borderBack.y || id.z >= resolution-borderBack.z) ?
-      0 : snoise(float4(5*id.x/(float)resolution, 5*id.y/(float)resolution, 5*id.z/(float)resolution, time));
-
+  if (id.x < borderFront.x || id.y < borderFront.y || id.z < borderFront.z ||
+      id.x >= resolution-borderBack.x || id.y >= resolution-borderBack.y || id.z >= resolution-borderBack.z) {
+    isoValues[id.xyz] = float4(1,0,1,1);
+    return;
+  }
+  float noiseVal = snoise(float4(5*id.x/(float)resolution, 5*id.y/(float)resolution, 5*id.z/(float)resolution, time));
   isoValues[id.xyz] = float4(noiseVal,noiseVal,noiseVal,noiseVal);
 }

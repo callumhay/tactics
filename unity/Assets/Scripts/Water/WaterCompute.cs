@@ -13,11 +13,14 @@ public class WaterCompute : MonoBehaviour {
   [Range(1,128)]
   public int numPressureIters = 10;
   
-
-
   private ComputeShader liquidComputeShader;
+  private int advectKernelId;
 
-
+  private void Start() {
+    liquidComputeShader = Resources.Load<ComputeShader>("Shaders/LiquidCS");
+    advectKernelId = liquidComputeShader.FindKernel("CSAdvect");
+  }
+  
 
 
 }

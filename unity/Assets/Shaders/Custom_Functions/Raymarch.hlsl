@@ -16,8 +16,8 @@ void DoSample(Texture3D volumeTex, SamplerState volumeSampler, float3 uvw, float
   colour.a = (1-sampleColour.a)*colour.a + sampleColour.a;
 }
 
-float3 calcUVW(int3 borderFront, float resolution, float3 currPos, float3 boxMin, float boxMinMaxLen) {
-  return borderFront / resolution + (currPos-boxMin) / boxMinMaxLen;
+float3 calcUVW(float3 borderVec, float resolution, float3 currPos, float3 boxMin, float boxMinMaxLen) {
+  return borderVec / resolution + (currPos-boxMin) / boxMinMaxLen;
 }
 
 float3 calcIsoNormal(Texture3D volumeTex, SamplerState volumeSampler, float3 uvwCenter, float resolution) {
@@ -42,7 +42,6 @@ void Raymarch_float(
 
   tNear = max(0, tNear); // If the camera is inside the volume then just start/end at the camera
   tFar = min(tFar, eyeDepth); // We only march as far as the end of the volume or the front of the closest object in the depth buffer
-
   clip(tFar - tNear); // Check for an intersection hit (negative values mean there was no hit so we clip them)
 
   // Calculate the intersection points of the eye ray to the box
@@ -77,7 +76,7 @@ void Raymarch_float(
   [unroll(MAX_ITERATIONS)]
   int i = 0;
   for (; i < nSamples; i++) {
-    uvw = calcUVW(borderFront, resolution, currPos, boxMin, boxMinMaxLen);
+    uvw = calcUVW(borderVec, resolution, currPos, boxMin, boxMinMaxLen);
     DoSample(volumeTex, volumeSampler, uvw, 1, opacityMultiplier, colour);
     currPos += stepVec;
     if (colour.a > 0.99) { break; }
@@ -85,7 +84,7 @@ void Raymarch_float(
 
   float remainingSample = frac(fSamples);
   if (i == nSamples && remainingSample > 0) {
-    uvw = calcUVW(borderFront, resolution, currPos, boxMin, boxMinMaxLen);
+    uvw = calcUVW(borderVec, resolution, currPos, boxMin, boxMinMaxLen);
     DoSample(volumeTex, volumeSampler, uvw, remainingSample, opacityMultiplier, colour);
     depthOffset = tNear-tFar;
   }
@@ -96,7 +95,7 @@ void Raymarch_float(
 
   // Calculate the current normal
   float3 currPosNoJitter = currPos+stepVec*jitterOffset;
-  uvw = calcUVW(borderFront, resolution, currPosNoJitter, boxMin, boxMinMaxLen);
+  uvw = calcUVW(borderVec, resolution, currPosNoJitter, boxMin, boxMinMaxLen);
   nNormal = normalize(calcIsoNormal(volumeTex, volumeSampler, uvw, resolution));
 }
 
