@@ -102,6 +102,10 @@ public class VolumeRaymarcher : MonoBehaviour {
     meshRenderer.material.SetTexture("isovalTex", volRenderTex);
   }
 
+  void OnDestroy() {
+    volRenderTex?.Release();
+  }
+
   void OnDrawGizmosSelected() {
     Gizmos.DrawWireCube(halfUnitSize(), volumeUnitSize);
   }
