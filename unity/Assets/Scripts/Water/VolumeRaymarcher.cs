@@ -23,23 +23,13 @@ public class VolumeRaymarcher : MonoBehaviour {
   private int liquidCSKernel;
   private RenderTexture volRenderTex;
 
-  private float maxHypVolUnitSize() { 
-    var halfSize = 0.5f * volumeUnitSize;
-    return 2*halfSize.magnitude;
-  }
-  
   private Vector3 halfUnitSize() { return 0.5f*volumeUnitSize; }
 
-  void Start() {
-    meshFilter = GetComponent<MeshFilter>();
-    if (!meshFilter) { meshFilter = gameObject.AddComponent<MeshFilter>(); }
-    meshRenderer = GetComponent<MeshRenderer>();
-    if (!meshRenderer) { meshRenderer = gameObject.AddComponent<MeshRenderer>(); }
-    meshRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-    meshRenderer.allowOcclusionWhenDynamic = false;
-    meshRenderer.motionVectorGenerationMode = MotionVectorGenerationMode.ForceNoMotion;
-    if (!jitterTexture) { jitterTexture = TextureHelper.buildJitterTexture2D(defaultJitterTexSize, true); }
+  public Vector3Int getBorderFront() { return resBorderFrontInt; }
+  public Vector3Int getBorderBack()  { return resBorderBackInt;  }
+  public int getFullResSize() { return volResolution; }
 
+  void Awake() {
     // Calculate the resolution of the 3D texture for rendering into the slices
     var numNodesVec = TerrainGrid.nodesPerUnit * volumeUnitSize - 
       new Vector3(volumeUnitSize.x/TerrainColumn.size-1, volumeUnitSize.y/TerrainColumn.size-1, volumeUnitSize.z/TerrainColumn.size-1);
@@ -59,7 +49,18 @@ public class VolumeRaymarcher : MonoBehaviour {
 
     Debug.Log("Resolution: " + volResolution);
     Debug.Log("Border (Float): " + resBorder + ", Front (Int): " + resBorderFrontInt + ", Back (Int): " + resBorderBackInt);
-    Debug.Log("Number of thread groups: " + numThreadGroups);
+    Debug.Log("Number of thread groups: " + numThreadGroups); 
+  }
+
+  void Start() {
+    meshFilter = GetComponent<MeshFilter>();
+    if (!meshFilter) { meshFilter = gameObject.AddComponent<MeshFilter>(); }
+    meshRenderer = GetComponent<MeshRenderer>();
+    if (!meshRenderer) { meshRenderer = gameObject.AddComponent<MeshRenderer>(); }
+    meshRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+    meshRenderer.allowOcclusionWhenDynamic = false;
+    meshRenderer.motionVectorGenerationMode = MotionVectorGenerationMode.ForceNoMotion;
+    if (!jitterTexture) { jitterTexture = TextureHelper.buildJitterTexture2D(defaultJitterTexSize, true); }
 
     volRenderTex = new RenderTexture(volResolution, volResolution, 0, RenderTextureFormat.ARGBFloat);
     volRenderTex.dimension = UnityEngine.Rendering.TextureDimension.Tex3D;
@@ -72,8 +73,8 @@ public class VolumeRaymarcher : MonoBehaviour {
     if (meshRenderer.sharedMaterial == null) {
       meshRenderer.sharedMaterial = Resources.Load<Material>("Materials/VolumeRaymarchMat"); // "Materials/DebugDiffuseMat"
       //var halfBoundSize = 0.5f* new Vector4(volumeUnitSize.x, volumeUnitSize.y, volumeUnitSize.z, 0);
-      meshRenderer.material.SetVector("boundsMax", volumeUnitSize);
-      meshRenderer.material.SetVector("boundsMin", new Vector3(0,0,0));
+      meshRenderer.material.SetVector("boundsMax", transform.localToWorldMatrix * volumeUnitSize);
+      meshRenderer.material.SetVector("boundsMin", transform.localToWorldMatrix * new Vector3(0,0,0));
       meshRenderer.material.SetVector("borderFront", new Vector3(resBorderFrontInt.x, resBorderFrontInt.y, resBorderFrontInt.z));
       meshRenderer.material.SetVector("borderBack", new Vector3(resBorderBackInt.x, resBorderBackInt.y, resBorderBackInt.z));
       meshRenderer.material.SetFloat("resolution", volResolution);

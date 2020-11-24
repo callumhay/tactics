@@ -1,4 +1,5 @@
 ﻿#pragma kernel CSAdvect
+#pragma kernel CSApplyExternalForces
 
 #define SOLID_NODE_TYPE 1
 #define EMPTY_NODE_TYPE 0
@@ -11,35 +12,41 @@
 #define UNSETTLED_NODE 0
 
 #define LIQUID_EPSILON 1e-6;
+#define MAX_PRESSURE_HEIGHT 5
+
+float unitsPerNode;
 
 float liquidDensity;
 float atmoPressure;
 float maxGravityVel;
 float maxPressureVel;
-int maxPressureHeight;
 
 float dt;
 
 uint3 borderBack;   // Border at the front of the buffer (at least 1 unit on each axis)
 uint3 borderFront;  // Border at the back of the buffer (at least 1 unit on each axis)
-uint  fullSize;     // Full size of the buffer on each side
 uint3 internalSize; // Internal size of the buffer (full size minus the borders)
+uint  fullSize;     // Full size of the buffer on each side
 
-int cellType(float3 cell) { return cell[NODE_TYPE_IDX]; }
+// Buffers used throughout the kernels
+RWTexture3D<float4> vel;       // Input buffer of the current velocities
+RWTexture3D<float4> nodeData;  // Input buffer of the liquid node/cell data
+
+
+int nodeType(float4 node) { return (int)node[NODE_TYPE_IDX]; }
+float nodeVolume(float4 node) { return node[NODE_VOL_IDX]; }
+
 bool isOutOfBounds(uint3 id) {
   return (id.x < borderFront.x || id.y < borderFront.y || id.z < borderFront.z ||
           id.x >= fullSize-borderBack.x || id.y >= fullSize-borderBack.y || id.z >= fullSize-borderBack.z);
 }
 
-// Liquid Advection
-RWTexture3D<float3> vel;       // Input buffer of the current velocities
-RWTexture3D<float3> cellData;  // Input buffer of the liquid node/cell data
-RWTexture3D<float3> advectVel; // Output buffer of the advected velocity
+// Liquid Advection *****************
+RWTexture3D<float4> advectVel; // Output buffer of the advected velocity
 
 [numthreads(8,8,8)]
 void CSAdvect(uint3 id : SV_DispatchThreadID) {
-  float3 cell = cellData[id.xyz];
-  if (isOutOfBounds(id) || cellType(cell) == SOLID_NODE_TYPE) { 
+  if (isOutOfBounds(id) || nodeType(nodeData[id.xyz]) == SOLID_NODE_TYPE) { 
     advectVel[id.xyz] = float3(0,0,0);
     return;
   }
@@ -77,6 +84,115 @@ void CSAdvect(uint3 id : SV_DispatchThreadID) {
   advectVel[id.xyz] = result;
 }
 
+// Applying External Forces (e.g., Gravity, Hydrostatic Pressure) ****************
+float gravityMagnitude;
+//float dt;
+//RWTexture3D<float4> vel;
+//RWTexture3D<float4> nodeData;
+RWTexture3D<float4> velApplExtForces; // Output of buffer for applying external forces
+
+[numthreads(8,8,8)]
+void CSApplyExternalForces(uint3 id : SV_DispatchThreadID) {
+  float4 node = nodeData[id.xyz];
+  float3 u = vel[id.xyz];
+
+  if (isOutOfBounds(id) || nodeType(node) == SOLID_NODE_TYPE || nodeVolume(node) < LIQUID_EPSILON) { 
+    velApplExtForces[id.xyz] = u;
+    return;
+  }
+
+  float4 result = float4(u.xyz, 0);
+  
+  float4 bottomNode   = nodeData[uint3(id.x,id.y-1,id.z)];
+  int bottomNodeType  = nodeType(bottomNode);
+  float bottomNodeVol = nodeVolume(bottomNode);
+
+  // Apply Gravity
+  result.y = clamp(result.y - gravityMagnitude*dt, -maxGravityVel, maxGravityVel);
+
+  // Determine the hydrostatic pressure = density*gravity*(mass of the fluid above)
+  // How much pressure is pressing down on this cell (up to the max pressure height)?
+  float liquidVolAboveCell = 0.0;
+  int pressureHeightIdx = min(borderFront.y+internalSize.y-1, id.y+1+MAX_PRESSURE_HEIGHT);
+  [unroll(MAX_PRESSURE_HEIGHT)]
+  for (int y = id.y+1; y < pressureHeightIdx; y++) {
+    float4 topNode   = nodeData[uint3(id.x, y, id.z)];
+    int topNodeType  = nodeType(topNode);
+    float topNodeVol = nodeVolume(topNode);
+
+    if (topNodeType === SOLID_NODE_TYPE || topNodeVol < LIQUID_EPSILON) { break; }
+    liquidVolAboveCell += topNodeVol;
+  }
+
+  float liquidMassAboveNode = liquidDensity * liquidVolAboveCell;
+  float hsForce = atmoPressure * (unitsPerNode * unitsPerNode) + liquidMassAboveCell * gravityMagnitude;
+  float dHSVel = hsForce*dt;
+
+  float4 nodeL = nodeData[uint3(id.x-1, id.y, id.z)];
+  float4 nodeR = nodeData[uint3(id.x+1, id.y, id.z)];
+  float4 nodeD = nodeData[uint3(id.xy, id.z-1)];
+  float4 nodeU = nodeData[uint3(id.xy, id.z+1)];
+  
+  // Apply hydrostatic pressure
+  
+
+  /*
+      const ym1 = clampm1(y);
+
+      // Apply Gravity
+      const bottomNode = cellData[x][ym1][z];
+      const bottomNodeType = cellType(bottomNode);
+      result[1] = clampValue(result[1] - gravity*dt, -this.constants.MAX_GRAVITY_VEL, this.constants.MAX_GRAVITY_VEL);
+
+      // Determine the hydrostatic pressure = density*gravity*(height of the fluid above 
+      // How much pressure is pressing down on this cell?
+      let liquidVolAboveCell = 0;
+      const pressureHeightIdx = Math.min(this.constants.NY, y+1+this.constants.PRESSURE_MAX_HEIGHT);
+      for (let i = y+1; i < pressureHeightIdx; i++) {
+        const aboveCell = cellData[x][i][z];
+        const aboveCellType = cellType(aboveCell);
+        const aboveCellVol = cellLiquidVol(aboveCell);
+        if (aboveCellType === this.constants.SOLID_NODE_TYPE || 
+            aboveCellVol < this.constants.LIQUID_EPSILON) { break; }
+        liquidVolAboveCell += aboveCellVol;
+      }
+      const liquidMassAboveCell = this.constants.LIQUID_DENSITY*liquidVolAboveCell;
+      const hsForce = this.constants.ATMO_PRESSURE*this.constants.unitArea + liquidMassAboveCell*gravity;
+      const dHSVel  = hsForce*dt;
+
+      const xm1 = clampm1(x), xp1 = clampp1(x,this.constants.NX_PLUS1);
+      const zm1 = clampm1(z), zp1 = clampp1(z,this.constants.NZ_PLUS1);
+      const cellL = cellData[xm1][y][z];
+      const cellR = cellData[xp1][y][z];
+      const cellD = cellData[x][y][zm1];
+      const cellU = cellData[x][y][zp1];
+      const bottomNodeLiquidVol = cellLiquidVol(bottomNode);
+
+      let totalVelX = 0, totalVelZ = 0;
+      if (bottomNodeType === this.constants.SOLID_NODE_TYPE || bottomNodeLiquidVol >= cellLiquidVol) {
+        totalVelX -= (cellType(cellL) === this.constants.EMPTY_NODE_TYPE && 
+                      cellLiquidVol(cellL) < cellLiquidVol) ? dHSVel : 0;
+        totalVelX += (cellType(cellR) === this.constants.EMPTY_NODE_TYPE && 
+                      cellLiquidVol(cellR) < cellLiquidVol) ? dHSVel : 0;
+        totalVelZ -= (cellType(cellD) === this.constants.EMPTY_NODE_TYPE &&
+                      cellLiquidVol(cellD) < cellLiquidVol) ? dHSVel : 0;
+        totalVelZ += (cellType(cellU) === this.constants.EMPTY_NODE_TYPE &&
+                      cellLiquidVol(cellU) < cellLiquidVol) ? dHSVel : 0;
+      }
+      result[0] = clampValue(result[0] + totalVelX, -this.constants.MAX_PRESSURE_VEL, this.constants.MAX_PRESSURE_VEL);
+      result[2] = clampValue(result[2] + totalVelZ, -this.constants.MAX_PRESSURE_VEL, this.constants.MAX_PRESSURE_VEL);
+      
+      // Friction hack
+      const frictionVelX = dt*this.constants.FRICTION_AMT;
+      const frictionVelZ = dt*this.constants.FRICTION_AMT;
+      result[0] = result[0] < 0 ? Math.min(0, result[0] + frictionVelX) : Math.max(0, result[0] - frictionVelX); 
+      result[2] = result[2] < 0 ? Math.min(0, result[2] + frictionVelZ) : Math.max(0, result[2] - frictionVelZ);
+
+      return result;
+  */
+
+
+}
 
 
 
