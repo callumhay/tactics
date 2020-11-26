@@ -2,6 +2,8 @@
 
 public class WaterCompute : MonoBehaviour {
 
+  public static readonly int NUM_THREADS_PER_BLOCK = 8;
+
   public float liquidDensity        = 1000.0f;   // kg/m^3
   public float atmosphericPressure  = 101325.0f; // N/m^2 (or Pascals)
   public float maxGravityVelocity   = 11.0f;     // m/s
@@ -11,7 +13,6 @@ public class WaterCompute : MonoBehaviour {
   [Range(1,128)]
   public int numPressureIters = 10;
   
-  private static readonly int NUM_THREADS_PER_BLOCK = 8;
   private int numThreadGroups;
   private ComputeShader liquidComputeShader;
   private int advectKernelId;
@@ -25,7 +26,7 @@ public class WaterCompute : MonoBehaviour {
   private int sumFlowsKernelId;
   private int adjustVolFromFlowsKernelId;
 
-  private RenderTexture nodeDataRT;
+  public RenderTexture nodeDataRT;
   private RenderTexture velRT;
   private RenderTexture temp3DFloat4RT1;
   private RenderTexture temp3DFloat4RT2;
@@ -34,6 +35,7 @@ public class WaterCompute : MonoBehaviour {
   private RenderTexture tempPressurePong;
   private ComputeBuffer flowsBuffer;
 
+  private VolumeRaymarcher volComponent;
 
   private void Start() {
     liquidComputeShader = Resources.Load<ComputeShader>("Shaders/LiquidCS");
@@ -54,7 +56,7 @@ public class WaterCompute : MonoBehaviour {
     liquidComputeShader.SetFloat("maxPressureVel", maxPressureVelocity);
     liquidComputeShader.SetFloat("unitsPerNode", TerrainGrid.unitsPerNode());
 
-    var volComponent = GetComponent<VolumeRaymarcher>();
+    volComponent = GetComponent<VolumeRaymarcher>();
     if (!volComponent) {
       Debug.LogError("Could not find VolumeRaymarcher component in GameObject.");
       return;
@@ -71,8 +73,15 @@ public class WaterCompute : MonoBehaviour {
     liquidComputeShader.SetInt("fullSize", fullResSize);
 
     numThreadGroups = fullResSize / NUM_THREADS_PER_BLOCK;
+    Debug.Log("Number of thread groups: " + numThreadGroups); 
 
     initBuffersAndRTs(fullResSize);
+
+        liquidComputeShader.SetVector("borderBack", new Vector3(borderBack.x,borderBack.y,borderBack.z));
+    liquidComputeShader.SetVector("borderFont", new Vector3(borderFront.x, borderFront.y, borderFront.z));
+    liquidComputeShader.SetVector("internalSize", new Vector3(internalResSize.x, internalResSize.y, internalResSize.z));
+    liquidComputeShader.SetInt("fullSize", fullResSize);
+    initDebugNodes();
   }
 
   private void OnDestroy() {
@@ -109,7 +118,8 @@ public class WaterCompute : MonoBehaviour {
   }
 
   private void FixedUpdate() {
-    liquidComputeShader.SetFloat("dt", Time.deltaTime);
+    /*
+    liquidComputeShader.SetFloat("dt", Time.fixedDeltaTime);
     advectVelocity();
     applyExternalForces();
     applyVorticityConfinement();
@@ -118,6 +128,8 @@ public class WaterCompute : MonoBehaviour {
     projectVelocity();
     calculateAndSumFlows();
     adjustNodesFromFlows();
+    */
+    volComponent.updateVolumeData(nodeDataRT);
   }
 
   private void advectVelocity() {
@@ -145,7 +157,7 @@ public class WaterCompute : MonoBehaviour {
     liquidComputeShader.Dispatch(curlKernelId, numThreadGroups, numThreadGroups, numThreadGroups);
     // NOTE: curl == temp3DFloat4RT1, |curl| == temp3DFloatRT
 
-    float dtVC = applyCFL(Time.deltaTime*this.vorticityConfinement);
+    float dtVC = applyCFL(Time.fixedDeltaTime*this.vorticityConfinement);
     liquidComputeShader.SetFloat("dtVC", dtVC);
     liquidComputeShader.SetTexture(vcKernelId, "vel", velRT);
     liquidComputeShader.SetTexture(vcKernelId, "curl", temp3DFloat4RT1);
@@ -230,4 +242,11 @@ public class WaterCompute : MonoBehaviour {
     GL.Clear(true, true, c);
     RenderTexture.active = tempRT;
   }
+
+  private void initDebugNodes() {
+    int debugKernelId = liquidComputeShader.FindKernel("CSFillDebugNodeData");
+    liquidComputeShader.SetTexture(debugKernelId, "nodeData", nodeDataRT);
+    liquidComputeShader.Dispatch(debugKernelId, numThreadGroups, numThreadGroups, numThreadGroups);
+  }
+
 }

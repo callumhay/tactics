@@ -8,18 +8,10 @@
 #pragma kernel CSCalculateFlowsKernel
 #pragma kernel CSSumFlowsKernel
 #pragma kernel CSAdjustNodeFlowsKernel
+#pragma kernel CSFillDebugNodeData
 
 #include "CommonCS.hlsl"
-
-#define SOLID_NODE_TYPE 1
-#define EMPTY_NODE_TYPE 0
-
-#define NODE_VOL_IDX 0
-#define NODE_TYPE_IDX 1
-#define NODE_SETTLED_IDX 2
-
-#define SETTLED_NODE 1
-#define UNSETTLED_NODE 0
+#include "NodeDefs.hlsl"
 
 #define LIQUID_EPSILON 1e-6
 #define MAX_PRESSURE_HEIGHT 5
@@ -54,11 +46,6 @@ uint idToIndex(uint3 id) {
 // Buffers used throughout the kernels
 RWTexture3D<float4> vel;       // Input buffer of the current velocities
 RWTexture3D<float4> nodeData;  // Input buffer of the liquid node/cell data
-
-
-int nodeType(float4 node) { return (int)node[NODE_TYPE_IDX]; }
-float nodeLiquidVolume(float4 node) { return node[NODE_VOL_IDX]; }
-int nodeSettled(float4 node) { return node[NODE_SETTLED_IDX]; }
 
 bool isOutOfBounds(uint3 id) {
   return (id.x < borderFront.x || id.y < borderFront.y || id.z < borderFront.z ||
@@ -179,7 +166,7 @@ void CSApplyExternalForces(uint3 id : SV_DispatchThreadID) {
   velApplExtForces[id.xyz] = result;
 }
 
-// Vorticity Confinement Kernels
+// Vorticity Confinement Kernels *****************
 
 //uint fullSize;
 //float unitsPerNode;
@@ -243,7 +230,7 @@ void CSVorticityConfinementKernel(uint3 id : SV_DispatchThreadID) {
   );
 }
 
-// Divergence
+// Divergence *****************
 //uint fullSize;
 //uint3 internalSize;
 //RWTexture3D<float4> vel;
@@ -273,7 +260,7 @@ void CSDivergenceKernel(uint3 id : SV_DispatchThreadID) {
   pressure[id.xyz] = 0.0;
 }
 
-// Pressure / Jacobian
+// Pressure / Jacobian *****************
 //RWTexture3D<float4> nodeData;
 //RWTexture3D<float> divergence; 
 RWTexture3D<float> inputPressure;
@@ -305,7 +292,7 @@ void CSPressureKernel(uint3 id : SV_DispatchThreadID) {
   outputPressure[id.xyz] = (pL + pR + pB + pT + pU + pD - bC) / 6.0;
 }
 
-// Project Velocity
+// Project Velocity *****************
 //uint3 internalSize;
 //RWTexture3D<float4> vel;
 //RWTexture3D<float4> nodeData;
@@ -348,7 +335,7 @@ void CSProjectKernel(uint3 id : SV_DispatchThreadID) {
   projectedVel[id.xyz] = result;
 }
 
-// Calculating flows in/out of nodes
+// Calculating flows in/out of nodes *****************
 //float unitsPerNode;
 //uint fullSize;
 //RWTexture3D<float4> vel;
@@ -477,7 +464,7 @@ void CSSumFlowsKernel(uint3 id : SV_DispatchThreadID) {
     (flowsC.flowR + flowsC.flowL + flowsC.flowB + flowsC.flowT + flowsC.flowD + flowsC.flowU);
 }
 
-// Adjust the node liquid volumes based on the final tabulation of all flows
+// Adjust the node liquid volumes based on the final tabulation of all flows *****************
 //RWTexture3D<float> summedFlows;
 //RWTexture3D<float4> nodeData; // Output of CSAdjustNodeFlowsKernel
 [numthreads(8,8,8)]
@@ -511,4 +498,19 @@ void CSAdjustNodeFlowsKernel(uint3 id : SV_DispatchThreadID) {
   }
 
   nodeData[id.xyz] = node;
+}
+
+// DEBUG STUFF *******************
+//RWTexture3D<float4> nodeData; // Output of CSFillDebugNodeData
+[numthreads(8,8,8)]
+void CSFillDebugNodeData(uint3 id : SV_DispatchThreadID) {
+
+  if (isOutOfBounds(id)) {
+    nodeData[id.xyz] = buildNode(SOLID_NODE_TYPE, 0.0, SETTLED_NODE);
+    return;
+  }
+
+  float volume = id.y > fullSize/2 ? 1.0 : 0.0;
+  nodeData[id.xyz] = float4(volume, 0, 0, 1);//buildNode(EMPTY_NODE_TYPE, volume, UNSETTLED_NODE);
+
 }

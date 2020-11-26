@@ -3,13 +3,15 @@
 
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
 #include "IntersectBox.hlsl"
-
+#include "NodeDefs.hlsl"
 
 #define MIN_ITERATIONS 3
 #define MAX_ITERATIONS 32
 
 void DoSample(Texture3D volumeTex, SamplerState volumeSampler, float3 uvw, float weight, float opacityMultiplier, inout float4 colour) {
-  float4 sampleColour = weight * SAMPLE_TEXTURE3D(volumeTex, volumeSampler, uvw);
+  float4 node = SAMPLE_TEXTURE3D(volumeTex, volumeSampler, uvw);
+  float nodeVol = nodeLiquidVolume(node);
+  float4 sampleColour = weight * float4(nodeVol, nodeVol, nodeVol, nodeVol);
   sampleColour.a *= opacityMultiplier;
   // Back to front rendering
   colour.rgb = (1-sampleColour.a)*colour.rgb + sampleColour.a * sampleColour.rgb;
@@ -22,17 +24,21 @@ float3 calcUVW(float3 borderVec, float resolution, float3 currPos, float3 boxMin
 
 float3 calcIsoNormal(Texture3D volumeTex, SamplerState volumeSampler, float3 uvwCenter, float resolution) {
   float cellSize = 1.0 / resolution;
-  return float3(
-    SAMPLE_TEXTURE3D(volumeTex, volumeSampler, uvwCenter - float3(cellSize, 0.0, 0.0)).r - SAMPLE_TEXTURE3D(volumeTex, volumeSampler, uvwCenter + float3(cellSize, 0.0, 0.0)).r,
-    SAMPLE_TEXTURE3D(volumeTex, volumeSampler, uvwCenter - float3(0.0, cellSize, 0.0)).r - SAMPLE_TEXTURE3D(volumeTex, volumeSampler, uvwCenter + float3(0.0, cellSize, 0.0)).r,
-    SAMPLE_TEXTURE3D(volumeTex, volumeSampler, uvwCenter - float3(0.0, 0.0, cellSize)).r - SAMPLE_TEXTURE3D(volumeTex, volumeSampler, uvwCenter + float3(0.0, 0.0, cellSize)).r
-  );
+
+  float volL = nodeLiquidVolume(SAMPLE_TEXTURE3D(volumeTex, volumeSampler, uvwCenter - float3(cellSize, 0.0, 0.0)));
+  float volR = nodeLiquidVolume(SAMPLE_TEXTURE3D(volumeTex, volumeSampler, uvwCenter + float3(cellSize, 0.0, 0.0)));
+  float volB = nodeLiquidVolume(SAMPLE_TEXTURE3D(volumeTex, volumeSampler, uvwCenter - float3(0.0, cellSize, 0.0)));
+  float volT = nodeLiquidVolume(SAMPLE_TEXTURE3D(volumeTex, volumeSampler, uvwCenter + float3(0.0, cellSize, 0.0)));
+  float volD = nodeLiquidVolume(SAMPLE_TEXTURE3D(volumeTex, volumeSampler, uvwCenter - float3(0.0, 0.0, cellSize)));
+  float volU = nodeLiquidVolume(SAMPLE_TEXTURE3D(volumeTex, volumeSampler, uvwCenter + float3(0.0, 0.0, cellSize)));
+
+  return float3(volL-volR, volB-volT, volD-volU);
 }
 
 void Raymarch_float(
   Texture3D volumeTex, SamplerState volumeSampler, 
   Texture2D jitterTex, SamplerState jitterSampler,
-  float eyeDepth, float cameraFarPlane, float2 pos, float3 rayOrigin, float3 rayDir, float3 boxMin, float3 boxMax, 
+  float eyeDepthAlongRay, float cameraFarPlane, float2 pos, float3 rayOrigin, float3 rayDir, float3 boxMin, float3 boxMax, 
   int3 borderFront, int3 borderBack, float resolution, float opacityMultiplier,
   out float4 colour, out float depthOffset, out float3 nNormal) {
   
@@ -41,7 +47,7 @@ void Raymarch_float(
   IntersectBox_float(rayOrigin, rayDir, boxMin, boxMax, tNear, tFar);
 
   tNear = max(0, tNear); // If the camera is inside the volume then just start/end at the camera
-  tFar = min(tFar, eyeDepth); // We only march as far as the end of the volume or the front of the closest object in the depth buffer
+  tFar = min(tFar, eyeDepthAlongRay); // We only march as far as the end of the volume or the front of the closest object in the depth buffer
   clip(tFar - tNear); // Check for an intersection hit (negative values mean there was no hit so we clip them)
 
   // Calculate the intersection points of the eye ray to the box
@@ -81,6 +87,7 @@ void Raymarch_float(
     currPos += stepVec;
     if (colour.a > 0.99) { break; }
   }
+  if (colour.a == 0) { clip(-1); } // Discard the fragment if there's no alpha
 
   float remainingSample = frac(fSamples);
   if (i == nSamples && remainingSample > 0) {
