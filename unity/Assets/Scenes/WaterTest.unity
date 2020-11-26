@@ -38,7 +38,7 @@ RenderSettings:
   m_ReflectionIntensity: 1
   m_CustomReflection: {fileID: 0}
   m_Sun: {fileID: 0}
-  m_IndirectSpecularColor: {r: 0, g: 0, b: 0, a: 1}
+  m_IndirectSpecularColor: {r: 0.047110256, g: 0.06642749, b: 0.105331734, a: 1}
   m_UseRadianceAmbientProbe: 0
 --- !u!157 &3
 LightmapSettings:
@@ -252,8 +252,9 @@ MonoBehaviour:
   atmosphericPressure: 101325
   maxGravityVelocity: 11
   maxPressureVelocity: 8
-  maxPressureHeight: 5
+  vorticityConfinement: 0.012
   numPressureIters: 10
+  nodeDataRT: {fileID: 0}
 --- !u!4 &220399447
 Transform:
   m_ObjectHideFlags: 0
@@ -490,7 +491,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   volumeUnitSize: {x: 15, y: 20, z: 15}
   jitterTexture: {fileID: 0}
-  liquidComputeShader: {fileID: 7200000, guid: 1a336e19ebf3e47c280c2580cab506cb, type: 3}
 --- !u!4 &736164559
 Transform:
   m_ObjectHideFlags: 0
@@ -521,8 +521,9 @@ MonoBehaviour:
   atmosphericPressure: 101325
   maxGravityVelocity: 11
   maxPressureVelocity: 8
-  maxPressureHeight: 5
+  vorticityConfinement: 0.012
   numPressureIters: 10
+  nodeDataRT: {fileID: 0}
 --- !u!1 &1169957086
 GameObject:
   m_ObjectHideFlags: 0
@@ -1865,7 +1866,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1907662201}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 7.6, y: -1.45, z: 4.4}
+  m_LocalPosition: {x: 7.6, y: -0.5, z: 4.4}
   m_LocalScale: {x: 55.200237, y: 1, z: 43.44868}
   m_Children: []
   m_Father: {fileID: 0}
