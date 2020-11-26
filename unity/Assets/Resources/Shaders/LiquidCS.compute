@@ -71,9 +71,9 @@ void CSAdvect(uint3 id : SV_DispatchThreadID) {
   uint3 ijk0 = uint3(floor(xx), floor(yy), floor(zz));
   uint3 ijk1 = ijk0 + uint3(1,1,1);
 
-  float sx1 = xx-ijk0.x; float sx0 = 1.0-sx1;
-  float sy1 = yy-ijk0.y; float sy0 = 1.0-sy1;
-  float sz1 = zz-ijk0.z; float sz0 = 1.0-sz1;
+  float sx1 = xx-(float)ijk0.x; float sx0 = 1.0-sx1;
+  float sy1 = yy-(float)ijk0.y; float sy0 = 1.0-sy1;
+  float sz1 = zz-(float)ijk0.z; float sz0 = 1.0-sz1;
 
   float3 vel000 = vel[ijk0.xyz].xyz;
   float3 vel010 = vel[uint3(ijk0.x, ijk1.y, ijk0.z)].xyz;
@@ -110,7 +110,7 @@ void CSApplyExternalForces(uint3 id : SV_DispatchThreadID) {
   float nodeVol = nodeLiquidVolume(node);
   float4 u = vel[id.xyz];
 
-  if (isOutOfBounds(id) || nodeType(node) == SOLID_NODE_TYPE || nodeVol < LIQUID_EPSILON) { 
+  if (isOutOfBounds(id) || nodeType(node) == SOLID_NODE_TYPE || abs(nodeVol) < LIQUID_EPSILON) { 
     velApplExtForces[id.xyz] = u;
     return;
   }
@@ -133,7 +133,7 @@ void CSApplyExternalForces(uint3 id : SV_DispatchThreadID) {
     int topNodeType  = nodeType(topNode);
     float topNodeVol = nodeLiquidVolume(topNode);
 
-    if (topNodeType == SOLID_NODE_TYPE || topNodeVol < LIQUID_EPSILON) { break; }
+    if (topNodeType == SOLID_NODE_TYPE || abs(topNodeVol) < LIQUID_EPSILON) { break; }
     liquidVolAboveCell += topNodeVol;
   }
 
@@ -271,7 +271,7 @@ void CSPressureKernel(uint3 id : SV_DispatchThreadID) {
   float pC = inputPressure[id.xyz];
   float4 node = nodeData[id.xyz];
   if (isOutOfBounds(id) || nodeType(node) == SOLID_NODE_TYPE) { outputPressure[id.xyz] = pC; return; }
-  if (nodeLiquidVolume(node) < LIQUID_EPSILON) { outputPressure[id.xyz] = 0.0; return; }
+  if (abs(nodeLiquidVolume(node)) < LIQUID_EPSILON) { outputPressure[id.xyz] = 0.0; return; }
 
   uint3 idxL, idxR, idxB, idxT, idxD, idxU;
   neighbourIndices(id, idxL, idxR, idxB, idxT, idxD, idxU);
@@ -470,7 +470,10 @@ void CSSumFlowsKernel(uint3 id : SV_DispatchThreadID) {
 [numthreads(8,8,8)]
 void CSAdjustNodeFlowsKernel(uint3 id : SV_DispatchThreadID) {
   float4 node = nodeData[id.xyz];
-  if (isOutOfBounds(id) || nodeType(node) == SOLID_NODE_TYPE) { return; } // Don't do anything if it's not a liquid node
+  if (isOutOfBounds(id) || nodeType(node) == SOLID_NODE_TYPE) { 
+    nodeData[id.xyz] = node;
+    return; 
+  }
 
   uint3 idxL, idxR, idxB, idxT, idxD, idxU;
   neighbourIndices(id, idxL, idxR, idxB, idxT, idxD, idxU);
@@ -506,11 +509,15 @@ void CSAdjustNodeFlowsKernel(uint3 id : SV_DispatchThreadID) {
 void CSFillDebugNodeData(uint3 id : SV_DispatchThreadID) {
 
   if (isOutOfBounds(id)) {
-    nodeData[id.xyz] = buildNode(SOLID_NODE_TYPE, 0.0, SETTLED_NODE);
+    nodeData[id.xyz] = buildNode(SOLID_NODE_TYPE, 0.0, UNSETTLED_NODE);
+    return;
+  }
+
+  if ((id.y > borderFront.y && id.y < borderFront.y+14)) {
+    nodeData[id.xyz] = buildNode(EMPTY_NODE_TYPE, 1, UNSETTLED_NODE);
     return;
   }
 
   float volume = id.y > fullSize/2 ? 1.0 : 0.0;
-  nodeData[id.xyz] = float4(volume, 0, 0, 1);//buildNode(EMPTY_NODE_TYPE, volume, UNSETTLED_NODE);
-
+  nodeData[id.xyz] = buildNode(EMPTY_NODE_TYPE, 0, UNSETTLED_NODE);
 }

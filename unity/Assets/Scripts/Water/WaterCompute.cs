@@ -6,8 +6,8 @@ public class WaterCompute : MonoBehaviour {
 
   public float liquidDensity        = 1000.0f;   // kg/m^3
   public float atmosphericPressure  = 101325.0f; // N/m^2 (or Pascals)
-  public float maxGravityVelocity   = 11.0f;     // m/s
-  public float maxPressureVelocity  = 8.0f;      // m/s
+  public float maxGravityVelocity   = 20.0f;     // m/s
+  public float maxPressureVelocity  = 18.0f;      // m/s
   [Range(0,1)]
   public float vorticityConfinement = 0.012f;
   [Range(1,128)]
@@ -76,11 +76,6 @@ public class WaterCompute : MonoBehaviour {
     Debug.Log("Number of thread groups: " + numThreadGroups); 
 
     initBuffersAndRTs(fullResSize);
-
-        liquidComputeShader.SetVector("borderBack", new Vector3(borderBack.x,borderBack.y,borderBack.z));
-    liquidComputeShader.SetVector("borderFont", new Vector3(borderFront.x, borderFront.y, borderFront.z));
-    liquidComputeShader.SetVector("internalSize", new Vector3(internalResSize.x, internalResSize.y, internalResSize.z));
-    liquidComputeShader.SetInt("fullSize", fullResSize);
     initDebugNodes();
   }
 
@@ -118,17 +113,19 @@ public class WaterCompute : MonoBehaviour {
   }
 
   private void FixedUpdate() {
-    /*
-    liquidComputeShader.SetFloat("dt", Time.fixedDeltaTime);
+
+    liquidComputeShader.SetFloat("dt", 10.0f);//Time.fixedDeltaTime);
     advectVelocity();
     applyExternalForces();
     applyVorticityConfinement();
     computeDivergence();
     computePressure();
     projectVelocity();
+
     calculateAndSumFlows();
     adjustNodesFromFlows();
-    */
+
+    //volComponent.updateVolumeData(velRT);
     volComponent.updateVolumeData(nodeDataRT);
   }
 
@@ -145,7 +142,7 @@ public class WaterCompute : MonoBehaviour {
     liquidComputeShader.SetTexture(applyExtForcesKernelId, "nodeData", nodeDataRT);
     liquidComputeShader.SetTexture(applyExtForcesKernelId, "velApplExtForces", temp3DFloat4RT1);
 
-    liquidComputeShader.SetFloat("gravityMagnitude", Mathf.Abs(Physics.gravity.y));
+    liquidComputeShader.SetFloat("gravityMagnitude", 9.81f);//Mathf.Abs(Physics.gravity.y));
     liquidComputeShader.Dispatch(applyExtForcesKernelId, numThreadGroups, numThreadGroups, numThreadGroups);
     swapRTs(ref velRT, ref temp3DFloat4RT1); // Put the result into the velocity buffer
   }
@@ -227,7 +224,7 @@ public class WaterCompute : MonoBehaviour {
   }
 
   private float applyCFL(float dt) {
-    return Mathf.Min(dt, 0.3f*TerrainGrid.unitsPerNode()/(Mathf.Max(maxGravityVelocity, maxPressureVelocity)));
+    return dt;// Mathf.Min(dt, 0.3f*TerrainGrid.unitsPerNode()/(Mathf.Max(maxGravityVelocity, maxPressureVelocity)));
   }
 
   private void swapRTs(ref RenderTexture rt1, ref RenderTexture rt2) {
