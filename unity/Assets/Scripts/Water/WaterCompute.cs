@@ -1,6 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using UnityEngine;
+﻿using UnityEngine;
 
 public class WaterCompute : MonoBehaviour {
 
@@ -20,13 +18,21 @@ public class WaterCompute : MonoBehaviour {
   private int applyExtForcesKernelId;
   private int curlKernelId;
   private int vcKernelId;
-
+  private int divergenceKernelId;
+  private int pressureKernelId;
+  private int projectKernelId;
+  private int flowsKernelId;
+  private int sumFlowsKernelId;
+  private int adjustVolFromFlowsKernelId;
 
   private RenderTexture nodeDataRT;
   private RenderTexture velRT;
   private RenderTexture temp3DFloat4RT1;
   private RenderTexture temp3DFloat4RT2;
   private RenderTexture temp3DFloatRT;
+  private RenderTexture tempPressurePing;
+  private RenderTexture tempPressurePong;
+  private ComputeBuffer flowsBuffer;
 
 
   private void Start() {
@@ -35,7 +41,13 @@ public class WaterCompute : MonoBehaviour {
     applyExtForcesKernelId = liquidComputeShader.FindKernel("CSApplyExternalForces");
     curlKernelId = liquidComputeShader.FindKernel("CSCurl");
     vcKernelId = liquidComputeShader.FindKernel("CSVorticityConfinementKernel");
-    
+    divergenceKernelId = liquidComputeShader.FindKernel("CSDivergenceKernel");
+    pressureKernelId = liquidComputeShader.FindKernel("CSPressureKernel");
+    projectKernelId = liquidComputeShader.FindKernel("CSProjectKernel");
+    flowsKernelId = liquidComputeShader.FindKernel("CSCalculateFlowsKernel");
+    sumFlowsKernelId = liquidComputeShader.FindKernel("CSSumFlowsKernel");
+    adjustVolFromFlowsKernelId = liquidComputeShader.FindKernel("CSAdjustNodeFlowsKernel");
+
     liquidComputeShader.SetFloat("liquidDensity", liquidDensity);
     liquidComputeShader.SetFloat("atmoPressure", atmosphericPressure);
     liquidComputeShader.SetFloat("maxGravityVel", maxGravityVelocity);
@@ -60,7 +72,7 @@ public class WaterCompute : MonoBehaviour {
 
     numThreadGroups = fullResSize / NUM_THREADS_PER_BLOCK;
 
-    initRenderTextures(fullResSize);
+    initBuffersAndRTs(fullResSize);
   }
 
   private void OnDestroy() {
@@ -69,14 +81,22 @@ public class WaterCompute : MonoBehaviour {
     temp3DFloat4RT1?.Release();
     temp3DFloat4RT2?.Release();
     temp3DFloatRT?.Release();
+    tempPressurePing?.Release();
+    tempPressurePong?.Release();
+    flowsBuffer?.Release();
   }
   
-  private void initRenderTextures(int fullResSize) {
+  private void initBuffersAndRTs(int fullResSize) {
     nodeDataRT = init3DRenderTexture(fullResSize, RenderTextureFormat.ARGBFloat);
     velRT = init3DRenderTexture(fullResSize, RenderTextureFormat.ARGBFloat);
     temp3DFloat4RT1 = init3DRenderTexture(fullResSize, RenderTextureFormat.ARGBFloat);
     temp3DFloat4RT2 = init3DRenderTexture(fullResSize, RenderTextureFormat.ARGBFloat);
     temp3DFloatRT = init3DRenderTexture(fullResSize, RenderTextureFormat.RFloat);
+    tempPressurePing = init3DRenderTexture(fullResSize, RenderTextureFormat.RFloat);
+    tempPressurePong = init3DRenderTexture(fullResSize, RenderTextureFormat.RFloat);
+
+    int flattenedBufSize = fullResSize*fullResSize*fullResSize;
+    flowsBuffer = new ComputeBuffer(flattenedBufSize, 6*sizeof(float));
   }
 
   private RenderTexture init3DRenderTexture(int resSize, RenderTextureFormat format) {
@@ -93,6 +113,11 @@ public class WaterCompute : MonoBehaviour {
     advectVelocity();
     applyExternalForces();
     applyVorticityConfinement();
+    computeDivergence();
+    computePressure();
+    projectVelocity();
+    calculateAndSumFlows();
+    adjustNodesFromFlows();
   }
 
   private void advectVelocity() {
@@ -127,22 +152,66 @@ public class WaterCompute : MonoBehaviour {
     liquidComputeShader.SetTexture(vcKernelId, "curlLength", temp3DFloatRT);
     liquidComputeShader.SetTexture(vcKernelId, "vcVel", temp3DFloat4RT2);
     swapRTs(ref velRT, ref temp3DFloat4RT2); // Put the result (vcVel) into the velocity buffer
+  }
 
+  private void computeDivergence() {
+    liquidComputeShader.SetTexture(divergenceKernelId, "vel", velRT);
+    liquidComputeShader.SetTexture(divergenceKernelId, "nodeData", nodeDataRT);
+    liquidComputeShader.SetTexture(divergenceKernelId, "divergence", temp3DFloatRT);
+    liquidComputeShader.SetTexture(divergenceKernelId, "pressure", tempPressurePing);
+    liquidComputeShader.Dispatch(divergenceKernelId, numThreadGroups, numThreadGroups, numThreadGroups);
+    // NOTE: divergence == temp3DFloatRT
+  }
 
-    /*
-    let temp = this.tempBuffVec3;
-    this.tempBuffVec3 = this.gpuManager.liquidCurl(this.velField);
-    temp.delete();
+  private void computePressure() {
+    // NOTE: divergence == temp3DFloatRT    
+    // NOTE: We cleared tempPressurePing (i.e., the input pressure) to all zeros in the divergence pass∏
+    for (int i = 0; i < numPressureIters; i++) {
+      liquidComputeShader.SetTexture(pressureKernelId, "nodeData", nodeDataRT);
+      liquidComputeShader.SetTexture(pressureKernelId, "divergence", temp3DFloatRT);
+      liquidComputeShader.SetTexture(pressureKernelId, "inputPressure", tempPressurePing);
+      liquidComputeShader.SetTexture(pressureKernelId, "outputPressure", tempPressurePong);
+      liquidComputeShader.Dispatch(pressureKernelId, numThreadGroups, numThreadGroups, numThreadGroups);
+      swapRTs(ref tempPressurePing, ref tempPressurePong);
+    }
 
-    temp = this.tempBuffScalar;
-    this.tempBuffScalar = this.gpuManager.liquidCurlLen(this.tempBuffVec3);
-    temp.delete();
+    // NOTE: final pressure values == tempPressurePing
+  }
 
-    const dtVC = this._applyCFL(dt*this.vorticityConfinement);
-    temp = this.velField;
-    this.velField = this.gpuManager.liquidApplyVC(dtVC, this.velField, this.tempBuffVec3, this.tempBuffScalar);
-    temp.delete();
-    */
+  private void projectVelocity() {
+    liquidComputeShader.SetTexture(projectKernelId, "vel", velRT);
+    liquidComputeShader.SetTexture(projectKernelId, "nodeData", nodeDataRT);
+    liquidComputeShader.SetTexture(projectKernelId, "pressure", tempPressurePing);
+    liquidComputeShader.SetTexture(projectKernelId, "projectedVel", temp3DFloat4RT1);
+    liquidComputeShader.Dispatch(projectKernelId, numThreadGroups, numThreadGroups, numThreadGroups);
+    swapRTs(ref velRT, ref temp3DFloat4RT1); // Put the result into the velocity buffer
+  }
+
+  struct NodeFlowInfo {
+    float flowL; float flowR;
+    float flowB; float flowT;
+    float flowD; float flowU;
+  };
+  private void calculateAndSumFlows() {
+    // Calculate all the flows going in/out of each cell to neighbouring cells along each axis
+    liquidComputeShader.SetTexture(flowsKernelId, "vel", velRT);
+    liquidComputeShader.SetTexture(flowsKernelId, "nodeData", nodeDataRT);
+    liquidComputeShader.SetBuffer(flowsKernelId, "flows", flowsBuffer);
+    liquidComputeShader.Dispatch(flowsKernelId, numThreadGroups, numThreadGroups, numThreadGroups);
+
+    // Sum together all the new liquid volumes based on the flows
+    liquidComputeShader.SetBuffer(sumFlowsKernelId, "flows", flowsBuffer);
+    liquidComputeShader.SetTexture(sumFlowsKernelId, "summedFlows", temp3DFloatRT);
+    liquidComputeShader.Dispatch(sumFlowsKernelId, numThreadGroups, numThreadGroups, numThreadGroups);
+
+    // NOTE: summed flows == temp3DFloatRT
+  }
+
+  private void adjustNodesFromFlows() {
+    // NOTE: summed flows == temp3DFloatRT
+    liquidComputeShader.SetTexture(adjustVolFromFlowsKernelId, "summedFlows", temp3DFloatRT);
+    liquidComputeShader.SetTexture(adjustVolFromFlowsKernelId, "nodeData", nodeDataRT);
+    liquidComputeShader.Dispatch(adjustVolFromFlowsKernelId, numThreadGroups, numThreadGroups, numThreadGroups);
   }
 
   private float applyCFL(float dt) {
@@ -153,5 +222,12 @@ public class WaterCompute : MonoBehaviour {
     var temp = rt1;
     rt1 = rt2;
     rt2 = temp;
+  }
+  
+  private void clearRT(RenderTexture rt, Color c) {
+    var tempRT = RenderTexture.active;
+    RenderTexture.active = rt;
+    GL.Clear(true, true, c);
+    RenderTexture.active = tempRT;
   }
 }

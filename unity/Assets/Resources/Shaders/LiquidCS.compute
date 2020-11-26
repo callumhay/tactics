@@ -2,6 +2,12 @@
 #pragma kernel CSApplyExternalForces
 #pragma kernel CSCurl
 #pragma kernel CSVorticityConfinementKernel
+#pragma kernel CSDivergenceKernel
+#pragma kernel CSPressureKernel
+#pragma kernel CSProjectKernel
+#pragma kernel CSCalculateFlowsKernel
+#pragma kernel CSSumFlowsKernel
+#pragma kernel CSAdjustNodeFlowsKernel
 
 #include "CommonCS.hlsl"
 
@@ -33,13 +39,26 @@ uint3 borderFront;  // Border at the back of the buffer (at least 1 unit on each
 uint3 internalSize; // Internal size of the buffer (full size minus the borders)
 uint  fullSize;     // Full size of the buffer on each side
 
+void neighbourIndices(uint3 id, out uint3 idxL, out uint3 idxR, out uint3 idxB, out uint3 idxT, out uint3 idxD, out uint3 idxU) {
+  uint3 xyzm1 = uint3(clampm1(id.x), clampm1(id.y), clampm1(id.z)); 
+  uint3 xyzp1 = uint3(clampp1(id.x, fullSize-1), clampp1(id.y, fullSize-1), clampp1(id.y, fullSize-1));
+  idxL = uint3(xyzm1.x, id.y, id.z); idxR = uint3(xyzp1.x, id.y, id.z);
+  idxB = uint3(id.x, xyzm1.y, id.z); idxT = uint3(id.x, xyzp1.y, id.z);
+  idxD = uint3(id.x, id.y, xyzm1.z); idxU = uint3(id.x, id.y, xyzp1.z);
+}
+
+uint idToIndex(uint3 id) {
+	return id.x + id.y * fullSize + id.z * fullSize * fullSize;
+}
+
 // Buffers used throughout the kernels
 RWTexture3D<float4> vel;       // Input buffer of the current velocities
 RWTexture3D<float4> nodeData;  // Input buffer of the liquid node/cell data
 
 
 int nodeType(float4 node) { return (int)node[NODE_TYPE_IDX]; }
-float nodeVolume(float4 node) { return node[NODE_VOL_IDX]; }
+float nodeLiquidVolume(float4 node) { return node[NODE_VOL_IDX]; }
+int nodeSettled(float4 node) { return node[NODE_SETTLED_IDX]; }
 
 bool isOutOfBounds(uint3 id) {
   return (id.x < borderFront.x || id.y < borderFront.y || id.z < borderFront.z ||
@@ -101,7 +120,7 @@ RWTexture3D<float4> velApplExtForces; // Output of buffer for applying external 
 void CSApplyExternalForces(uint3 id : SV_DispatchThreadID) {
 
   float4 node = nodeData[id.xyz];
-  float nodeVol = nodeVolume(node);
+  float nodeVol = nodeLiquidVolume(node);
   float4 u = vel[id.xyz];
 
   if (isOutOfBounds(id) || nodeType(node) == SOLID_NODE_TYPE || nodeVol < LIQUID_EPSILON) { 
@@ -112,7 +131,7 @@ void CSApplyExternalForces(uint3 id : SV_DispatchThreadID) {
   float4 result = float4(u.xyz, 0);  
   float4 bottomNode   = nodeData[uint3(id.x,id.y-1,id.z)];
   int bottomNodeType  = nodeType(bottomNode);
-  float bottomNodeVol = nodeVolume(bottomNode);
+  float bottomNodeVol = nodeLiquidVolume(bottomNode);
 
   // Apply Gravity
   result.y = clamp(result.y - gravityMagnitude*dt, -maxGravityVel, maxGravityVel);
@@ -125,7 +144,7 @@ void CSApplyExternalForces(uint3 id : SV_DispatchThreadID) {
   for (int y = id.y+1; y < pressureHeightIdx; y++) {
     float4 topNode   = nodeData[uint3(id.x, y, id.z)];
     int topNodeType  = nodeType(topNode);
-    float topNodeVol = nodeVolume(topNode);
+    float topNodeVol = nodeLiquidVolume(topNode);
 
     if (topNodeType == SOLID_NODE_TYPE || topNodeVol < LIQUID_EPSILON) { break; }
     liquidVolAboveCell += topNodeVol;
@@ -143,14 +162,10 @@ void CSApplyExternalForces(uint3 id : SV_DispatchThreadID) {
   // Apply hydrostatic pressure
   float totalVelX = 0.0; float totalVelZ = 0.0;
   if (bottomNodeType == SOLID_NODE_TYPE || bottomNodeVol >= nodeVol) {
-    totalVelX -= (nodeType(nodeL) == EMPTY_NODE_TYPE && 
-      nodeVolume(nodeL) < nodeVol) ? dHSVel : 0;
-    totalVelX += (nodeType(nodeR) == EMPTY_NODE_TYPE && 
-      nodeVolume(nodeR) < nodeVol) ? dHSVel : 0;
-    totalVelZ -= (nodeType(nodeD) == EMPTY_NODE_TYPE &&
-      nodeVolume(nodeD) < nodeVol) ? dHSVel : 0;
-    totalVelZ += (nodeType(nodeU) == EMPTY_NODE_TYPE &&
-      nodeVolume(nodeU) < nodeVol) ? dHSVel : 0;
+    totalVelX -= (nodeType(nodeL) == EMPTY_NODE_TYPE && nodeLiquidVolume(nodeL) < nodeVol) ? dHSVel : 0;
+    totalVelX += (nodeType(nodeR) == EMPTY_NODE_TYPE && nodeLiquidVolume(nodeR) < nodeVol) ? dHSVel : 0;
+    totalVelZ -= (nodeType(nodeD) == EMPTY_NODE_TYPE && nodeLiquidVolume(nodeD) < nodeVol) ? dHSVel : 0;
+    totalVelZ += (nodeType(nodeU) == EMPTY_NODE_TYPE && nodeLiquidVolume(nodeU) < nodeVol) ? dHSVel : 0;
   }
   result.x = clamp(result.x + totalVelX, -maxPressureVel, maxPressureVel);
   result.z = clamp(result.z + totalVelZ, -maxPressureVel, maxPressureVel);
@@ -174,15 +189,13 @@ RWTexture3D<float> curlLength; // Output of CSCurl
 
 [numthreads(8,8,8)]
 void CSCurl(uint3 id : SV_DispatchThreadID) {
-  uint3 xyzm1 = uint3(clampm1(id.x), clampm1(id.y), clampm1(id.z)); 
-  uint3 xyzp1 = uint3(clampp1(id.x, fullSize-1), clampp1(id.y, fullSize-1), clampp1(id.y, fullSize-1));
 
-  float3 L = vel[uint3(xyzm1.x, id.y, id.z)].xyz;
-  float3 R = vel[uint3(xyzp1.x, id.y, id.z)].xyz;
-  float3 B = vel[uint3(id.x, xyzm1.y, id.z)].xyz;
-  float3 T = vel[uint3(id.x, xyzp1.y, id.z)].xyz;
-  float3 D = vel[uint3(id.x, id.y, xyzm1.z)].xyz;
-  float3 U = vel[uint3(id.x, id.y, xyzp1.z)].xyz;
+  uint3 idxL, idxR, idxB, idxT, idxD, idxU;
+  neighbourIndices(id, idxL, idxR, idxB, idxT, idxD, idxU);
+
+  float3 L = vel[idxL].xyz; float3 R = vel[idxR].xyz;
+  float3 B = vel[idxB].xyz; float3 T = vel[idxT].xyz;
+  float3 D = vel[idxD].xyz; float3 U = vel[idxU].xyz;
 
   float unitsPerNodeTimes2 = 2.0*unitsPerNode;
   float4 curlVec = float4(
@@ -204,16 +217,14 @@ RWTexture3D<float4> vcVel; // Output of CSVorticityConfinementKernel
 
 [numthreads(8,8,8)]
 void CSVorticityConfinementKernel(uint3 id : SV_DispatchThreadID) {
-  uint3 xyzm1 = uint3(clampm1(id.x), clampm1(id.y), clampm1(id.z)); 
-  uint3 xyzp1 = uint3(clampp1(id.x, fullSize-1), clampp1(id.y, fullSize-1), clampp1(id.y, fullSize-1));
+
+  uint3 idxL, idxR, idxB, idxT, idxD, idxU;
+  neighbourIndices(id, idxL, idxR, idxB, idxT, idxD, idxU);
 
   float4 omega = curl[id.xyz];
-  float omegaL = curlLength[uint3(xyzm1.x, id.y, id.z)];
-  float omegaR = curlLength[uint3(xyzp1.x, id.y, id.z)];
-  float omegaB = curlLength[uint3(id.x, xyzm1.y, id.z)];
-  float omegaT = curlLength[uint3(id.x, xyzp1.y, id.z)];
-  float omegaD = curlLength[uint3(id.x, id.y, xyzm1.z)];
-  float omegaU = curlLength[uint3(id.x, id.y, xyzp1.z)];
+  float omegaL = curlLength[idxL]; float omegaR = curlLength[idxR];
+  float omegaB = curlLength[idxB]; float omegaT = curlLength[idxT];
+  float omegaD = curlLength[idxD]; float omegaU = curlLength[idxU];
 
   float unitsPerNodeTimes2 = 2.0*unitsPerNode;
   float3 eta = float3(
@@ -232,3 +243,272 @@ void CSVorticityConfinementKernel(uint3 id : SV_DispatchThreadID) {
   );
 }
 
+// Divergence
+//uint fullSize;
+//uint3 internalSize;
+//RWTexture3D<float4> vel;
+//RWTexture3D<float4> nodeData;
+RWTexture3D<float> pressure; // Output: We clear the initial pressure buffer while we calculate the divergence
+RWTexture3D<float> divergence; // Output of CSDivergenceKernel
+
+
+[numthreads(8,8,8)]
+void CSDivergenceKernel(uint3 id : SV_DispatchThreadID) {
+  uint3 idxL, idxR, idxB, idxT, idxD, idxU;
+  neighbourIndices(id, idxL, idxR, idxB, idxT, idxD, idxU);
+
+  float4 nL = nodeData[idxL]; float4 nR = nodeData[idxR];
+  float4 nB = nodeData[idxB]; float4 nT = nodeData[idxT];
+  float4 nD = nodeData[idxD]; float4 nU = nodeData[idxU];
+
+  float3 noVel = float3(0,0,0);
+  float3 fieldL = (nodeType(nL) == SOLID_NODE_TYPE) ? noVel : vel[idxL].xyz;
+  float3 fieldR = (nodeType(nR) == SOLID_NODE_TYPE) ? noVel : vel[idxR].xyz;
+  float3 fieldB = (nodeType(nB) == SOLID_NODE_TYPE) ? noVel : vel[idxB].xyz;
+  float3 fieldT = (nodeType(nT) == SOLID_NODE_TYPE) ? noVel : vel[idxT].xyz;
+  float3 fieldD = (nodeType(nD) == SOLID_NODE_TYPE) ? noVel : vel[idxD].xyz;
+  float3 fieldU = (nodeType(nU) == SOLID_NODE_TYPE) ? noVel : vel[idxU].xyz;
+
+  divergence[id.xyz] = ((fieldR[0]-fieldL[0]) + (fieldT[1]-fieldB[1]) + (fieldU[2]-fieldD[2])) / (float)(internalSize.x+internalSize.y+internalSize.z);
+  pressure[id.xyz] = 0.0;
+}
+
+// Pressure / Jacobian
+//RWTexture3D<float4> nodeData;
+//RWTexture3D<float> divergence; 
+RWTexture3D<float> inputPressure;
+RWTexture3D<float> outputPressure; // Output of CSPressureKernel
+
+[numthreads(8,8,8)]
+void CSPressureKernel(uint3 id : SV_DispatchThreadID) {
+  float pC = inputPressure[id.xyz];
+  float4 node = nodeData[id.xyz];
+  if (isOutOfBounds(id) || nodeType(node) == SOLID_NODE_TYPE) { outputPressure[id.xyz] = pC; return; }
+  if (nodeLiquidVolume(node) < LIQUID_EPSILON) { outputPressure[id.xyz] = 0.0; return; }
+
+  uint3 idxL, idxR, idxB, idxT, idxD, idxU;
+  neighbourIndices(id, idxL, idxR, idxB, idxT, idxD, idxU);
+
+  float4 nL = nodeData[idxL]; float4 nR = nodeData[idxR];
+  float4 nB = nodeData[idxB]; float4 nT = nodeData[idxT];
+  float4 nD = nodeData[idxD]; float4 nU = nodeData[idxU];
+
+  float bC = divergence[id.xyz]; // Contains the 'divergence' calculated previously
+
+  float pL = (nodeType(nL) == SOLID_NODE_TYPE) ? pC : inputPressure[idxL];
+  float pR = (nodeType(nR) == SOLID_NODE_TYPE) ? pC : inputPressure[idxR];
+  float pB = (nodeType(nB) == SOLID_NODE_TYPE) ? pC : inputPressure[idxB];
+  float pT = (nodeType(nT) == SOLID_NODE_TYPE) ? pC : inputPressure[idxT];
+  float pD = (nodeType(nD) == SOLID_NODE_TYPE) ? pC : inputPressure[idxD];
+  float pU = (nodeType(nU) == SOLID_NODE_TYPE) ? pC : inputPressure[idxU];
+
+  outputPressure[id.xyz] = (pL + pR + pB + pT + pU + pD - bC) / 6.0;
+}
+
+// Project Velocity
+//uint3 internalSize;
+//RWTexture3D<float4> vel;
+//RWTexture3D<float4> nodeData;
+//RWTexture3D<float> pressure;
+RWTexture3D<float4> projectedVel; // Output of CSProjectKernel
+
+[numthreads(8,8,8)]
+void CSProjectKernel(uint3 id : SV_DispatchThreadID) {
+  float4 node = nodeData[id.xyz];
+  if (isOutOfBounds(id) || nodeType(node) == SOLID_NODE_TYPE) { projectedVel[id.xyz] = float4(0,0,0,0); return; }
+
+  uint3 idxL, idxR, idxB, idxT, idxD, idxU;
+  neighbourIndices(id, idxL, idxR, idxB, idxT, idxD, idxU);
+
+  float4 nL = nodeData[idxL]; float4 nR = nodeData[idxR];
+  float4 nB = nodeData[idxB]; float4 nT = nodeData[idxT];
+  float4 nD = nodeData[idxD]; float4 nU = nodeData[idxU];
+
+  float3 u = vel[id.xyz].xyz;
+  float pC = pressure[id.xyz];
+  float pL = pressure[idxL]; float pR = pressure[idxR];
+  float pB = pressure[idxB]; float pT = pressure[idxT];
+  float pD = pressure[idxD]; float pU = pressure[idxU];
+
+  // NOTE: This requires augmentation if the boundaries have velocity!
+  float3 vMaskPos = float3(1,1,1);
+  float3 vMaskNeg = float3(1,1,1);
+  if (nodeType(nL) == SOLID_NODE_TYPE || nodeSettled(nL) == SETTLED_NODE) { pL = pC; vMaskNeg[0] = 0; }
+  if (nodeType(nR) == SOLID_NODE_TYPE || nodeSettled(nR) == SETTLED_NODE) { pR = pC; vMaskPos[0] = 0; }
+  if (nodeType(nB) == SOLID_NODE_TYPE || nodeSettled(nB) == SETTLED_NODE) { pB = pC; vMaskNeg[1] = 0; }
+  if (nodeType(nT) == SOLID_NODE_TYPE || nodeSettled(nT) == SETTLED_NODE) { pT = pC; vMaskPos[1] = 0; }
+  if (nodeType(nD) == SOLID_NODE_TYPE || nodeSettled(nD) == SETTLED_NODE) { pD = pC; vMaskNeg[2] = 0; }
+  if (nodeType(nU) == SOLID_NODE_TYPE || nodeSettled(nU) == SETTLED_NODE) { pU = pC; vMaskPos[2] = 0; }
+
+  float sizeSum = internalSize.x+internalSize.y+internalSize.z;
+  float4 result = float4(u[0] - (pR-pL) / sizeSum, u[1] - (pT-pB) / sizeSum, u[2] - (pU-pD) / sizeSum, 0);
+  result[0] = min(result[0]*vMaskPos[0], max(result[0]*vMaskNeg[0], result[0]));
+  result[1] = min(result[1]*vMaskPos[1], max(result[1]*vMaskNeg[1], result[1]));
+  result[2] = min(result[2]*vMaskPos[2], max(result[2]*vMaskNeg[2], result[2]));
+  projectedVel[id.xyz] = result;
+}
+
+// Calculating flows in/out of nodes
+//float unitsPerNode;
+//uint fullSize;
+//RWTexture3D<float4> vel;
+//RWTexture3D<float4> nodeData;
+struct NodeFlowInfo {
+  float flowL; float flowR;
+  float flowB; float flowT;
+  float flowD; float flowU;
+};
+RWStructuredBuffer<NodeFlowInfo> flows; // Output from CSCalculateFlowsKernel
+
+[numthreads(8,8,8)]
+void CSCalculateFlowsKernel(uint3 id : SV_DispatchThreadID) {
+  NodeFlowInfo result; 
+  result.flowL = result.flowR = result.flowB = result.flowT = result.flowD = result.flowU = 0.0;
+  uint flowsIdx = idToIndex(id);
+
+  float4 node = nodeData[id.xyz];
+  float liquidVol = nodeLiquidVolume(node);
+  if (isOutOfBounds(id) || nodeType(node) == SOLID_NODE_TYPE || liquidVol == 0 || nodeSettled(node) == SETTLED_NODE) {
+    flows[flowsIdx] = result;
+    return;
+  }
+  
+  uint3 idxL, idxR, idxB, idxT, idxD, idxU;
+  neighbourIndices(id, idxL, idxR, idxB, idxT, idxD, idxU);
+
+  float4 nL = nodeData[idxL]; float4 nR = nodeData[idxR];
+  float4 nB = nodeData[idxB]; float4 nT = nodeData[idxT];
+  float4 nD = nodeData[idxD]; float4 nU = nodeData[idxU];
+
+  float liquidVolL = nodeLiquidVolume(nL); float liquidVolR = nodeLiquidVolume(nR);
+  float liquidVolB = nodeLiquidVolume(nB); float liquidVolT = nodeLiquidVolume(nT);
+  float liquidVolD = nodeLiquidVolume(nD); float liquidVolU = nodeLiquidVolume(nU);
+
+  int typeL = nodeType(nL); int typeR = nodeType(nR);
+  int typeB = nodeType(nB); int typeT = nodeType(nT);
+  int typeD = nodeType(nD); int typeU = nodeType(nU);
+
+  float3 u = vel[id.xyz].xyz;
+
+  // Calculate the absolute cross-section flows
+  float unitArea = unitsPerNode * unitsPerNode;
+  float3 absCSFlowLBD = abs(min(float3(0,0,0),u) * unitArea);
+  float3 absCSFlowRTU = abs(max(float3(0,0,0),u) * unitArea);
+
+  float unitVolume = unitArea * unitsPerNode;
+  float3 flowToLBD = clamp(dt * unitVolume * absCSFlowLBD, 0, liquidVol);
+  float3 flowToRTU = clamp(dt * unitVolume * absCSFlowRTU, 0, liquidVol);
+  flowToRTU.y = clamp((liquidVol-liquidVolT) * absCSFlowRTU.y * dt, 0, liquidVol); // Yup, this is a hack, without it the liquid will not settle evenly / will disperse into the air.
+
+  float3 maskLBD = float3(1,1,1); float3 maskRTU = float3(1,1,1);
+  
+  // Can we flow left?
+  if (liquidVolL >= unitVolume || liquidVolL >= liquidVol ||  typeL == SOLID_NODE_TYPE ||  (typeB == EMPTY_NODE_TYPE && liquidVolB < liquidVol)) {
+    // No flow leftward - redivert the flow to the other 3 possible directions on the xz plane
+    float flowToLDiv = flowToLBD.x/3.0; 
+    flowToRTU.x += flowToLDiv;
+    flowToRTU.z += flowToLDiv;
+    flowToLBD.z += flowToLDiv;
+    maskLBD.x = 0;
+  }
+  // Can we flow right?
+  if (liquidVolR >= unitVolume || liquidVolR >= liquidVol ||  typeR == SOLID_NODE_TYPE ||  (typeB == EMPTY_NODE_TYPE && liquidVolB < liquidVol)) {
+    // No flow rightward - redivert the flow to the other 3 possible directions on the xz plane
+    float flowToRDiv = flowToRTU.x/3.0; 
+    flowToLBD.x += flowToRDiv;
+    flowToRTU.z += flowToRDiv;
+    flowToLBD.z += flowToRDiv;
+    maskRTU.x = 0;
+  }
+  
+  // Can we flow down?
+  if (liquidVolB >= unitVolume || typeB == SOLID_NODE_TYPE) { maskLBD.y = 0; }
+  // Can we flow up?
+  if (liquidVolT >= liquidVol || typeT == SOLID_NODE_TYPE) { maskRTU.y = 0; }
+
+  // Can we flow back?
+  if (liquidVolD >= unitVolume || liquidVolD >= liquidVol || typeD == SOLID_NODE_TYPE || (typeB == EMPTY_NODE_TYPE && liquidVolB < liquidVol)) {
+    // No flow backward - redivert the flow to the other 3 possible directions on the xz plane
+    float flowToDDiv = flowToLBD.z/3.0; 
+    flowToLBD.x += flowToDDiv;
+    flowToRTU.x += flowToDDiv;
+    flowToRTU.z += flowToDDiv;
+    maskLBD.z = 0;
+  }
+  // Can we flow forward?
+  if (liquidVolU >= unitVolume || liquidVolU >= liquidVol || typeU == SOLID_NODE_TYPE || (typeB == EMPTY_NODE_TYPE && liquidVolB < liquidVol)) {
+    // No flow forward
+    float flowToUDiv = flowToRTU.z/3.0; 
+    flowToLBD.x += flowToUDiv;
+    flowToRTU.x += flowToUDiv;
+    flowToLBD.z += flowToUDiv;
+    maskRTU.z = 0;
+  }
+
+  flowToLBD *= maskLBD; flowToRTU *= maskRTU;
+
+  float totalFlow = flowToLBD.x + flowToLBD.y + flowToLBD.z + flowToRTU.x + flowToRTU.y + flowToRTU.z + 1e-10;
+  result.flowL = min(max(0.5*(liquidVol-liquidVolL),0), min(liquidVol*(flowToLBD.x/totalFlow), flowToLBD.x));
+  result.flowR = min(max(0.5*(liquidVol-liquidVolR),0), min(liquidVol*(flowToRTU.x/totalFlow), flowToRTU.x));
+  result.flowB = min(0.5*(liquidVol+liquidVolB),        min(liquidVol*(flowToLBD.y/totalFlow), flowToLBD.y));
+  result.flowT = min(max(0.5*(liquidVol-liquidVolT),0), min(liquidVol*(flowToRTU.y/totalFlow), flowToRTU.y));
+  result.flowD = min(max(0.5*(liquidVol-liquidVolD),0), min(liquidVol*(flowToLBD.z/totalFlow), flowToLBD.z));
+  result.flowU = min(max(0.5*(liquidVol-liquidVolU),0), min(liquidVol*(flowToRTU.z/totalFlow), flowToRTU.z));
+
+  flows[flowsIdx] = result;
+}
+
+//RWStructuredBuffer<NodeFlowInfo> flows;
+RWTexture3D<float> summedFlows; // Output of CSSumFlowsKernel
+[numthreads(8,8,8)]
+void CSSumFlowsKernel(uint3 id : SV_DispatchThreadID) {
+
+  uint3 idxL, idxR, idxB, idxT, idxD, idxU;
+  neighbourIndices(id, idxL, idxR, idxB, idxT, idxD, idxU);
+
+  NodeFlowInfo flowsC = flows[idToIndex(id)];
+  NodeFlowInfo flowsL = flows[idToIndex(idxL)]; NodeFlowInfo flowsR = flows[idToIndex(idxR)];
+  NodeFlowInfo flowsB = flows[idToIndex(idxB)]; NodeFlowInfo flowsT = flows[idToIndex(idxT)];
+  NodeFlowInfo flowsD = flows[idToIndex(idxD)]; NodeFlowInfo flowsU = flows[idToIndex(idxU)];
+
+  // The total volume change in this cell is equal to all the incoming flows
+  // from neighbour cells minus the total outward flow from the current cell
+  summedFlows[id.xyz] = (flowsL.flowR + flowsR.flowL + flowsB.flowT + flowsT.flowB + flowsD.flowU + flowsU.flowD) -
+    (flowsC.flowR + flowsC.flowL + flowsC.flowB + flowsC.flowT + flowsC.flowD + flowsC.flowU);
+}
+
+// Adjust the node liquid volumes based on the final tabulation of all flows
+//RWTexture3D<float> summedFlows;
+//RWTexture3D<float4> nodeData; // Output of CSAdjustNodeFlowsKernel
+[numthreads(8,8,8)]
+void CSAdjustNodeFlowsKernel(uint3 id : SV_DispatchThreadID) {
+  float4 node = nodeData[id.xyz];
+  if (isOutOfBounds(id) || nodeType(node) == SOLID_NODE_TYPE) { return; } // Don't do anything if it's not a liquid node
+
+  uint3 idxL, idxR, idxB, idxT, idxD, idxU;
+  neighbourIndices(id, idxL, idxR, idxB, idxT, idxD, idxU);
+
+  float sC = summedFlows[id.xyz];
+  float sL = summedFlows[idxL]; float sR = summedFlows[idxR];
+  float sB = summedFlows[idxB]; float sT = summedFlows[idxT];
+  float sD = summedFlows[idxD]; float sU = summedFlows[idxU];
+
+  float liquidVol = nodeLiquidVolume(node);
+  float finalVol = (liquidVol + sC);
+  node[NODE_VOL_IDX] = abs(finalVol) < LIQUID_EPSILON ? 0 : finalVol;
+
+  // Unsettle the node if there are any changes in the neighbour cell flows
+  if (abs(sL) >= LIQUID_EPSILON || abs(sR) >= LIQUID_EPSILON || 
+      abs(sB) >= LIQUID_EPSILON || abs(sT) >= LIQUID_EPSILON ||
+      abs(sD) >= LIQUID_EPSILON || abs(sU) >= LIQUID_EPSILON) {
+    node[NODE_SETTLED_IDX] = UNSETTLED_NODE;
+  }
+  else {
+    // If there's no change in the flow of the node then it becomes settled
+    float unitVolume = unitsPerNode * unitsPerNode * unitsPerNode;
+    node[NODE_SETTLED_IDX] = (abs(sC) < LIQUID_EPSILON && abs(liquidVol) < LIQUID_EPSILON) ||
+      abs(liquidVol-unitVolume) < LIQUID_EPSILON ? SETTLED_NODE : UNSETTLED_NODE;
+  }
+
+  nodeData[id.xyz] = node;
+}

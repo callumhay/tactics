@@ -1,6 +1,6 @@
 ﻿#pragma kernel CSMarchingCubes
-#include "CommonCS.compute"
-#include "MarchingCubesTableCS.compute"
+#include "CommonCS.hlsl"
+#include "MarchingCubesTableCS.hlsl"
 
 struct Triangle {
   float3 a; 
