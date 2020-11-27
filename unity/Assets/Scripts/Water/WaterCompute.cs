@@ -6,8 +6,10 @@ public class WaterCompute : MonoBehaviour {
 
   public float liquidDensity        = 1000.0f;   // kg/m^3
   public float atmosphericPressure  = 101325.0f; // N/m^2 (or Pascals)
-  public float maxGravityVelocity   = 20.0f;     // m/s
-  public float maxPressureVelocity  = 18.0f;      // m/s
+  public float maxGravityVelocity   = 15.0f;     // m/s
+  public float maxPressureVelocity  = 10.0f;     // m/s
+  [Range(-1000,1000)]
+  public float gravityMagnitude     = 9.81f;     // m/s
   [Range(0,1)]
   public float vorticityConfinement = 0.012f;
   [Range(1,128)]
@@ -50,11 +52,7 @@ public class WaterCompute : MonoBehaviour {
     sumFlowsKernelId = liquidComputeShader.FindKernel("CSSumFlowsKernel");
     adjustVolFromFlowsKernelId = liquidComputeShader.FindKernel("CSAdjustNodeFlowsKernel");
 
-    liquidComputeShader.SetFloat("liquidDensity", liquidDensity);
-    liquidComputeShader.SetFloat("atmoPressure", atmosphericPressure);
-    liquidComputeShader.SetFloat("maxGravityVel", maxGravityVelocity);
-    liquidComputeShader.SetFloat("maxPressureVel", maxPressureVelocity);
-    liquidComputeShader.SetFloat("unitsPerNode", TerrainGrid.unitsPerNode());
+    initUniforms();
 
     volComponent = GetComponent<VolumeRaymarcher>();
     if (!volComponent) {
@@ -82,6 +80,10 @@ public class WaterCompute : MonoBehaviour {
     initDebugNodes();
   }
 
+  private void OnValidate() {
+    initUniforms();
+  }
+
   private void OnDestroy() {
     nodeDataRT?.Release();
     velRT?.Release();
@@ -105,6 +107,16 @@ public class WaterCompute : MonoBehaviour {
     int flattenedBufSize = fullResSize*fullResSize*fullResSize;
     flowsBuffer = new ComputeBuffer(flattenedBufSize, 6*sizeof(float));
   }
+  private void initUniforms() {
+    if (liquidComputeShader == null) { return; }
+    //Debug.Log("Reinitializing liquid compute uniforms...");
+    liquidComputeShader.SetFloat("liquidDensity", liquidDensity);
+    liquidComputeShader.SetFloat("atmoPressure", atmosphericPressure);
+    liquidComputeShader.SetFloat("maxGravityVel", maxGravityVelocity);
+    liquidComputeShader.SetFloat("maxPressureVel", maxPressureVelocity);
+    liquidComputeShader.SetFloat("unitsPerNode", TerrainGrid.unitsPerNode());
+    liquidComputeShader.SetFloat("gravityMagnitude", gravityMagnitude);//Mathf.Abs(Physics.gravity.y));
+  }
 
   private RenderTexture init3DRenderTexture(int resSize, RenderTextureFormat format) {
     var result = new RenderTexture(resSize, resSize, 0, format);
@@ -116,8 +128,8 @@ public class WaterCompute : MonoBehaviour {
   }
 
   private void FixedUpdate() {
-    /*
-    liquidComputeShader.SetFloat("dt", 10.0f);//Time.fixedDeltaTime);
+
+    liquidComputeShader.SetFloat("dt", Time.fixedDeltaTime);
     advectVelocity();
     applyExternalForces();
     applyVorticityConfinement();
@@ -126,7 +138,6 @@ public class WaterCompute : MonoBehaviour {
     projectVelocity();
     calculateAndSumFlows();
     adjustNodesFromFlows();
-    */
 
     volComponent.updateVolumeData(nodeDataRT);
   }
@@ -143,8 +154,6 @@ public class WaterCompute : MonoBehaviour {
     liquidComputeShader.SetTexture(applyExtForcesKernelId, "vel", velRT); // Output from advect becomes input velocity to apply ext. forces
     liquidComputeShader.SetTexture(applyExtForcesKernelId, "nodeData", nodeDataRT);
     liquidComputeShader.SetTexture(applyExtForcesKernelId, "velApplExtForces", temp3DFloat4RT1);
-
-    liquidComputeShader.SetFloat("gravityMagnitude", 9.81f);//Mathf.Abs(Physics.gravity.y));
     liquidComputeShader.Dispatch(applyExtForcesKernelId, numThreadGroups, numThreadGroups, numThreadGroups);
     swapRTs(ref velRT, ref temp3DFloat4RT1); // Put the result into the velocity buffer
   }

@@ -64,9 +64,9 @@ void CSAdvect(uint3 id : SV_DispatchThreadID) {
 
   float3 u = vel[id.xyz].xyz;
   
-  float xx = clamp(id.x-dt*u.x, borderFront.x-0.5, internalSize.x+0.5);
-  float yy = clamp(id.y-dt*u.y, borderFront.y-0.5, internalSize.y+0.5);
-  float zz = clamp(id.z-dt*u.z, borderFront.z-0.5, internalSize.z+0.5);
+  float xx = clamp(id.x-dt*u.x, borderFront.x-0.5, borderFront.x+internalSize.x-0.5);
+  float yy = clamp(id.y-dt*u.y, borderFront.y-0.5, borderFront.y+internalSize.y-0.5);
+  float zz = clamp(id.z-dt*u.z, borderFront.z-0.5, borderFront.z+internalSize.z-0.5);
 
   uint3 ijk0 = uint3(floor(xx), floor(yy), floor(zz));
   uint3 ijk1 = ijk0 + uint3(1,1,1);
@@ -125,7 +125,7 @@ void CSApplyExternalForces(uint3 id : SV_DispatchThreadID) {
 
   // Determine the hydrostatic pressure = density*gravity*(mass of the fluid above)
   // How much pressure is pressing down on this cell (up to the max pressure height)?
-  float liquidVolAboveCell = 0.0;
+  float liquidVolAboveNode = 0.0;
   int pressureHeightIdx = min(borderFront.y+internalSize.y-1, id.y+1+MAX_PRESSURE_HEIGHT);
   [unroll(MAX_PRESSURE_HEIGHT)]
   for (int y = id.y+1; y < pressureHeightIdx; y++) {
@@ -134,10 +134,10 @@ void CSApplyExternalForces(uint3 id : SV_DispatchThreadID) {
     float topNodeVol = nodeLiquidVolume(topNode);
 
     if (topNodeType == SOLID_NODE_TYPE || abs(topNodeVol) < LIQUID_EPSILON) { break; }
-    liquidVolAboveCell += topNodeVol;
+    liquidVolAboveNode += topNodeVol;
   }
 
-  float liquidMassAboveNode = liquidDensity * liquidVolAboveCell;
+  float liquidMassAboveNode = liquidDensity * liquidVolAboveNode;
   float hsForce = atmoPressure * (unitsPerNode * unitsPerNode) + liquidMassAboveNode * gravityMagnitude;
   float dHSVel = hsForce*dt;
 
@@ -383,8 +383,8 @@ void CSCalculateFlowsKernel(uint3 id : SV_DispatchThreadID) {
   float3 absCSFlowRTU = abs(max(float3(0,0,0),u) * unitArea);
 
   float unitVolume = unitArea * unitsPerNode;
-  float3 flowToLBD = clamp(dt * unitVolume * absCSFlowLBD, 0, liquidVol);
-  float3 flowToRTU = clamp(dt * unitVolume * absCSFlowRTU, 0, liquidVol);
+  float3 flowToLBD = clamp(dt * unitVolume * absCSFlowLBD, float3(0,0,0), float3(liquidVol,liquidVol,liquidVol));
+  float3 flowToRTU = clamp(dt * unitVolume * absCSFlowRTU, float3(0,0,0), float3(liquidVol,liquidVol,liquidVol));
   flowToRTU.y = clamp((liquidVol-liquidVolT) * absCSFlowRTU.y * dt, 0, liquidVol); // Yup, this is a hack, without it the liquid will not settle evenly / will disperse into the air.
 
   float3 maskLBD = float3(1,1,1); float3 maskRTU = float3(1,1,1);
@@ -437,7 +437,7 @@ void CSCalculateFlowsKernel(uint3 id : SV_DispatchThreadID) {
   float totalFlow = flowToLBD.x + flowToLBD.y + flowToLBD.z + flowToRTU.x + flowToRTU.y + flowToRTU.z + 1e-10;
   result.flowL = min(max(0.5*(liquidVol-liquidVolL),0), min(liquidVol*(flowToLBD.x/totalFlow), flowToLBD.x));
   result.flowR = min(max(0.5*(liquidVol-liquidVolR),0), min(liquidVol*(flowToRTU.x/totalFlow), flowToRTU.x));
-  result.flowB = min(0.5*(liquidVol+liquidVolB),        min(liquidVol*(flowToLBD.y/totalFlow), flowToLBD.y));
+  result.flowB = min(liquidVol, min(liquidVol*(flowToLBD.y/totalFlow), flowToLBD.y)); //min(0.5*(liquidVol+liquidVolB),        min(liquidVol*(flowToLBD.y/totalFlow), flowToLBD.y)); //
   result.flowT = min(max(0.5*(liquidVol-liquidVolT),0), min(liquidVol*(flowToRTU.y/totalFlow), flowToRTU.y));
   result.flowD = min(max(0.5*(liquidVol-liquidVolD),0), min(liquidVol*(flowToLBD.z/totalFlow), flowToLBD.z));
   result.flowU = min(max(0.5*(liquidVol-liquidVolU),0), min(liquidVol*(flowToRTU.z/totalFlow), flowToRTU.z));
@@ -469,7 +469,7 @@ void CSSumFlowsKernel(uint3 id : SV_DispatchThreadID) {
 //RWTexture3D<float4> nodeData; // Output of CSAdjustNodeFlowsKernel
 [numthreads(8,8,8)]
 void CSAdjustNodeFlowsKernel(uint3 id : SV_DispatchThreadID) {
-  float4 node = nodeData[id.xyz];
+  float4 node = nodeData[id.xyz].xyzw;
   if (isOutOfBounds(id) || nodeType(node) == SOLID_NODE_TYPE) { 
     nodeData[id.xyz] = node;
     return; 
@@ -487,6 +487,7 @@ void CSAdjustNodeFlowsKernel(uint3 id : SV_DispatchThreadID) {
   float finalVol = (liquidVol + sC);
   node[NODE_VOL_IDX] = abs(finalVol) < LIQUID_EPSILON ? 0 : finalVol;
 
+/*
   // Unsettle the node if there are any changes in the neighbour cell flows
   if (abs(sL) >= LIQUID_EPSILON || abs(sR) >= LIQUID_EPSILON || 
       abs(sB) >= LIQUID_EPSILON || abs(sT) >= LIQUID_EPSILON ||
@@ -499,7 +500,7 @@ void CSAdjustNodeFlowsKernel(uint3 id : SV_DispatchThreadID) {
     node[NODE_SETTLED_IDX] = (abs(sC) < LIQUID_EPSILON && abs(liquidVol) < LIQUID_EPSILON) ||
       abs(liquidVol-unitVolume) < LIQUID_EPSILON ? SETTLED_NODE : UNSETTLED_NODE;
   }
-
+  */
   nodeData[id.xyz] = node;
 }
 
@@ -513,13 +514,13 @@ void CSFillDebugNodeData(uint3 id : SV_DispatchThreadID) {
     return;
   }
 
-  //|| id.x == borderFront.x+internalSize.x-50
+  /*
   if (id.x == borderFront.x || id.y == borderFront.y || id.z == borderFront.z || id.x == borderFront.x+internalSize.x-1 ||
       id.y == borderFront.y+internalSize.y-1 || id.z == borderFront.z+internalSize.z-1) {
     nodeData[id.xyz] = buildNode(EMPTY_NODE_TYPE, 1, UNSETTLED_NODE);
     return;
   }
-  
-  //float volume = id.y > fullSize/2 ? 1.0 : 0.0;
-  nodeData[id.xyz] = buildNode(EMPTY_NODE_TYPE, 0, UNSETTLED_NODE);
+  */
+  float maxVol = unitsPerNode*unitsPerNode*unitsPerNode;
+  nodeData[id.xyz] = buildNode(EMPTY_NODE_TYPE, (float)id.y > fullSize/1.75 ? maxVol : 0.0, UNSETTLED_NODE);
 }

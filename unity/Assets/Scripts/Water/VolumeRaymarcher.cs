@@ -61,6 +61,7 @@ public class VolumeRaymarcher : MonoBehaviour {
       meshRenderer.material.SetVector("borderFront", new Vector3(resBorderFrontInt.x, resBorderFrontInt.y, resBorderFrontInt.z));
       meshRenderer.material.SetVector("borderBack", new Vector3(resBorderBackInt.x, resBorderBackInt.y, resBorderBackInt.z));
       meshRenderer.material.SetFloat("resolution", volResolution);
+      meshRenderer.material.SetFloat("nodeVolume", Mathf.Pow(TerrainGrid.unitsPerNode(),3));
       meshRenderer.material.SetTexture("jitterTex", jitterTexture);
     }
 

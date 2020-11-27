@@ -13,8 +13,8 @@
 
 float4 buildNode(int type, float liquidVol, int settled) {
   float4 node = float4(0,0,0,0);
-  node[NODE_TYPE_IDX] = type;
-  node[NODE_VOL_IDX] = liquidVol;
+  node[NODE_TYPE_IDX]    = type;
+  node[NODE_VOL_IDX]     = liquidVol;
   node[NODE_SETTLED_IDX] = settled;
   return node;
 }

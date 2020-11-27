@@ -8,11 +8,11 @@
 #define MIN_ITERATIONS 3
 #define MAX_ITERATIONS 32
 
-void DoSample(Texture3D volumeTex, SamplerState volumeSampler, float3 uvw, float weight, float opacityMultiplier, inout float4 colour) {
+void DoSample(Texture3D volumeTex, SamplerState volumeSampler, float3 uvw, float weight, float opacityMultiplier, float nodeVolume, inout float4 colour) {
   float4 node = SAMPLE_TEXTURE3D(volumeTex, volumeSampler, uvw);
-  float nodeVol = nodeLiquidVolume(node);
-  float4 c = nodeType(node) == SOLID_NODE_TYPE ? float4(1,0,0,1) : float4(nodeVol, nodeVol, nodeVol, nodeVol);
-  float4 sampleColour = weight * c;
+  float nodeVolPercentage = nodeLiquidVolume(node)/nodeVolume;
+  float4 c = (nodeSettled(node) ==  SETTLED_NODE) ? float4(0,1,0,nodeVolPercentage) : float4(1, 1, 1, nodeVolPercentage);
+  float4 sampleColour = weight * c; //float4(nodeVol, nodeVol, nodeVol, nodeVol);
   
   sampleColour.a *= opacityMultiplier;
   // Back to front rendering
@@ -41,7 +41,7 @@ void Raymarch_float(
   Texture3D volumeTex, SamplerState volumeSampler, 
   Texture2D jitterTex, SamplerState jitterSampler,
   float eyeDepthAlongRay, float cameraFarPlane, float2 pos, float3 rayOrigin, float3 rayDir, float3 boxMin, float3 boxMax, 
-  int3 borderFront, int3 borderBack, float resolution, float opacityMultiplier,
+  int3 borderFront, int3 borderBack, float resolution, float opacityMultiplier, float nodeVolume,
   out float4 colour, out float depthOffset, out float3 nNormal) {
   
   depthOffset = 0;
@@ -86,7 +86,7 @@ void Raymarch_float(
   int i = 0;
   for (; i < nSamples; i++) {
     uvw = calcUVW(borderFront, resNoBorderLen, currPos, boxMin, boxMinMaxLen);
-    DoSample(volumeTex, volumeSampler, uvw, 1, opacityMultiplier, colour);
+    DoSample(volumeTex, volumeSampler, uvw, 1, opacityMultiplier, nodeVolume, colour);
     currPos += stepVec;
     if (colour.a > 0.99) { break; }
   }
@@ -95,7 +95,7 @@ void Raymarch_float(
   float remainingSample = frac(fSamples);
   if (i == nSamples && remainingSample > 0) {
     uvw = calcUVW(borderFront, resNoBorderLen, currPos, boxMin, boxMinMaxLen);
-    DoSample(volumeTex, volumeSampler, uvw, remainingSample, opacityMultiplier, colour);
+    DoSample(volumeTex, volumeSampler, uvw, remainingSample, opacityMultiplier, nodeVolume, colour);
     depthOffset = tNear-tFar;
   }
   else {
