@@ -66,10 +66,13 @@ public class WaterCompute : MonoBehaviour {
     var borderFront = volComponent.getBorderFront();
     var fullResSize = volComponent.getFullResSize();
     var internalResSize = new Vector3Int(fullResSize, fullResSize, fullResSize) - (borderBack+borderFront);
+    Debug.Log("Internal resolution size: " + internalResSize);
+    Debug.Log("Border Front: " +  new Vector3(borderFront.x, borderFront.y, borderFront.z));
+    Debug.Log("Border Back: " + new Vector3(borderBack.x, borderBack.y,borderBack.z));
 
-    liquidComputeShader.SetVector("borderBack", new Vector3(borderBack.x,borderBack.y,borderBack.z));
-    liquidComputeShader.SetVector("borderFont", new Vector3(borderFront.x, borderFront.y, borderFront.z));
-    liquidComputeShader.SetVector("internalSize", new Vector3(internalResSize.x, internalResSize.y, internalResSize.z));
+    liquidComputeShader.SetInts("borderBack", new int[]{borderBack.x, borderBack.y,borderBack.z});
+    liquidComputeShader.SetInts("borderFront", new int[]{borderFront.x, borderFront.y, borderFront.z});
+    liquidComputeShader.SetInts("internalSize", new int[]{internalResSize.x, internalResSize.y, internalResSize.z});
     liquidComputeShader.SetInt("fullSize", fullResSize);
 
     numThreadGroups = fullResSize / NUM_THREADS_PER_BLOCK;
@@ -113,7 +116,7 @@ public class WaterCompute : MonoBehaviour {
   }
 
   private void FixedUpdate() {
-
+    /*
     liquidComputeShader.SetFloat("dt", 10.0f);//Time.fixedDeltaTime);
     advectVelocity();
     applyExternalForces();
@@ -121,11 +124,10 @@ public class WaterCompute : MonoBehaviour {
     computeDivergence();
     computePressure();
     projectVelocity();
-
     calculateAndSumFlows();
     adjustNodesFromFlows();
+    */
 
-    //volComponent.updateVolumeData(velRT);
     volComponent.updateVolumeData(nodeDataRT);
   }
 

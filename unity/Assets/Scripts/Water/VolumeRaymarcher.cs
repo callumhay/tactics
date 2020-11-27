@@ -39,7 +39,7 @@ public class VolumeRaymarcher : MonoBehaviour {
     var resBorderBack = 2*resBorder - resBorderFrontInt;
     resBorderBackInt = new Vector3Int((int)resBorderBack.x, (int)resBorderBack.y, (int)resBorderBack.z);
 
-    Debug.Log("Resolution: " + volResolution);
+    Debug.Log("Resolution: " + volResolution + ", number of nodes: " + numNodesVec);
     Debug.Log("Border (Float): " + resBorder + ", Front (Int): " + resBorderFrontInt + ", Back (Int): " + resBorderBackInt);
   }
 

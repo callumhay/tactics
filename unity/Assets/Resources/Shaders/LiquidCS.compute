@@ -513,11 +513,13 @@ void CSFillDebugNodeData(uint3 id : SV_DispatchThreadID) {
     return;
   }
 
-  if ((id.y > borderFront.y && id.y < borderFront.y+14)) {
+  //|| id.x == borderFront.x+internalSize.x-50
+  if (id.x == borderFront.x || id.y == borderFront.y || id.z == borderFront.z || id.x == borderFront.x+internalSize.x-1 ||
+      id.y == borderFront.y+internalSize.y-1 || id.z == borderFront.z+internalSize.z-1) {
     nodeData[id.xyz] = buildNode(EMPTY_NODE_TYPE, 1, UNSETTLED_NODE);
     return;
   }
-
-  float volume = id.y > fullSize/2 ? 1.0 : 0.0;
+  
+  //float volume = id.y > fullSize/2 ? 1.0 : 0.0;
   nodeData[id.xyz] = buildNode(EMPTY_NODE_TYPE, 0, UNSETTLED_NODE);
 }

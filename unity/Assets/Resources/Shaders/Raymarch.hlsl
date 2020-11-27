@@ -20,8 +20,8 @@ void DoSample(Texture3D volumeTex, SamplerState volumeSampler, float3 uvw, float
   colour.a = (1-sampleColour.a)*colour.a + sampleColour.a;
 }
 
-float3 calcUVW(float3 resNoBorderVecDivRes, float3 borderFrontDivRes, float resolution, float3 currPos, float3 boxMin, float boxMinMaxLen) {
-  return borderFrontDivRes + ((currPos-boxMin) / boxMinMaxLen) * resNoBorderVecDivRes;
+float3 calcUVW(float3 borderFront, float resNoBorderLen, float3 currPos, float3 boxMin, float boxMinMaxLen) {
+  return (borderFront + ((currPos-boxMin)/boxMinMaxLen)*resNoBorderLen) / (float)resolution;
 }
 
 float3 calcIsoNormal(Texture3D volumeTex, SamplerState volumeSampler, float3 uvwCenter, float resolution) {
@@ -68,9 +68,7 @@ void Raymarch_float(
   float3 resVec = float3(resolution, resolution, resolution);
   float3 resNoBorderVec = resVec-borderVec;
   float resNoBorderLen = length(resNoBorderVec);
-
   float3 resNoBorderVecDivRes = resNoBorderVec / (float)resolution;
-  float borderFrontDivRes = borderFront / (float)resolution;
 
   // Perform a jitter along the ray, the jitter must not exceed half the voxel unit distance along the ray
   float jitterOffset = SAMPLE_TEXTURE2D(jitterTex, jitterSampler, pos.xy).r; // Random values in [0,1)
@@ -80,14 +78,14 @@ void Raymarch_float(
   int nSamples = floor(fSamples);
   float3 stepVec = farToNearVec / (nSamples-1.0);
   float3 currPos = pFar - stepVec*jitterOffset;
-  
+
   // March back-to-front along the ray, sample and accumulate color at each step
   colour = float4(0,0,0,0);
   float3 uvw;
   [unroll(MAX_ITERATIONS)]
   int i = 0;
   for (; i < nSamples; i++) {
-    uvw = calcUVW(resNoBorderVecDivRes, borderFrontDivRes, resolution, currPos, boxMin, boxMinMaxLen);
+    uvw = calcUVW(borderFront, resNoBorderLen, currPos, boxMin, boxMinMaxLen);
     DoSample(volumeTex, volumeSampler, uvw, 1, opacityMultiplier, colour);
     currPos += stepVec;
     if (colour.a > 0.99) { break; }
@@ -96,7 +94,7 @@ void Raymarch_float(
 
   float remainingSample = frac(fSamples);
   if (i == nSamples && remainingSample > 0) {
-    uvw = calcUVW(resNoBorderVecDivRes, borderFrontDivRes, resolution, currPos, boxMin, boxMinMaxLen);
+    uvw = calcUVW(borderFront, resNoBorderLen, currPos, boxMin, boxMinMaxLen);
     DoSample(volumeTex, volumeSampler, uvw, remainingSample, opacityMultiplier, colour);
     depthOffset = tNear-tFar;
   }
@@ -107,7 +105,7 @@ void Raymarch_float(
 
   // Calculate the current normal
   float3 currPosNoJitter = currPos+stepVec*jitterOffset;
-  uvw = calcUVW(resNoBorderVecDivRes, borderFrontDivRes, resolution, currPosNoJitter, boxMin, boxMinMaxLen);
+  uvw = calcUVW(borderFront, resNoBorderLen, currPosNoJitter, boxMin, boxMinMaxLen);
   nNormal = normalize(calcIsoNormal(volumeTex, volumeSampler, uvw, resolution));
 }
 
