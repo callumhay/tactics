@@ -21,7 +21,7 @@ public class NodeMaterialContrib {
 
 [Serializable]
 public class TerrainGridNode {
-  public static readonly int maxMaterialsPerNode = 2;
+  public static readonly int MAX_MATERIALS_PER_NODE = 2;
 
   [NonSerialized]
   public Vector3 position;
@@ -50,7 +50,11 @@ public class TerrainGridNode {
       "You can't have a node that's both land and liquid!");
   }
   
-  public bool isTerrain() { return isoVal > Mathf.Epsilon; }
+  public bool isTerrain() { return isoVal >= MarchingCubes.ISOVAL_CUTOFF; }
+  public bool isLiquid() { return !isTerrain() && liquidVol > 0f; }
+
+  public bool isEmpty() { return !isTerrain() && liquidVol == 0f; }
+
   public bool isDefinitelyGrounded() { return gridIndex.y == 0 && isTerrain(); }
 
   public Color editorUnselectedColour(float alpha=0.0f) {

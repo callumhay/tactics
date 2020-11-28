@@ -32,6 +32,8 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
   public Vector3 unitsPerNodeVec3() { var u = unitsPerNode(); return new Vector3(u,u,u); }
   public Vector3 halfUnitsPerNodeVec3() { var v = unitsPerNodeVec3(); return 0.5f*v; }
 
+  public static float unitVolumePerNode() { return Mathf.Pow(unitsPerNode(),3f); }
+
   public static int unitsToNodeIndex(float unitVal) { return Mathf.FloorToInt(unitVal / unitsPerNode()); }
   public Vector3Int unitsToNodeIndexVec3(float x, float y, float z) { 
     return new Vector3Int(
@@ -132,19 +134,20 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     return neighbours;
   }
 
-  public List<TerrainGridNode> getNodesInsideBox(in Bounds box, bool groundFirst, float setLevelUnits) {
+  public List<TerrainGridNode> getNodesInsideBox(in Bounds box, bool groundFirst, bool liquidFirst, float setLevelUnits) {
     var result = new List<TerrainGridNode>();
     var indices = getIndexRangeForBox(box);
     var maxYIdx = unitsToNodeIndex(setLevelUnits);
     indices.yStartIdx = Math.Min(maxYIdx, indices.yStartIdx);
     indices.yEndIdx = Math.Min(maxYIdx, indices.yEndIdx);
 
-    if (groundFirst) {
+    if (groundFirst || liquidFirst) {
       int startY = indices.yStartIdx;
       for (int y = 0; y < indices.yStartIdx && startY == indices.yStartIdx; y++) {
         for (int x = indices.xStartIdx; x <= indices.xEndIdx && startY == indices.yStartIdx; x++) {
           for (int z = indices.zStartIdx; z <= indices.zEndIdx; z++) {
-            if (!this.nodes[x,y,z].isTerrain()) { startY = y; break; }
+            var node = this.nodes[x,y,z];
+            if ((groundFirst && !node.isTerrain()) || (liquidFirst && !node.isLiquid())) { startY = y; break; }
           }
         }
       }
@@ -164,12 +167,12 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     return result;
   }  
 
-  public List<TerrainGridNode> getNodesInsideSphere(in Vector3 center, float radius, bool groundFirst, float setLevelUnits) {
+  public List<TerrainGridNode> getNodesInsideSphere(in Vector3 center, float radius, bool groundFirst, bool liquidFirst, float setLevelUnits) {
     var lsCenter = center - transform.position; // Get the center in localspace
 
     // Narrow the search down to the nodes inside the sphere's bounding box
     var dia = 2*radius;
-    var nodesInBox = getNodesInsideBox(new Bounds(lsCenter, new Vector3(dia, dia, dia)), groundFirst, setLevelUnits);
+    var nodesInBox = getNodesInsideBox(new Bounds(lsCenter, new Vector3(dia, dia, dia)), groundFirst, liquidFirst, setLevelUnits);
 
     // Go through the list and only take the nodes inside the sphere
     var sqrRadius = radius*radius;
@@ -182,12 +185,12 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     return result;
   }
 
-  public List<TerrainGridNode> getNodesInsideProjXZCircle(in Vector3 center, float radius, bool groundFirst, float setLevelUnits) {
+  public List<TerrainGridNode> getNodesInsideProjXZCircle(in Vector3 center, float radius, bool groundFirst, bool liquidFirst, float setLevelUnits) {
     var lsCenter = center - transform.position; // Get the center in localspace
     
     // Find the highest y node in the xz coordinates with an isovalue
     var isCenter = unitsToNodeIndexVec3(lsCenter); isCenter.y++;
-    if (groundFirst) {
+    if (groundFirst || liquidFirst) {
       int startY = isCenter.y;
       var startXIdx = Mathf.FloorToInt(isCenter.x-radius);
       var endXIdx = Mathf.FloorToInt(isCenter.x+radius);
@@ -196,15 +199,16 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
       for (int y = 0; y < isCenter.y && startY == isCenter.y; y++) {
         for (int x = startXIdx; x <= endXIdx && startY == isCenter.y; x++) {
           for (int z = startZIdx; z <= endZIdx  && startY == isCenter.y; z++) {
-            if (!this.nodes[x,y,z].isTerrain()) { startY = y; break; }
+            var node = this.nodes[x,y,z];
+            if ((groundFirst && !node.isTerrain()) || (liquidFirst && !node.isLiquid())) { startY = y; break; }
           }
         }
       }
       isCenter.y = startY;
     }
     else {
-      while (isCenter.y > 1 && !nodes[isCenter.x,isCenter.y-1,isCenter.z].isTerrain()) { isCenter.y--; }
-      while (isCenter.y < nodes.GetLength(1)-1 && nodes[isCenter.x,isCenter.y,isCenter.z].isTerrain()) { isCenter.y++; }
+      while (isCenter.y > 1 && nodes[isCenter.x,isCenter.y-1,isCenter.z].isEmpty()) { isCenter.y--; }
+      while (isCenter.y < nodes.GetLength(1)-1 && !nodes[isCenter.x,isCenter.y,isCenter.z].isEmpty()) { isCenter.y++; }
     }
     isCenter.y = Mathf.Min(Mathf.Max(0, unitsToNodeIndex(setLevelUnits-radius)), isCenter.y);
 
@@ -224,15 +228,15 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     }
     return result;
   }
-  public List<TerrainGridNode> getNodesInsideProjXZSquare(in Bounds box, bool groundFirst, float setLevelUnits) {
+  public List<TerrainGridNode> getNodesInsideProjXZSquare(in Bounds box, bool groundFirst, bool liquidFirst, float setLevelUnits) {
     var lsCenter = box.center - transform.position; // Get the center in localspace
     // Find the highest y node in the xz coordinates with an isovalue
     var isCenter = unitsToNodeIndexVec3(lsCenter); isCenter.y++;
-    while (isCenter.y > 1 && !nodes[isCenter.x,isCenter.y-1,isCenter.z].isTerrain()) { isCenter.y--; }
-    while (isCenter.y < nodes.GetLength(1)-1 && nodes[isCenter.x,isCenter.y,isCenter.z].isTerrain()) { isCenter.y++; }
+    while (isCenter.y > 1 && nodes[isCenter.x,isCenter.y-1,isCenter.z].isEmpty()) { isCenter.y--; }
+    while (isCenter.y < nodes.GetLength(1)-1 && !nodes[isCenter.x,isCenter.y,isCenter.z].isEmpty()) { isCenter.y++; }
 
     var projBox = new Bounds(nodeIndexToUnitsVec3(isCenter), new Vector3(box.size.x, 1.5f*halfUnitsPerNode(), box.size.z));
-    return getNodesInsideBox(projBox, groundFirst, setLevelUnits);
+    return getNodesInsideBox(projBox, groundFirst, liquidFirst, setLevelUnits);
   }
 
 
@@ -451,6 +455,8 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
   }
   */
 
+
+
   private void regenerateMeshes(/*bool updateComputeBuffer = false*/) {
     foreach (var terrainCol in terrainColumns.Values) {
       terrainCol.regenerateMesh();
@@ -606,24 +612,12 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     return resultTCs;
   }
 
-  /*
-  public void addWaterToNodes(float amt, in List<TerrainGridNode> nodes) {
-    
-  }
-  */
-
-  public void addIsoValuesToNodes(float isoVal, in List<TerrainGridNode> nodes) {
-    var changedNodes = new HashSet<TerrainGridNode>();
-    foreach (var node in nodes) {
-      var prevIsoVal = node.isoVal;
-      node.isoVal = Mathf.Clamp(node.isoVal + isoVal, 0, 1);
-      if (node.isoVal != prevIsoVal) { changedNodes.Add(node); }
-    }
-
+  private void updateNodesInGameOrEditor(in IEnumerable<TerrainGridNode> changedNodes) {
     #if UNITY_EDITOR
     var appIsPlaying = Application.IsPlaying(gameObject);
     if (!appIsPlaying) {
       updateNodesInEditor(changedNodes);
+      updateWaterGizmoMesh();
     }
     else 
     #endif
@@ -633,12 +627,44 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     }
   }
 
+  public void addLiquidToNodes(float liquidVolPercentage, in List<TerrainGridNode> nodes) {
+    var changedNodes = new HashSet<TerrainGridNode>();
+    var maxNodeVol = unitVolumePerNode();
+    var liquidVol  = maxNodeVol*liquidVolPercentage;
+    foreach (var node in nodes) {
+      var prevVol = node.liquidVol;
+      var prevIsoVal = node.isoVal;
+
+      if (node.isTerrain()) { node.liquidVol = 0f; } // If the node is land then we can't add liquid to it
+      else { node.liquidVol = Mathf.Clamp(node.liquidVol + liquidVol, 0, maxNodeVol); node.isoVal = 0f; }
+
+      if (node.liquidVol != prevVol || node.isoVal != prevIsoVal) { changedNodes.Add(node); }
+    }
+    updateNodesInGameOrEditor(changedNodes);
+  }
+
+  public void addIsoValuesToNodes(float isoVal, in List<TerrainGridNode> nodes) {
+    var changedNodes = new HashSet<TerrainGridNode>();
+    foreach (var node in nodes) {
+      var prevIsoVal = node.isoVal;
+
+      if (node.isLiquid()) { node.isoVal = 0f; } // If the node is liquid then we can't add land to it
+      else { node.isoVal = Mathf.Clamp(node.isoVal + isoVal, 0, 1); }
+
+      if (node.isoVal != prevIsoVal) { changedNodes.Add(node); }
+    }
+    updateNodesInGameOrEditor(changedNodes);
+  }
+
   public void addIsoValuesAndMaterialToNodes(float isoVal, float matAmt, Material mat, in List<TerrainGridNode> nodes) {
     var changedNodes = new HashSet<TerrainGridNode>();
     var matToPaint = mat ? mat : MaterialHelper.defaultMaterial;
     foreach (var node in nodes) {
       var prevIsoVal = node.isoVal;
-      node.isoVal = Mathf.Clamp(node.isoVal + isoVal, 0, 1);
+
+      if (node.isLiquid()) { node.isoVal = 0f; } // If the node is liquid then we can't add land to it
+      else { node.isoVal = Mathf.Clamp(node.isoVal + isoVal, 0, 1); }
+      
       if (node.isoVal != prevIsoVal) { 
         // If the node just came into existance (was just painted from 0 to 1) then only paint the given material
         if (node.isoVal >= 0 && prevIsoVal <= 0) {
@@ -664,7 +690,7 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
           }
         }
         if (!foundMat) {
-          if (node.materials.Count >= TerrainGridNode.maxMaterialsPerNode) {
+          if (node.materials.Count >= TerrainGridNode.MAX_MATERIALS_PER_NODE) {
             Debug.LogWarning("A node already has the maximum number of materials, erase those materials first.");
           }
           else {
@@ -673,24 +699,59 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
         }
       }
     }
-
-    #if UNITY_EDITOR
-    var appIsPlaying = Application.IsPlaying(gameObject);
-    if (!appIsPlaying) {
-      updateNodesInEditor(changedNodes);
-    }
-    else 
-    #endif
-    {
-      var affectedTCs = findAllAffectedTCs(changedNodes);
-      terrainPhysicsCleanup(affectedTCs);
-    }
+    updateNodesInGameOrEditor(changedNodes);
   }
 
   // Editor-Only Stuff ----------------------------------------------
   #if UNITY_EDITOR
 
   private static float editorAlpha = 0.5f;
+  private Mesh waterGizmoMesh;
+
+  private void updateWaterGizmoMesh() {
+    
+    var vertices = new List<Vector3>();
+    //var colours = new List<Color>();
+    var indices = new List<int>();
+    
+    var nodeSize = unitsPerNode();
+    var maxNodeVol = unitVolumePerNode();
+    var nodeSizeVec = new Vector3(nodeSize,nodeSize,nodeSize);
+    var halfNodeSizeVec = nodeSizeVec / 2;
+    for (int x = 0; x < nodes.GetLength(0); x++) {
+      for (int y = 0; y < nodes.GetLength(1); y++) {
+        for (int z = 0; z < nodes.GetLength(2); z++) {
+          var node = nodes[x,y,z];
+          if (node.isLiquid()) { 
+            Vector3[] verts;
+            int[] tris;
+            int startVertNum = vertices.Count;
+            MeshHelper.BuildCubeData(nodeSizeVec, out tris, out verts);
+            for (int i = 0; i < verts.Length; i++) {
+              vertices.Add(verts[i] + node.position - halfNodeSizeVec);
+            }
+            for (int i = 0; i < tris.Length; i++) {
+              indices.Add(startVertNum + tris[i]);
+            }
+            //var volPct = node.liquidVol / maxNodeVol;
+            //colours.Add(new Color(0, 0.25f*volPct, volPct, 1f));
+          }
+        }
+      }
+    }
+    if (vertices.Count > 0) {
+      if (waterGizmoMesh == null) { waterGizmoMesh = new Mesh(); }
+      else { waterGizmoMesh.Clear(); }
+
+      waterGizmoMesh.SetVertices(vertices);
+      //waterGizmoMesh.SetColors(colours);
+      waterGizmoMesh.SetIndices(indices, MeshTopology.Triangles, 0);
+      waterGizmoMesh.RecalculateNormals();
+    }
+    else {
+      waterGizmoMesh = null;
+    }
+  }
 
   public void OnValidate() {
     Invoke("delayedOnValidate", 0);
@@ -701,6 +762,7 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
       buildBedrock();
       buildTerrainColumns();
       regenerateMeshes();
+      updateWaterGizmoMesh();
     }
   }
 
@@ -710,6 +772,10 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     Gizmos.DrawWireCube(transform.position + 
       new Vector3(((float)xSize)/2,((float)ySize)/2,((float)zSize)/2), new Vector3(xSize,ySize,zSize)
     );
+    if (waterGizmoMesh) {
+      Gizmos.color = new Color(0,0.25f,1f,0.75f);
+      Gizmos.DrawMesh(waterGizmoMesh);
+    }
   }
 
   public float fastSampleHeight(int terrainColX, int terrainColZ) {

@@ -89,19 +89,22 @@ public class TerrainGridToolWindow : EditorWindow {
     if (gridSnaping) {
       terrainGrid?.getGridSnappedPoint(ref finalEditPt);
     }
+
+    bool groundFirst = groundUpOnly && paintType != TGTWSettings.PaintType.Water;
+    bool waterFirst  = groundUpOnly && paintType == TGTWSettings.PaintType.Water;
     
     switch (brushType) {
       case TGTWSettings.BrushType.Sphere:
         var radius = 0.5f * brushSize;
         nodes = paintMode3D ? 
-          terrainGrid?.getNodesInsideSphere(finalEditPt, radius, groundUpOnly, setLevelValue) : 
-          terrainGrid?.getNodesInsideProjXZCircle(finalEditPt, radius, groundUpOnly, setLevelValue);
+          terrainGrid?.getNodesInsideSphere(finalEditPt, radius, groundFirst, waterFirst, setLevelValue) : 
+          terrainGrid?.getNodesInsideProjXZCircle(finalEditPt, radius, groundFirst, waterFirst, setLevelValue);
         break;
       case TGTWSettings.BrushType.Cube:
         var bounds = new Bounds(finalEditPt, new Vector3(brushSize, brushSize, brushSize));
         nodes = paintMode3D ? 
-          terrainGrid?.getNodesInsideBox(bounds, groundUpOnly, setLevelValue) : 
-          terrainGrid?.getNodesInsideProjXZSquare(bounds, groundUpOnly, setLevelValue);
+          terrainGrid?.getNodesInsideBox(bounds, groundFirst, waterFirst, setLevelValue) : 
+          terrainGrid?.getNodesInsideProjXZSquare(bounds, groundFirst, waterFirst, setLevelValue);
         break;
       default:
         break;
@@ -121,7 +124,7 @@ public class TerrainGridToolWindow : EditorWindow {
         terrainGrid?.updateNodesInEditor(nodes);
         break;
       case TGTWSettings.PaintType.Water:
-        // TODO terrainGrid?.addWaterToNodes(1f, nodes);
+        terrainGrid?.addLiquidToNodes(1f, nodes);
         break;
       default:
         break;
@@ -139,7 +142,7 @@ public class TerrainGridToolWindow : EditorWindow {
         terrainGrid?.updateNodesInEditor(nodes);
         break;
       case TGTWSettings.PaintType.Water:
-        // TODO terrainGrid?.addWaterToNodes(-1f, nodes);
+        terrainGrid?.addLiquidToNodes(-1f, nodes);
         break;
       default:
         break;
@@ -160,7 +163,7 @@ public class TerrainGridToolWindow : EditorWindow {
         }
       }
       if (!foundMat) {
-        if (node.materials.Count >= TerrainGridNode.maxMaterialsPerNode) {
+        if (node.materials.Count >= TerrainGridNode.MAX_MATERIALS_PER_NODE) {
           Debug.LogWarning("A node already has the maximum number of materials, erase those materials first.");
         }
         else {

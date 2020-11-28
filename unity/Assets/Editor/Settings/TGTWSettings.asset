@@ -14,11 +14,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   brushSize: 1
   matPaintIntensity: 0.25
-  paintType: 0
+  paintType: 2
   paintMode: 1
   brushType: 1
   gridSnaping: 1
   showGridOverlay: 1
-  groundUpOnly: 1
+  groundUpOnly: 0
   setLevelValue: 15
   paintMaterial: {fileID: 0}

@@ -520,11 +520,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   liquidDensity: 1000
   atmosphericPressure: 101325
-  maxGravityVelocity: 500
-  maxPressureVelocity: 8
-  gravityMagnitude: 68.7
-  vorticityConfinement: 0.012
-  numPressureIters: 10
+  maxGravityVelocity: 300
+  maxPressureVelocity: 300
+  gravityMagnitude: 988
+  vorticityConfinement: 0.865
+  numPressureIters: 20
   nodeDataRT: {fileID: 0}
 --- !u!1 &1169957086
 GameObject:

@@ -17,7 +17,7 @@ public class CubeCorner {
 }
 
 public class MarchingCubes {
-  public static float isoValCutoff = 0.5f;
+  public static readonly float ISOVAL_CUTOFF = 0.5f;
   public static Vector3Int[] corners = new Vector3Int[]{
     new Vector3Int(0, 0, 0), new Vector3Int(1, 0, 0), 
     new Vector3Int(1, 0, 1), new Vector3Int(0, 0, 1), 
@@ -83,7 +83,7 @@ public class MarchingCubes {
     var point = new Vector3(p1.x, p1.y, p1.z);
     
     if (Mathf.Abs(iv2-iv1) > 1e-6f) {
-      l2 = ((isoValCutoff-iv1) / (iv2-iv1));
+      l2 = ((ISOVAL_CUTOFF-iv1) / (iv2-iv1));
       point += (p2-p1) * l2;
       l1 = 1-l2;
     }
@@ -102,14 +102,14 @@ public class MarchingCubes {
 
   private static int calcCubeIndex(in CubeCorner[] corners) {
     int cubeindex = 0;
-    if (corners[0].isoVal >= isoValCutoff) { cubeindex |= 1;  }
-    if (corners[1].isoVal >= isoValCutoff) { cubeindex |= 2;  }
-    if (corners[2].isoVal >= isoValCutoff) { cubeindex |= 4;  }
-    if (corners[3].isoVal >= isoValCutoff) { cubeindex |= 8;  }
-    if (corners[4].isoVal >= isoValCutoff) { cubeindex |= 16; }
-    if (corners[5].isoVal >= isoValCutoff) { cubeindex |= 32; }
-    if (corners[6].isoVal >= isoValCutoff) { cubeindex |= 64; }
-    if (corners[7].isoVal >= isoValCutoff) { cubeindex |= 128;}
+    if (corners[0].isoVal >= ISOVAL_CUTOFF) { cubeindex |= 1;  }
+    if (corners[1].isoVal >= ISOVAL_CUTOFF) { cubeindex |= 2;  }
+    if (corners[2].isoVal >= ISOVAL_CUTOFF) { cubeindex |= 4;  }
+    if (corners[3].isoVal >= ISOVAL_CUTOFF) { cubeindex |= 8;  }
+    if (corners[4].isoVal >= ISOVAL_CUTOFF) { cubeindex |= 16; }
+    if (corners[5].isoVal >= ISOVAL_CUTOFF) { cubeindex |= 32; }
+    if (corners[6].isoVal >= ISOVAL_CUTOFF) { cubeindex |= 64; }
+    if (corners[7].isoVal >= ISOVAL_CUTOFF) { cubeindex |= 128;}
     return cubeindex;
   }
 
