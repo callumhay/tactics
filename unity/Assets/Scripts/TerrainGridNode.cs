@@ -21,8 +21,7 @@ public class NodeMaterialContrib {
 
 [Serializable]
 public class TerrainGridNode {
-
-  public static int maxMaterialsPerNode = 2;
+  public static readonly int maxMaterialsPerNode = 2;
 
   [NonSerialized]
   public Vector3 position;
@@ -31,7 +30,8 @@ public class TerrainGridNode {
   [NonSerialized]
   public List<Vector3Int> columnIndices = new List<Vector3Int>();
 
-  public float isoVal = 0f;
+  public float isoVal = 0f;    // How much terrain is contained in this node (via Marching Cubes)
+  public float liquidVol = 0f; // How much liquid is contained in this node (Liters)
   public List<NodeMaterialContrib> materials = new List<NodeMaterialContrib>(); // Currently we only allow a maximum of 2 materials on a node
 
   private bool _isTraversalGrounded = false; // Used during terrain traversal to flag whether this is grounded or not
@@ -40,10 +40,14 @@ public class TerrainGridNode {
     set { _isTraversalGrounded = value || isDefinitelyGrounded(); }
   }
 
-  public TerrainGridNode(in Vector3 gridSpacePos, in Vector3Int gridIdx, float iso=0.0f) {
+  public TerrainGridNode(in Vector3 gridSpacePos, in Vector3Int gridIdx, float _isoVal=0f, float _liquidVol=0f) {
     position = gridSpacePos;
     gridIndex = gridIdx;
-    isoVal = iso;
+    isoVal = _isoVal;
+    liquidVol = _liquidVol;
+
+    Debug.Assert(isoVal > 0 && liquidVol == 0 || isoVal == 0 && liquidVol > 0 || isoVal == 0 && liquidVol == 0, 
+      "You can't have a node that's both land and liquid!");
   }
   
   public bool isTerrain() { return isoVal > Mathf.Epsilon; }

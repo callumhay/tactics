@@ -19,6 +19,9 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
   private Dictionary<Vector3Int, TerrainColumn> terrainColumns;
   private Bedrock bedrock;
 
+  // CPU <-> GPU buffer - this allows us to tell the water simulation about the terrain and vice-versa
+  //ComputeBuffer nodeComputeBuf;
+
   public int numNodesX() { return LevelData.sizeToNumNodes(xSize); }
   public int numNodesY() { return LevelData.sizeToNumNodes(ySize); }
   public int numNodesZ() { return LevelData.sizeToNumNodes(zSize); }
@@ -389,6 +392,7 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
       }
     }
     nodes = tempNodes;
+    // TODO: Update the compute buffer HERE.
   }
 
   private void buildTerrainColumns() {
@@ -426,21 +430,45 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     bedrock.gameObj.transform.SetAsFirstSibling();
   }
 
-  private void regenerateMeshes() {
+  /*
+  struct ComputeBufferNode {
+    float terrainIsoVal;
+    float waterVolume;
+  };
+  private int nodeIdxToCBIdx(in Vector3Int nodeIdx) {
+    return node3DIndexToFlatIndex(nodeIdx.x, nodeIdx.y, nodeIdx.z, nodeIdx.x * numNodesY() * numNodesZ() + nodeIdx.y * numNodesZ() + nodeIdx.z;
+  }
+  private void updateComputeBuffer(in IEnumerable<TerrainGridNode> nodes) {
+    var totalNodes = numNodes();
+    ComputeBuffer nodeComputeBuf = new ComputeBuffer(totalNodes, 2*sizeof(float), ComputeBufferType.Default, ComputeBufferMode.SubUpdates);
+    var nodeCBArr = nodeComputeBuf.BeginWrite<ComputeBufferNode>(0, totalNodes);
+    foreach (var node in nodes) {
+      var currCBNode = nodeCBArr[nodeIdxToCBIdx(node.gridIndex)];
+      currCBNode.terrainIsoVal = node.isoVal;
+      currCBNode.waterVolume   = node.liquidVol;
+    }
+    nodeComputeBuf.EndWrite<ComputeBufferNode>(totalNodes);
+  }
+  */
+
+  private void regenerateMeshes(/*bool updateComputeBuffer = false*/) {
     foreach (var terrainCol in terrainColumns.Values) {
       terrainCol.regenerateMesh();
     }
     bedrock.regenerateMesh();
+    // TODO: Update the compute buffer HERE for every node.
   }
 
   private void regenerateMeshes(in ICollection<TerrainColumn> terrainCols) {
     foreach (var terrainCol in terrainCols) {
       terrainCol.regenerateMesh();
     }
+    // TODO: Update the compute buffer HERE for every node in the given set of TerrainColumns.
   }
   private HashSet<TerrainColumn> regenerateMeshes(in IEnumerable<TerrainGridNode> nodes) {
     var terrainCols = findAllAffectedTCs(nodes);
     regenerateMeshes(terrainCols);
+     // TODO: Update the compute buffer HERE for every node, make sure not to do this in the other regenerateMeshes method
     return terrainCols;
   }
 
@@ -578,6 +606,12 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     return resultTCs;
   }
 
+  /*
+  public void addWaterToNodes(float amt, in List<TerrainGridNode> nodes) {
+    
+  }
+  */
+
   public void addIsoValuesToNodes(float isoVal, in List<TerrainGridNode> nodes) {
     var changedNodes = new HashSet<TerrainGridNode>();
     foreach (var node in nodes) {
@@ -697,7 +731,7 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     var affectedTCs = regenerateMeshes(nodes);
     foreach (var node in nodes) {
       var gridIdx = node.gridIndex;
-      var flatIdx = LevelData.node3DIndexToFlatIndex(gridIdx.x, gridIdx.y, gridIdx.z, numNodesX(), numNodesY());
+      var flatIdx = LevelData.node3DIndexToFlatIndex(gridIdx.x, gridIdx.y, gridIdx.z, numNodesY(), numNodesZ());
       var ldNode = levelData.nodes[flatIdx];
       ldNode.isoVal = node.isoVal;
       ldNode.materials = node.materials;
@@ -712,7 +746,7 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     var nodesProp = serializedObj.FindProperty("nodes");
     foreach (var node in changedNodes) {
       var gridIdx = node.gridIndex;
-      var flatIdx = LevelData.node3DIndexToFlatIndex(gridIdx.x, gridIdx.y, gridIdx.z, numNodesX(), numNodesY());
+      var flatIdx = LevelData.node3DIndexToFlatIndex(gridIdx.x, gridIdx.y, gridIdx.z, numNodesY(), numNodesZ());
       var isoValProp = nodesProp.GetArrayElementAtIndex(flatIdx).FindPropertyRelative("isoVal");
       isoValProp.floatValue = node.isoVal;
     }

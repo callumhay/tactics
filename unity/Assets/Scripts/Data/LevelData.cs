@@ -1,6 +1,4 @@
-﻿using System;
-using UnityEngine;
-using UnityEditor;
+﻿using UnityEngine;
 
 [PreferBinarySerialization]
 [CreateAssetMenu(fileName="New Level", menuName="Tactics/Level")]
@@ -22,8 +20,8 @@ public class LevelData : ScriptableObject {
     }
   }
 
-  public static int node3DIndexToFlatIndex(int x, int y, int z, int numNodesX, int numNodesY) {
-    return z + (y*numNodesX) + (x*numNodesX*numNodesY);
+  public static int node3DIndexToFlatIndex(int x, int y, int z, int numNodesY, int numNodesZ) {
+    return z + (y*numNodesZ) + (x*numNodesZ*numNodesY);
   }
   public static int numNodesToSize(int numNodes) {
     return (numNodes - 1)/(TerrainGrid.nodesPerUnit*TerrainColumn.size - 1);
@@ -51,7 +49,7 @@ public class LevelData : ScriptableObject {
     for (int x = 0; x < numNodesX; x++) {
       for (int y = 0; y < numNodesY; y++) {
         for (int z = 0; z < numNodesZ; z++) {
-          nodes[node3DIndexToFlatIndex(x,y,z,numNodesX,numNodesY)] = _nodes[x,y,z];
+          nodes[node3DIndexToFlatIndex(x,y,z,numNodesY,numNodesZ)] = _nodes[x,y,z];
         }
       }
     }
@@ -77,7 +75,7 @@ public class LevelData : ScriptableObject {
       for (int x = 0; x < maxX; x++) {
         for (int y = 0; y < maxY; y++) {
           for (int z = 0; z < maxZ; z++) {
-            var idx = node3DIndexToFlatIndex(x,y,z,maxX,maxY);
+            var idx = node3DIndexToFlatIndex(x,y,z,maxY,maxZ);
             if (idx < nodes.GetLength(0)) { result[x,y,z] = nodes[idx]; }
           }
         }

@@ -112,13 +112,16 @@ public class TerrainGridToolWindow : EditorWindow {
 
   public void paintNodes(in List<TerrainGridNode> nodes, in TerrainGrid terrainGrid) {
     switch (paintType) {
-      case TGTWSettings.PaintType.IsoValues:
+      case TGTWSettings.PaintType.Terrain:
         if (settings.paintMaterial) { terrainGrid?.addIsoValuesAndMaterialToNodes(1f, matPaintIntensity, settings.paintMaterial, nodes); }
         else { terrainGrid?.addIsoValuesToNodes(1f, nodes); }
         break;
       case TGTWSettings.PaintType.MaterialsOnly:
         paintMaterial(nodes, matPaintIntensity);
         terrainGrid?.updateNodesInEditor(nodes);
+        break;
+      case TGTWSettings.PaintType.Water:
+        // TODO terrainGrid?.addWaterToNodes(1f, nodes);
         break;
       default:
         break;
@@ -127,13 +130,16 @@ public class TerrainGridToolWindow : EditorWindow {
   
   public void eraseNodes(in List<TerrainGridNode> nodes, in TerrainGrid terrainGrid) {
     switch (paintType) {
-      case TGTWSettings.PaintType.IsoValues:
+      case TGTWSettings.PaintType.Terrain:
         if (settings.paintMaterial) { terrainGrid?.addIsoValuesAndMaterialToNodes(-1f, -matPaintIntensity, settings.paintMaterial, nodes); }
         else { terrainGrid?.addIsoValuesToNodes(-1f, nodes); }
         break;
       case TGTWSettings.PaintType.MaterialsOnly:
         paintMaterial(nodes, -matPaintIntensity);
         terrainGrid?.updateNodesInEditor(nodes);
+        break;
+      case TGTWSettings.PaintType.Water:
+        // TODO terrainGrid?.addWaterToNodes(-1f, nodes);
         break;
       default:
         break;
