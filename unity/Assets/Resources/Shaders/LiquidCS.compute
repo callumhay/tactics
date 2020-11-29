@@ -432,16 +432,14 @@ void CSCalculateFlowsKernel(uint3 id : SV_DispatchThreadID) {
     remainingVolume -= flowToRTU.z;
     result.flowU = flowToRTU.z;
   }
-
-  /*  
+ 
   // Upward flow
   if (remainingVolume > LIQUID_EPSILON && typeT != SOLID_NODE_TYPE && liquidVolT < liquidVol) {
     flowToRTU.y = min(flowToRTU.y, min(unitVolume-liquidVolT, remainingVolume));
-    flowToRTU.y = min(max(0.5*(remainingVolume-liquidVolT), 0.0), flowToRTU.y);
+    flowToRTU.y = min(max(0.5*(remainingVolume+liquidVolT), 0.0), flowToRTU.y);
     remainingVolume -= flowToRTU.y;
     result.flowT = flowToRTU.y;
   }
-  */
 
   flows[flowsIdx] = result;
 
