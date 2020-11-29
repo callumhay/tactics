@@ -28,16 +28,22 @@ public class WaterCompute : MonoBehaviour {
 
   public static readonly int NUM_THREADS_PER_BLOCK = 8;
 
-  public float liquidDensity        = 1000.0f;   // kg/m^3
-  public float atmosphericPressure  = 1000.0f;
-  public float maxGravityVelocity   = 10000.0f;    // m/s
-  public float maxPressureVelocity  = 20000.0f;     // m/s
+  [Range(1,10000)]
+  public float liquidDensity = 1000.0f;   // kg/m^3
+  [Range(0,101325)]
+  public float atmosphericPressure = 1000.0f;
+  [Range(0,100)]
+  public float maxGravityVelocity = 100.0f;    // m/s
+  [Range(0,100)]
+  public float maxPressureVelocity = 100.0f;     // m/s
   [Range(0,100)]
   public float friction = 1.0f;
-  [Range(-1000,1000)]
-  public float gravityMagnitude     = 200f;
+  [Range(0,10000)]
+  public float gravityMagnitude = 200f;
   [Range(0,1)]
   public float vorticityConfinement = 0.012f;
+  [Range(1,100)]
+  public float flowMultiplier = 1.0f;
   [Range(1,128)]
   public int numPressureIters = 20;
   
@@ -139,6 +145,7 @@ public class WaterCompute : MonoBehaviour {
     liquidComputeShader.SetFloat("unitsPerNode", TerrainGrid.unitsPerNode());
     liquidComputeShader.SetFloat("gravityMagnitude", gravityMagnitude);//Mathf.Abs(Physics.gravity.y));
     liquidComputeShader.SetFloat("friction", friction);
+    liquidComputeShader.SetFloat("flowMultiplier", flowMultiplier);
   }
 
   private void Start() {

@@ -29,6 +29,7 @@ float atmoPressure;
 float maxGravityVel;
 float maxPressureVel;
 float friction;
+float flowMultiplier;
 
 float dt;
 
@@ -39,7 +40,7 @@ uint  fullSize;     // Full size of the buffer on each side
 
 void neighbourIndices(uint3 id, out uint3 idxL, out uint3 idxR, out uint3 idxB, out uint3 idxT, out uint3 idxD, out uint3 idxU) {
   uint3 xyzm1 = uint3(clampm1(id.x), clampm1(id.y), clampm1(id.z)); 
-  uint3 xyzp1 = uint3(clampp1(id.x, fullSize-1), clampp1(id.y, fullSize-1), clampp1(id.y, fullSize-1));
+  uint3 xyzp1 = uint3(clampp1(id.x, fullSize-1), clampp1(id.y, fullSize-1), clampp1(id.z, fullSize-1));
   idxL = uint3(xyzm1.x, id.y, id.z); idxR = uint3(xyzp1.x, id.y, id.z);
   idxB = uint3(id.x, xyzm1.y, id.z); idxT = uint3(id.x, xyzp1.y, id.z);
   idxD = uint3(id.x, id.y, xyzm1.z); idxU = uint3(id.x, id.y, xyzp1.z);
@@ -359,7 +360,7 @@ void CSCalculateFlowsKernel(uint3 id : SV_DispatchThreadID) {
 
   float4 node = nodeData[id.xyz];
   float liquidVol = nodeLiquidVolume(node);
-  if (isOutOfBounds(id) || nodeType(node) == SOLID_NODE_TYPE || liquidVol == 0 || nodeSettled(node) == SETTLED_NODE) {
+  if (isOutOfBounds(id) || nodeType(node) == SOLID_NODE_TYPE || liquidVol == 0 || nodeSettled(node) == SETTLED_NODE || liquidVol < LIQUID_EPSILON) {
     flows[flowsIdx] = result;
     return;
   }
@@ -381,19 +382,80 @@ void CSCalculateFlowsKernel(uint3 id : SV_DispatchThreadID) {
 
   float3 u = vel[id.xyz].xyz;
 
-  // Calculate the absolute cross-section flows
   float unitArea = unitsPerNode * unitsPerNode;
+  float unitVolume = unitArea * unitsPerNode;
+
+  // Calculate the absolute cross-section flows
   float3 absCSFlowLBD = abs(min(float3(0,0,0),u) * unitArea);
   float3 absCSFlowRTU = abs(max(float3(0,0,0),u) * unitArea);
 
-  float unitVolume = unitArea * unitsPerNode;
+
+  // NEW CODE STARTS HERE **************
+  float3 flowToLBD = clamp(dt * unitVolume * absCSFlowLBD * flowMultiplier, float3(0,0,0), float3(liquidVol,liquidVol,liquidVol));
+  float3 flowToRTU = clamp(dt * unitVolume * absCSFlowRTU * flowMultiplier, float3(0,0,0), float3(liquidVol,liquidVol,liquidVol));
+  float remainingVolume = liquidVol;
+  
+  // Downward flow
+  if (remainingVolume > LIQUID_EPSILON && liquidVolB < unitVolume && typeB != SOLID_NODE_TYPE) {
+    flowToLBD.y = min(flowToLBD.y, min(unitVolume-liquidVolB, remainingVolume));
+    flowToLBD.y = min(max(0.5*(remainingVolume+liquidVolB), 0.0), flowToLBD.y); // Without this line the liquid will compress
+    remainingVolume -= flowToLBD.y;
+    result.flowB = flowToLBD.y;
+  }
+  
+  // Leftward flow
+  if (remainingVolume > LIQUID_EPSILON && typeL != SOLID_NODE_TYPE && (typeL == EMPTY_NODE_TYPE && liquidVolL < unitVolume)) {
+    flowToLBD.x = min(flowToLBD.x, min(unitVolume-liquidVolL, remainingVolume));
+    flowToLBD.x = min(max(0.5*(remainingVolume-liquidVolL), 0.0), flowToLBD.x);
+    remainingVolume -= flowToLBD.x;
+    result.flowL = flowToLBD.x;
+  }
+  // Rightward flow
+  if (remainingVolume > LIQUID_EPSILON && typeR != SOLID_NODE_TYPE && (typeR == EMPTY_NODE_TYPE && liquidVolR < unitVolume)) {
+    flowToRTU.x = min(flowToRTU.x, min(unitVolume-liquidVolR, remainingVolume));
+    flowToRTU.x = min(max(0.5*(remainingVolume-liquidVolR), 0.0), flowToRTU.x);
+    remainingVolume -= flowToRTU.x;
+    result.flowR = flowToRTU.x;
+  }
+  // Backward flow
+  if (remainingVolume > LIQUID_EPSILON && typeD != SOLID_NODE_TYPE && (typeD == EMPTY_NODE_TYPE && liquidVolD < unitVolume)) {
+    flowToLBD.z = min(flowToLBD.z, min(unitVolume-liquidVolD, remainingVolume));
+    flowToLBD.z = min(max(0.5*(remainingVolume-liquidVolD), 0.0), flowToLBD.z);
+    remainingVolume -= flowToLBD.z;
+    result.flowD = flowToLBD.z;
+  }
+
+  // Forward flow
+  if (remainingVolume > LIQUID_EPSILON && typeU != SOLID_NODE_TYPE && (typeU == EMPTY_NODE_TYPE && liquidVolU < unitVolume)) {
+    flowToRTU.z = min(flowToRTU.z, min(unitVolume-liquidVolU, remainingVolume));
+    flowToRTU.z = min(max(0.5*(remainingVolume-liquidVolU), 0.0), flowToRTU.z);
+    remainingVolume -= flowToRTU.z;
+    result.flowU = flowToRTU.z;
+  }
+
+  /*  
+  // Upward flow
+  if (remainingVolume > LIQUID_EPSILON && typeT != SOLID_NODE_TYPE && liquidVolT < liquidVol) {
+    flowToRTU.y = min(flowToRTU.y, min(unitVolume-liquidVolT, remainingVolume));
+    flowToRTU.y = min(max(0.5*(remainingVolume-liquidVolT), 0.0), flowToRTU.y);
+    remainingVolume -= flowToRTU.y;
+    result.flowT = flowToRTU.y;
+  }
+  */
+
+  flows[flowsIdx] = result;
+
+  // NEW CODE ENDS HERE *****************
+
+/*
+  
 
   float3 origFlowToLBD = clamp(dt * unitVolume * absCSFlowLBD, float3(0,0,0), float3(liquidVol,liquidVol,liquidVol));
   float3 origFlowToRTU = clamp(dt * unitVolume * absCSFlowRTU, float3(0,0,0), float3(liquidVol,liquidVol,liquidVol));
+  origFlowToRTU.y = clamp((liquidVol-liquidVolT) * (absCSFlowRTU.y) * dt, 0, liquidVol); // Yup, this is a hack, without it the liquid will not settle evenly / will disperse into the air.
+
   float3 flowToLBD = origFlowToLBD;
   float3 flowToRTU = origFlowToRTU;
-
-  flowToRTU.y = clamp((liquidVol-liquidVolT) * (absCSFlowRTU.y) * dt, 0, liquidVol); // Yup, this is a hack, without it the liquid will not settle evenly / will disperse into the air.
 
   float3 maskLBD = float3(1,1,1); float3 maskRTU = float3(1,0,1);
   float flowDiversionsLeft = 5.0;
@@ -471,6 +533,7 @@ void CSCalculateFlowsKernel(uint3 id : SV_DispatchThreadID) {
   result.flowU = min(max(0.5*(liquidVol-liquidVolU),0), min(liquidVol*(flowToRTU.z/totalFlow), origFlowToRTU.z));
 
   flows[flowsIdx] = result;
+  */
 }
 
 //RWStructuredBuffer<NodeFlowInfo> flows;
