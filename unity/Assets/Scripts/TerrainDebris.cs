@@ -43,13 +43,13 @@ public class TerrainDebris {
     //sleepListener = gameObj.GetComponent<GameEventListener>() ?? gameObj.AddComponent<GameEventListener>();
     //sleepListener.unityEvent = sleepListener.unityEvent ?? new UnityEvent<GameObject>();
     //sleepListener.unityEvent.AddListener(onDebrisSleep);
-    //sleepListener.gameEvent = Resources.Load<GameEvent>("Events/DebrisSleepEvent");
+    //sleepListener.gameEvent = Resources.Load<GameEvent>(GameEvent.DEBRIS_SLEEP_EVENT);
 
     felloffListener = gameObj.GetComponent<GameEventListener>();
     if (felloffListener == null) { felloffListener =  gameObj.AddComponent<GameEventListener>(); }
     felloffListener.unityEvent = felloffListener.unityEvent ?? new UnityEvent<GameObject>();
     felloffListener.unityEvent.AddListener(onDebrisFellOff);
-    felloffListener.gameEvent = Resources.Load<GameEvent>("Events/DebrisFellOffTerrainEvent");
+    felloffListener.gameEvent = Resources.Load<GameEvent>(GameEvent.DEBRIS_FELL_OFF_EVENT);
 
     collisionMonitor = gameObj.GetComponent<DebrisCollisionMonitor>();
     if (collisionMonitor == null) { collisionMonitor = gameObj.AddComponent<DebrisCollisionMonitor>(); }

@@ -11,6 +11,19 @@
 #define SETTLED_NODE 1
 #define UNSETTLED_NODE 0
 
+#define ISOVAL_CUTOFF 0.5
+
+struct NodeFlowInfo {
+  float flowL; float flowR;
+  float flowB; float flowT;
+  float flowD; float flowU;
+};
+
+struct LiquidNodeUpdate {
+  float terrainIsoVal;
+  float liquidVolume;
+};
+
 float4 buildNode(int type, float liquidVol, int settled) {
   float4 node = float4(0,0,0,0);
   node[NODE_TYPE_IDX]    = type;

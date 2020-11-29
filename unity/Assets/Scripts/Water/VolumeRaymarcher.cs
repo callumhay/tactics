@@ -1,31 +1,40 @@
 ﻿using System;
-using System.Collections.Generic;
 using UnityEngine;
 
 public class VolumeRaymarcher : MonoBehaviour {
-  public Vector3 volumeUnitSize = new Vector3(20,20,20);
-
-  private static int defaultJitterTexSize = 256;
+  private static readonly int JITTER_TEX_SIZE = 256;
   public Texture2D jitterTexture;
 
-  // Assigned in Start()
+  // Assigned in Awake/Start
   private int volResolution;
   private Vector3 resBorder;
   private Vector3Int resBorderFrontInt;
   private Vector3Int resBorderBackInt;
   private MeshFilter meshFilter;
   private MeshRenderer meshRenderer;
-
-  private Vector3 halfUnitSize() { return 0.5f*volumeUnitSize; }
+  private TerrainGrid terrainGrid;
 
   public Vector3Int getBorderFront() { return resBorderFrontInt; }
   public Vector3Int getBorderBack()  { return resBorderBackInt;  }
   public int getFullResSize() { return volResolution; }
 
-  void Awake() {
+  private Vector3 getVolumeUnitSize() {
+    Debug.Assert(terrainGrid != null);
+    return new Vector3(terrainGrid.xSize, terrainGrid.ySize, terrainGrid.zSize)*TerrainColumn.size;
+  }
+
+  public void initResolutionInfo() {
+    if (terrainGrid != null) { return; }
+    // Find the terrain grid component, this must exist and be initialized before this function is called!
+    terrainGrid = GetComponent<TerrainGrid>();
+    if (!terrainGrid) {
+      Debug.LogError("Could not find TerrainGrid component on GameObject!");
+      return;
+    }
+
     // Calculate the resolution of the 3D texture for rendering into the slices
-    var numNodesVec = TerrainGrid.nodesPerUnit * volumeUnitSize - 
-      new Vector3(volumeUnitSize.x/TerrainColumn.size-1, volumeUnitSize.y/TerrainColumn.size-1, volumeUnitSize.z/TerrainColumn.size-1);
+    var numNodesVec = new Vector3(terrainGrid.numNodesX(), terrainGrid.numNodesY(), terrainGrid.numNodesZ());
+
     // Calculate the maximum resolution (there must be at least one voxel per node on each axis 
     // plus 2 voxels for a border of 1 voxel on either side)
     var maxRes = Mathf.CeilToInt(Math.Max(numNodesVec.x, Math.Max(numNodesVec.y, numNodesVec.z)));
@@ -44,6 +53,9 @@ public class VolumeRaymarcher : MonoBehaviour {
   }
 
   void Start() {
+    initResolutionInfo();
+    var volumeUnitSize = getVolumeUnitSize();
+
     meshFilter = GetComponent<MeshFilter>();
     if (!meshFilter) { meshFilter = gameObject.AddComponent<MeshFilter>(); }
     meshRenderer = GetComponent<MeshRenderer>();
@@ -51,7 +63,7 @@ public class VolumeRaymarcher : MonoBehaviour {
     meshRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
     meshRenderer.allowOcclusionWhenDynamic = false;
     meshRenderer.motionVectorGenerationMode = MotionVectorGenerationMode.ForceNoMotion;
-    if (!jitterTexture) { jitterTexture = TextureHelper.buildJitterTexture2D(defaultJitterTexSize, true); }
+    if (!jitterTexture) { jitterTexture = TextureHelper.buildJitterTexture2D(JITTER_TEX_SIZE, true); }
 
     // Set the raycasting material
     if (meshRenderer.sharedMaterial == null) {
@@ -75,17 +87,9 @@ public class VolumeRaymarcher : MonoBehaviour {
     meshFilter.mesh = mesh;
   }
 
-  //void Update() {
-    //meshRenderer.material.SetTexture("nodeTex", volRenderTex);
+  //void OnDrawGizmos() {
+  //  Gizmos.DrawWireCube(halfUnitSize(), volumeUnitSize);
   //}
-
-  //void OnDestroy() {
-  //  volRenderTex?.Release();
-  //}
-
-  void OnDrawGizmosSelected() {
-    Gizmos.DrawWireCube(halfUnitSize(), volumeUnitSize);
-  }
 
   public void updateVolumeData(RenderTexture rt) {
     meshRenderer.material.SetTexture("nodeTex", rt);

@@ -12,13 +12,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 98d9b1dd3dee9476ba6c0f6586489315, type: 3}
   m_Name: TGTWSettings
   m_EditorClassIdentifier: 
-  brushSize: 1
+  brushSize: 1.72
   matPaintIntensity: 0.25
   paintType: 2
-  paintMode: 1
+  paintMode: 0
   brushType: 1
   gridSnaping: 1
   showGridOverlay: 1
   groundUpOnly: 0
-  setLevelValue: 15
+  setLevelValue: 5
   paintMaterial: {fileID: 0}

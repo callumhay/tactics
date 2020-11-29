@@ -1,6 +1,6 @@
 ﻿// Lookup a flattened index from a 3D index given the constant size/resolution for each axis
 uint index(uint x, uint y, uint z, uint size) {
-	return x + y * size + z * size * size;
+	return (x * size * size) + (y * size) + z;
 }
 
 uint clampm1(uint c) {

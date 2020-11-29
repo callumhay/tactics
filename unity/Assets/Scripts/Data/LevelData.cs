@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+﻿using System.Collections.Generic;
+using UnityEngine;
 
 [PreferBinarySerialization]
 [CreateAssetMenu(fileName="New Level", menuName="Tactics/Level")]
@@ -16,6 +17,7 @@ public class LevelData : ScriptableObject {
   private void OnValidate() {
     var terrainGrid = FindObjectOfType<TerrainGrid>();
     if (terrainGrid != null) {
+      if (nodes == null) { nodes = new TerrainGridNode[terrainGrid.numNodes()]; }
       terrainGrid.OnValidate();
     }
   }
@@ -36,6 +38,27 @@ public class LevelData : ScriptableObject {
     return (size*TerrainGrid.nodesPerUnit*TerrainColumn.size) + 1 - size;
   }
 
+  public void updateFromNodes(in TerrainGridNode[,,] allNodes, in IEnumerable<TerrainGridNode> nodeUpdates) {
+    // If this LevelData hasn't been initialized then we use all the nodes to initialze it and we're done
+    if (nodes == null || nodes.Length != allNodes.Length) { 
+      nodes = new TerrainGridNode[allNodes.Length]; 
+      setNodesFrom3DArray(allNodes); 
+    }
+    else {
+      // ... otherwise we just update the given nodeUpdates
+      int numNodesY = allNodes.GetLength(1);
+      int numNodesZ = allNodes.GetLength(2);
+      
+      foreach (var nodeUpdate in nodeUpdates) {
+        var gridIdx = nodeUpdate.gridIndex;
+        var flatIdx = LevelData.node3DIndexToFlatIndex(gridIdx.x, gridIdx.y, gridIdx.z, numNodesY, numNodesZ);
+        var node = nodes[flatIdx];
+        node.isoVal = nodeUpdate.isoVal;
+        node.materials = nodeUpdate.materials;
+      }
+    }
+  }
+
   public void setNodesFrom3DArray(in TerrainGridNode[,,] _nodes) {
     if (_nodes == null) { return; }
 
@@ -43,7 +66,7 @@ public class LevelData : ScriptableObject {
     var numNodesY = _nodes.GetLength(1);
     var numNodesZ = _nodes.GetLength(2);
 
-    if (numNodesX*numNodesY*numNodesZ != nodes.GetLength(0)) { return; }
+    if (numNodesX*numNodesY*numNodesZ != nodes.Length) { return; }
 
     nodes = new TerrainGridNode[numNodesX*numNodesY*numNodesZ];
     for (int x = 0; x < numNodesX; x++) {
@@ -56,18 +79,11 @@ public class LevelData : ScriptableObject {
   }
 
   public TerrainGridNode[,,] getNodesAs3DArray(int numNodesX, int numNodesY, int numNodesZ) {
-    if (nodes == null) { return null; }
+    if (nodes == null || numNodesX*numNodesY*numNodesZ != nodes.Length) { return null; }
 
     var maxX = numNodesX;
     var maxY = numNodesY;
     var maxZ = numNodesZ;
-
-    if (numNodesX*numNodesY*numNodesZ != nodes.GetLength(0)) {
-      return null;
-    //  maxX = Math.Min(maxX, sizeToNumNodes(oldXSize));
-    //  maxY = Math.Min(maxY, sizeToNumNodes(oldYSize));
-    //  maxZ = Math.Min(maxZ, sizeToNumNodes(oldZSize));
-    }
 
     TerrainGridNode[,,] result = null;
     if (nodes != null) {

@@ -19,8 +19,8 @@ public class DebrisCollisionMonitor : MonoBehaviour {
   private bool fellOffEventFired = false;
 
   private void Start() {
-    onSleepEvent   = Resources.Load<GameEvent>("Events/DebrisSleepEvent");
-    onFellOffEvent = Resources.Load<GameEvent>("Events/DebrisFellOffTerrainEvent");
+    onSleepEvent   = Resources.Load<GameEvent>(GameEvent.DEBRIS_SLEEP_EVENT);
+    onFellOffEvent = Resources.Load<GameEvent>(GameEvent.DEBRIS_FELL_OFF_EVENT);
   }
 
   private void FixedUpdate() {

@@ -3,6 +3,9 @@ using UnityEngine;
 
 [CreateAssetMenu(menuName = "Tactics/Events/Basic Game Event", order = 2)]
 public class GameEvent : ScriptableObject {
+  public static readonly string DEBRIS_FELL_OFF_EVENT = "Events/DebrisFellOffTerrainEvent";
+  public static readonly string DEBRIS_SLEEP_EVENT    = "Events/DebrisSleepEvent";
+
   private List<GameEventListener> subscribers = new List<GameEventListener>();
 
   public void FireEvent() {

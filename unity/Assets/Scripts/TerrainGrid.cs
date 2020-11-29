@@ -19,8 +19,9 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
   private Dictionary<Vector3Int, TerrainColumn> terrainColumns;
   private Bedrock bedrock;
 
-  // CPU <-> GPU buffer - this allows us to tell the water simulation about the terrain and vice-versa
-  //ComputeBuffer nodeComputeBuf;
+  // Liquid computation component
+  private WaterCompute waterCompute;
+  
 
   public int numNodesX() { return LevelData.sizeToNumNodes(xSize); }
   public int numNodesY() { return LevelData.sizeToNumNodes(ySize); }
@@ -272,6 +273,10 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
       var newNodes = levelData.getNodesAs3DArray(numNodesX(), numNodesY(), numNodesZ());
       if (newNodes != null) { nodes = newNodes; }
       generateNodes();
+      // If the level data was empty then populate it with properly generated nodes
+      //if (updateLevelData) {
+      //  levelData.setNodesFrom3DArray(nodes);
+      //}
     }
   }
   public void OnBeforeSerialize() {
@@ -283,22 +288,29 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     loadLevelDataNodes();
   }
 
-  public void Awake() {}
-
-  void Start() {
+  public void Awake() {
     if (Application.IsPlaying(gameObject)) {
       gameObject.SetActive(false);
       var onSleepEventListener = gameObject.AddComponent<GameEventListener>();
       onSleepEventListener.unityEvent = new UnityEvent<GameObject>();
       onSleepEventListener.unityEvent.AddListener(mergeDebrisIntoTerrain);
-      onSleepEventListener.gameEvent = Resources.Load<GameEvent>("Events/DebrisSleepEvent");
+      onSleepEventListener.gameEvent = Resources.Load<GameEvent>(GameEvent.DEBRIS_SLEEP_EVENT);
       gameObject.SetActive(true);
 
       // Important! We must instantiate the level data in game mode or else
       // we'll overwrite the asset while the game plays
       levelData = Instantiate<LevelData>(levelData);
       loadLevelDataNodes();
-      
+    }
+  }
+
+  void Start() {
+    // Setup liquid computation/simulation stuff
+    waterCompute = GetComponent<WaterCompute>();
+    if (waterCompute == null) { Debug.LogError("Could not find WaterCompute in GameObject."); }
+    else { waterCompute.initAll(); }
+
+    if (Application.IsPlaying(gameObject)) {
       // Build all the assets for the game that aren't stored in the level data
       buildBedrock();
       buildTerrainColumns();
@@ -396,7 +408,6 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
       }
     }
     nodes = tempNodes;
-    // TODO: Update the compute buffer HERE.
   }
 
   private void buildTerrainColumns() {
@@ -434,29 +445,6 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     bedrock.gameObj.transform.SetAsFirstSibling();
   }
 
-  /*
-  struct ComputeBufferNode {
-    float terrainIsoVal;
-    float waterVolume;
-  };
-  private int nodeIdxToCBIdx(in Vector3Int nodeIdx) {
-    return node3DIndexToFlatIndex(nodeIdx.x, nodeIdx.y, nodeIdx.z, nodeIdx.x * numNodesY() * numNodesZ() + nodeIdx.y * numNodesZ() + nodeIdx.z;
-  }
-  private void updateComputeBuffer(in IEnumerable<TerrainGridNode> nodes) {
-    var totalNodes = numNodes();
-    ComputeBuffer nodeComputeBuf = new ComputeBuffer(totalNodes, 2*sizeof(float), ComputeBufferType.Default, ComputeBufferMode.SubUpdates);
-    var nodeCBArr = nodeComputeBuf.BeginWrite<ComputeBufferNode>(0, totalNodes);
-    foreach (var node in nodes) {
-      var currCBNode = nodeCBArr[nodeIdxToCBIdx(node.gridIndex)];
-      currCBNode.terrainIsoVal = node.isoVal;
-      currCBNode.waterVolume   = node.liquidVol;
-    }
-    nodeComputeBuf.EndWrite<ComputeBufferNode>(totalNodes);
-  }
-  */
-
-
-
   private void regenerateMeshes(/*bool updateComputeBuffer = false*/) {
     foreach (var terrainCol in terrainColumns.Values) {
       terrainCol.regenerateMesh();
@@ -469,6 +457,7 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     foreach (var terrainCol in terrainCols) {
       terrainCol.regenerateMesh();
     }
+    waterCompute.updateNodes(nodes);
     // TODO: Update the compute buffer HERE for every node in the given set of TerrainColumns.
   }
   private HashSet<TerrainColumn> regenerateMeshes(in IEnumerable<TerrainGridNode> nodes) {
@@ -592,7 +581,6 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
   public HashSet<TerrainColumn> terrainPhysicsCleanup() {
     return terrainPhysicsCleanup(new List<TerrainColumn>());
   }
-
   public HashSet<TerrainColumn> terrainPhysicsCleanup(in IEnumerable<TerrainColumn> affectedTCs) {
 
     TerrainNodeTraverser.updateGroundedNodes(this, affectedTCs);
@@ -717,18 +705,18 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     var nodeSize = unitsPerNode();
     var maxNodeVol = unitVolumePerNode();
     var nodeSizeVec = new Vector3(nodeSize,nodeSize,nodeSize);
-    var halfNodeSizeVec = nodeSizeVec / 2;
+    var nodeWorldTranslation = (-nodeSizeVec / 2) + transform.position;
     for (int x = 0; x < nodes.GetLength(0); x++) {
       for (int y = 0; y < nodes.GetLength(1); y++) {
         for (int z = 0; z < nodes.GetLength(2); z++) {
           var node = nodes[x,y,z];
           if (node.isLiquid()) { 
-            Vector3[] verts;
+            Vector3[] verts; 
             int[] tris;
             int startVertNum = vertices.Count;
             MeshHelper.BuildCubeData(nodeSizeVec, out tris, out verts);
             for (int i = 0; i < verts.Length; i++) {
-              vertices.Add(verts[i] + node.position - halfNodeSizeVec);
+              vertices.Add(verts[i] + node.position + nodeWorldTranslation);
             }
             for (int i = 0; i < tris.Length; i++) {
               indices.Add(startVertNum + tris[i]);
@@ -742,7 +730,7 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     if (vertices.Count > 0) {
       if (waterGizmoMesh == null) { waterGizmoMesh = new Mesh(); }
       else { waterGizmoMesh.Clear(); }
-
+      waterGizmoMesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
       waterGizmoMesh.SetVertices(vertices);
       //waterGizmoMesh.SetColors(colours);
       waterGizmoMesh.SetIndices(indices, MeshTopology.Triangles, 0);
@@ -792,16 +780,10 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     return finalYNodeIdx*unitsPerNode();
   }
 
-  public void updateNodesInEditor(in IEnumerable<TerrainGridNode> nodes) {
+  public void updateNodesInEditor(in IEnumerable<TerrainGridNode> updateNodes) {
     if (Application.IsPlaying(gameObject)) { return; }
-    var affectedTCs = regenerateMeshes(nodes);
-    foreach (var node in nodes) {
-      var gridIdx = node.gridIndex;
-      var flatIdx = LevelData.node3DIndexToFlatIndex(gridIdx.x, gridIdx.y, gridIdx.z, numNodesY(), numNodesZ());
-      var ldNode = levelData.nodes[flatIdx];
-      ldNode.isoVal = node.isoVal;
-      ldNode.materials = node.materials;
-    }
+    var affectedTCs = regenerateMeshes(updateNodes);
+    levelData.updateFromNodes(nodes, updateNodes);
     EditorUtility.SetDirty(levelData);
     AssetDatabase.SaveAssets();
     /*
