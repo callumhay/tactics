@@ -330,12 +330,12 @@ void CSProjectKernel(uint3 id : SV_DispatchThreadID) {
   // NOTE: This requires augmentation if the boundaries have velocity!
   float3 vMaskPos = float3(1,1,1);
   float3 vMaskNeg = float3(1,1,1);
-  if (nodeType(nL) == SOLID_NODE_TYPE || nodeSettled(nL) == SETTLED_NODE) { pL = pC; vMaskNeg[0] = 0; }
-  if (nodeType(nR) == SOLID_NODE_TYPE || nodeSettled(nR) == SETTLED_NODE) { pR = pC; vMaskPos[0] = 0; }
-  if (nodeType(nB) == SOLID_NODE_TYPE || nodeSettled(nB) == SETTLED_NODE) { pB = pC; vMaskNeg[1] = 0; }
-  if (nodeType(nT) == SOLID_NODE_TYPE || nodeSettled(nT) == SETTLED_NODE) { pT = pC; vMaskPos[1] = 0; }
-  if (nodeType(nD) == SOLID_NODE_TYPE || nodeSettled(nD) == SETTLED_NODE) { pD = pC; vMaskNeg[2] = 0; }
-  if (nodeType(nU) == SOLID_NODE_TYPE || nodeSettled(nU) == SETTLED_NODE) { pU = pC; vMaskPos[2] = 0; }
+  if (nodeType(nL) == SOLID_NODE_TYPE /*|| nodeSettled(nL) == SETTLED_NODE*/) { pL = pC; vMaskNeg[0] = 0; }
+  if (nodeType(nR) == SOLID_NODE_TYPE /*|| nodeSettled(nR) == SETTLED_NODE*/) { pR = pC; vMaskPos[0] = 0; }
+  if (nodeType(nB) == SOLID_NODE_TYPE /*|| nodeSettled(nB) == SETTLED_NODE*/) { pB = pC; vMaskNeg[1] = 0; }
+  if (nodeType(nT) == SOLID_NODE_TYPE /*|| nodeSettled(nT) == SETTLED_NODE*/) { pT = pC; vMaskPos[1] = 0; }
+  if (nodeType(nD) == SOLID_NODE_TYPE /*|| nodeSettled(nD) == SETTLED_NODE*/) { pD = pC; vMaskNeg[2] = 0; }
+  if (nodeType(nU) == SOLID_NODE_TYPE /*|| nodeSettled(nU) == SETTLED_NODE*/) { pU = pC; vMaskPos[2] = 0; }
 
   float sizeSum = internalSize.x+internalSize.y+internalSize.z;
   float4 result = float4(u[0] - (pR-pL) / sizeSum, u[1] - (pT-pB) / sizeSum, u[2] - (pU-pD) / sizeSum, 0);
@@ -360,7 +360,7 @@ void CSCalculateFlowsKernel(uint3 id : SV_DispatchThreadID) {
 
   float4 node = nodeData[id.xyz];
   float liquidVol = nodeLiquidVolume(node);
-  if (isOutOfBounds(id) || nodeType(node) == SOLID_NODE_TYPE || liquidVol == 0 || nodeSettled(node) == SETTLED_NODE || liquidVol < LIQUID_EPSILON) {
+  if (isOutOfBounds(id) || nodeType(node) == SOLID_NODE_TYPE /*|| nodeSettled(node) == SETTLED_NODE*/ || liquidVol < LIQUID_EPSILON) {
     flows[flowsIdx] = result;
     return;
   }
@@ -555,6 +555,7 @@ void CSSumFlowsKernel(uint3 id : SV_DispatchThreadID) {
 
 // Adjust the node liquid volumes based on the final tabulation of all flows *****************
 //RWTexture3D<float> summedFlows;
+//RWStructuredBuffer<NodeFlowInfo> flows;
 //RWTexture3D<float4> nodeData; // Output of CSAdjustNodeFlowsKernel
 [numthreads(8,8,8)]
 void CSAdjustNodeFlowsKernel(uint3 id : SV_DispatchThreadID) {
@@ -564,32 +565,31 @@ void CSAdjustNodeFlowsKernel(uint3 id : SV_DispatchThreadID) {
     return; 
   }
 
-  uint3 idxL, idxR, idxB, idxT, idxD, idxU;
-  neighbourIndices(id, idxL, idxR, idxB, idxT, idxD, idxU);
-
+  //uint3 idxL, idxR, idxB, idxT, idxD, idxU;
+  //neighbourIndices(id, idxL, idxR, idxB, idxT, idxD, idxU);
+  //NodeFlowInfo fC = flows[idToIndex(id)];
+  //NodeFlowInfo fL = flows[idToIndex(idxL)]; NodeFlowInfo fR = flows[idToIndex(idxR)];
+  //NodeFlowInfo fB = flows[idToIndex(idxB)]; NodeFlowInfo fT = flows[idToIndex(idxT)];
+  //NodeFlowInfo fD = flows[idToIndex(idxD)]; NodeFlowInfo fU = flows[idToIndex(idxU)];
+  
   float sC = summedFlows[id.xyz];
-  float sL = summedFlows[idxL]; float sR = summedFlows[idxR];
-  float sB = summedFlows[idxB]; float sT = summedFlows[idxT];
-  float sD = summedFlows[idxD]; float sU = summedFlows[idxU];
-
   float liquidVol = nodeLiquidVolume(node);
   float finalVol = (liquidVol + sC);
   node[NODE_VOL_IDX] = abs(finalVol) < LIQUID_EPSILON ? 0 : finalVol;
-
-/*
-  // Unsettle the node if there are any changes in the neighbour cell flows
-  if (abs(sL) >= LIQUID_EPSILON || abs(sR) >= LIQUID_EPSILON || 
-      abs(sB) >= LIQUID_EPSILON || abs(sT) >= LIQUID_EPSILON ||
-      abs(sD) >= LIQUID_EPSILON || abs(sU) >= LIQUID_EPSILON) {
+  /*
+  if (abs(finalVol) < LIQUID_EPSILON) {
+    node[NODE_VOL_IDX] = 0;
     node[NODE_SETTLED_IDX] = UNSETTLED_NODE;
   }
   else {
-    // If there's no change in the flow of the node then it becomes settled
-    float unitVolume = unitsPerNode * unitsPerNode * unitsPerNode;
-    node[NODE_SETTLED_IDX] = (abs(sC) < LIQUID_EPSILON && abs(liquidVol) < LIQUID_EPSILON) ||
-      abs(liquidVol-unitVolume) < LIQUID_EPSILON ? SETTLED_NODE : UNSETTLED_NODE;
+    node[NODE_VOL_IDX] = finalVol;
+    node[NODE_SETTLED_IDX] = (abs(sC) >= LIQUID_EPSILON || fC.flowR >= LIQUID_EPSILON || fC.flowL >= LIQUID_EPSILON || fC.flowT >= LIQUID_EPSILON || fC.flowB >= LIQUID_EPSILON || fC.flowU >= LIQUID_EPSILON || fC.flowD >= LIQUID_EPSILON ||
+      fL.flowR >= LIQUID_EPSILON || fR.flowL >= LIQUID_EPSILON || 
+      fB.flowT >= LIQUID_EPSILON || fT.flowB >= LIQUID_EPSILON || fD.flowU >= LIQUID_EPSILON || 
+      fU.flowD >= LIQUID_EPSILON) ? UNSETTLED_NODE : SETTLED_NODE;
   }
   */
+  
   nodeData[id.xyz] = node;
 }
 

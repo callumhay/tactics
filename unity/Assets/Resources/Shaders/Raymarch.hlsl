@@ -10,7 +10,7 @@
 
 void DoSample(Texture3D volumeTex, SamplerState volumeSampler, float3 uvw, float weight, float opacityMultiplier, float nodeVolume, inout float4 colour) {
   float4 node = SAMPLE_TEXTURE3D(volumeTex, volumeSampler, uvw);
-  float nodeVolPercentage = nodeLiquidVolume(node)/nodeVolume;
+  float nodeVolPercentage = smoothstep(0, nodeVolume, 10*nodeLiquidVolume(node));
   float4 c = (nodeSettled(node) ==  SETTLED_NODE) ? float4(0,1,0,nodeVolPercentage) : float4(1, 1, 1, nodeVolPercentage);//((nodeType(node) == SOLID_NODE_TYPE) ? float4(1,0,0,1) : float4(1, 1, 1, nodeVolPercentage));
   float4 sampleColour = weight * c; //float4(nodeVol, nodeVol, nodeVol, nodeVol);
   

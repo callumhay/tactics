@@ -275,6 +275,7 @@ public class WaterCompute : MonoBehaviour {
 
   private void adjustNodesFromFlows() {
     // NOTE: summed flows == temp3DFloatRT
+    liquidComputeShader.SetBuffer(adjustVolFromFlowsKernelId, "flows", flowsBuffer);
     liquidComputeShader.SetTexture(adjustVolFromFlowsKernelId, "summedFlows", temp3DFloatRT);
     liquidComputeShader.SetTexture(adjustVolFromFlowsKernelId, "nodeData", nodeDataRT);
     liquidComputeShader.Dispatch(adjustVolFromFlowsKernelId, numThreadGroups, numThreadGroups, numThreadGroups);
