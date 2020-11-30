@@ -396,9 +396,12 @@ void CSCalculateFlowsKernel(uint3 id : SV_DispatchThreadID) {
   float remainingVolume = liquidVol;
   
   // Downward flow
-  if (remainingVolume > LIQUID_EPSILON && liquidVolB < unitVolume && typeB != SOLID_NODE_TYPE) {
+  if (remainingVolume > LIQUID_EPSILON && typeB != SOLID_NODE_TYPE && (typeB == EMPTY_NODE_TYPE && liquidVolB < unitVolume)) {
     flowToLBD.y = min(flowToLBD.y, min(unitVolume-liquidVolB, remainingVolume));
-    flowToLBD.y = min(max(0.5*(remainingVolume+liquidVolB), 0.0), flowToLBD.y); // Without this line the liquid will compress
+    float totalLiquid = remainingVolume + liquidVolB;
+    float calcLiquidB = max(0, (totalLiquid <= unitVolume ? unitVolume : (totalLiquid < 2*unitVolume ? (2*unitVolume+totalLiquid) / unitVolume : 0.5*totalLiquid)) - liquidVolB);
+
+    flowToLBD.y = min(calcLiquidB, flowToLBD.y);//min(0.5*(remainingVolume+liquidVolB), flowToLBD.y); // Without this line the liquid will compress
     remainingVolume -= flowToLBD.y;
     result.flowB = flowToLBD.y;
   }
@@ -424,7 +427,6 @@ void CSCalculateFlowsKernel(uint3 id : SV_DispatchThreadID) {
     remainingVolume -= flowToLBD.z;
     result.flowD = flowToLBD.z;
   }
-
   // Forward flow
   if (remainingVolume > LIQUID_EPSILON && typeU != SOLID_NODE_TYPE && (typeU == EMPTY_NODE_TYPE && liquidVolU < unitVolume)) {
     flowToRTU.z = min(flowToRTU.z, min(unitVolume-liquidVolU, remainingVolume));
@@ -434,9 +436,14 @@ void CSCalculateFlowsKernel(uint3 id : SV_DispatchThreadID) {
   }
  
   // Upward flow
-  if (remainingVolume > LIQUID_EPSILON && typeT != SOLID_NODE_TYPE && liquidVolT < liquidVol) {
+  // NOTE: Make sure we check that it's liquidVolT < unitVolume (AND NOT liquidVolT < liquidVol) here or else the liquid will compress
+  if (remainingVolume > LIQUID_EPSILON && typeT != SOLID_NODE_TYPE && (typeT == EMPTY_NODE_TYPE && liquidVolT < unitVolume)) { 
     flowToRTU.y = min(flowToRTU.y, min(unitVolume-liquidVolT, remainingVolume));
-    flowToRTU.y = min(max(0.5*(remainingVolume+liquidVolT), 0.0), flowToRTU.y);
+
+    float totalLiquid = remainingVolume + liquidVolT;
+    float calcLiquidT = max(0, remainingVolume - (totalLiquid <= unitVolume ? unitVolume : (totalLiquid < 2*unitVolume ? (2*unitVolume+totalLiquid) / unitVolume : 0.5*totalLiquid)));
+
+    flowToRTU.y = min(calcLiquidT, flowToRTU.y);//min(0.5*(remainingVolume+liquidVolT), flowToRTU.y);
     remainingVolume -= flowToRTU.y;
     result.flowT = flowToRTU.y;
   }

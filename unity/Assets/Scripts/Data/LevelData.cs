@@ -11,9 +11,6 @@ public class LevelData : ScriptableObject {
   public int xSize = 10, ySize = 10, zSize = 10; // Size in units (not nodes!) of the level
   public TerrainGridNode[] nodes;
 
-  private void OnEnable() {
-  }
-
   private void OnValidate() {
     var terrainGrid = FindObjectOfType<TerrainGrid>();
     if (terrainGrid != null) {

@@ -14,9 +14,12 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
   public int ySize { get { return levelData.ySize; } }
   public int zSize { get { return levelData.zSize; } }
 
-  // Live data used in the editor and in-game
+  // Live data used in the editor and in-game, note that we serialize these fields so that we can undo/redo edit operations
+  [SerializeField]
   private TerrainGridNode[,,] nodes; // Does not include the outer "ghost" nodes with zeroed isovalues
+  [SerializeField]
   private Dictionary<Vector3Int, TerrainColumn> terrainColumns;
+
   private Bedrock bedrock;
 
   // Liquid computation component
@@ -305,12 +308,13 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
   }
 
   void Start() {
-    // Setup liquid computation/simulation stuff
-    waterCompute = GetComponent<WaterCompute>();
-    if (waterCompute == null) { Debug.LogError("Could not find WaterCompute in GameObject."); }
-    else { waterCompute.initAll(); }
 
     if (Application.IsPlaying(gameObject)) {
+      // Setup liquid computation/simulation stuff
+      waterCompute = GetComponent<WaterCompute>();
+      if (waterCompute == null) { Debug.LogError("Could not find WaterCompute in GameObject."); }
+      else { waterCompute.initAll(); }
+
       // Build all the assets for the game that aren't stored in the level data
       buildBedrock();
       buildTerrainColumns();
@@ -457,8 +461,7 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     foreach (var terrainCol in terrainCols) {
       terrainCol.regenerateMesh();
     }
-    waterCompute.updateNodes(nodes);
-    // TODO: Update the compute buffer HERE for every node in the given set of TerrainColumns.
+    waterCompute?.updateNodes(nodes); // Update the compute buffer HERE for every node in the given set of TerrainColumns.
   }
   private HashSet<TerrainColumn> regenerateMeshes(in IEnumerable<TerrainGridNode> nodes) {
     var terrainCols = findAllAffectedTCs(nodes);
@@ -782,9 +785,17 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
 
   public void updateNodesInEditor(in IEnumerable<TerrainGridNode> updateNodes) {
     if (Application.IsPlaying(gameObject)) { return; }
+
+    //Undo.RegisterFullObjectHierarchyUndo(this, "Terrain Grid Nodes Edited");
+    //Undo.FlushUndoRecordObjects();
     var affectedTCs = regenerateMeshes(updateNodes);
+    
+
     levelData.updateFromNodes(nodes, updateNodes);
     EditorUtility.SetDirty(levelData);
+    
+    //EditorUtility.SetDirty(this);
+
     AssetDatabase.SaveAssets();
     /*
     // This is incredibly slow... not sure why.

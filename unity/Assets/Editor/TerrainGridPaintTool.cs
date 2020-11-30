@@ -59,26 +59,23 @@ public class TerrainGridTool : EditorTool {
         List<TerrainGridNode> nodes = settingsWindow.getAffectedNodesAtPoint(lastEditPt, terrainGrid);
         if (nodes == null) { return; }
 
-        EditorGUI.BeginChangeCheck();
         if (mouseDownButton == 0 || mouseDownButton == 1) {
           GUI.changed = true;
         }
-        if (EditorGUI.EndChangeCheck()) {
-          //Undo.RegisterCompleteObjectUndo(terrainGrid, "Terrain Grid Nodes Edited"); // Not working... no idea why.
-          
-          switch (mouseDownButton) {
-            case 0: // Left Click: Paint
-              settingsWindow.paintNodes(nodes, terrainGrid);
-              break;
-            case 1: // Right Click: Erase
-              settingsWindow.eraseNodes(nodes, terrainGrid);
-              break;
-            case 2: // Middle Click
-              break;
-            default: // Ignore
-              break;
-          }
+
+        switch (mouseDownButton) {
+          case 0: // Left Click: Paint
+            settingsWindow.paintNodes(nodes, terrainGrid);
+            break;
+          case 1: // Right Click: Erase
+            settingsWindow.eraseNodes(nodes, terrainGrid);
+            break;
+          case 2: // Middle Click
+            break;
+          default: // Ignore
+            break;
         }
+
       }
       else {
         mouseDownButton = NO_MOUSE_BUTTON;
