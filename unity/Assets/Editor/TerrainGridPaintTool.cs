@@ -20,8 +20,6 @@ public class TerrainGridTool : EditorTool {
     }
   }
 
-  private static int NO_MOUSE_BUTTON = -1;
-  private int mouseDownButton = NO_MOUSE_BUTTON;
   private bool editPtActive = false;
   private Vector3 lastEditPt = new Vector3();
   private TerrainGridToolWindow settingsWindow;
@@ -41,44 +39,42 @@ public class TerrainGridTool : EditorTool {
     // Take control of the mouse so that we can properly paint - this MUST be called first!
     HandleUtility.AddDefaultControl(GUIUtility.GetControlID(FocusType.Passive));
 
+    switch (settingsWindow.editorType) {
+      case TGTWSettings.EditorType.FreePaintEditor: {
+
+        break;
+      }
+      case TGTWSettings.EditorType.ColumnEditor: {
+        break;
+      }
+      default: break;
+    }
+
     var e = Event.current;
     var wsRay = HandleUtility.GUIPointToWorldRay(e.mousePosition);
     var yOffset = settingsWindow.paintMode == TGTWSettings.PaintMode.Floating ? 0.5f*settingsWindow.brushSize : 0;
-    if (terrainGrid.intersectEditorRay(wsRay, yOffset, out lastEditPt)) {
-      editPtActive = true;
-    }
-    else {
-      editPtActive = false;
-    }
+
+    if (terrainGrid.intersectEditorRay(wsRay, yOffset, out lastEditPt)) { editPtActive = true; }
+    else { editPtActive = false; }
 
     if (editPtActive) {
-      if (e.type == EventType.MouseDown && e.modifiers == EventModifiers.None) {
-        mouseDownButton = e.button;
-        
+
+      if (e.type == EventType.MouseDown && (e.modifiers == EventModifiers.None || e.modifiers == EventModifiers.Control)) {
         // Grab all the nodes inside the brush
         List<TerrainGridNode> nodes = settingsWindow.getAffectedNodesAtPoint(lastEditPt, terrainGrid);
         if (nodes == null) { return; }
 
-        if (mouseDownButton == 0 || mouseDownButton == 1) {
+        if (e.button == 1 || (e.button == 0 && e.modifiers == EventModifiers.Control)) {
+          Undo.RecordObject(terrainGrid.levelData, "Erased Terrain Nodes");
+          settingsWindow.eraseNodes(nodes, terrainGrid);
           GUI.changed = true;
         }
-
-        switch (mouseDownButton) {
-          case 0: // Left Click: Paint
-            settingsWindow.paintNodes(nodes, terrainGrid);
-            break;
-          case 1: // Right Click: Erase
-            settingsWindow.eraseNodes(nodes, terrainGrid);
-            break;
-          case 2: // Middle Click
-            break;
-          default: // Ignore
-            break;
+        else if (e.button == 0) {
+          Undo.RecordObject(terrainGrid.levelData, "Painted Terrain Nodes");
+          settingsWindow.paintNodes(nodes, terrainGrid);
+          GUI.changed = true;
         }
-
-      }
-      else {
-        mouseDownButton = NO_MOUSE_BUTTON;
+        
       }
     }
   }
@@ -93,7 +89,6 @@ public class TerrainGridTool : EditorTool {
   }
 
   void onSceneGUI(SceneView sceneView) {
-    
     var terrainGrid = target as TerrainGrid;
     if (!InternalEditorUtility.isApplicationActive || !terrainGrid || !settingsWindow) { return; }
 

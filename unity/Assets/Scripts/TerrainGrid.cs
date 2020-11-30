@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEditor;
+using UnityEditor.SceneManagement;
 using UnityEngine.Events;
 
 [ExecuteAlways]
@@ -15,16 +16,13 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
   public int zSize { get { return levelData.zSize; } }
 
   // Live data used in the editor and in-game, note that we serialize these fields so that we can undo/redo edit operations
-  [SerializeField]
   private TerrainGridNode[,,] nodes; // Does not include the outer "ghost" nodes with zeroed isovalues
-  [SerializeField]
   private Dictionary<Vector3Int, TerrainColumn> terrainColumns;
 
   private Bedrock bedrock;
 
   // Liquid computation component
   private WaterCompute waterCompute;
-  
 
   public int numNodesX() { return LevelData.sizeToNumNodes(xSize); }
   public int numNodesY() { return LevelData.sizeToNumNodes(ySize); }
@@ -46,7 +44,7 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
       Mathf.Clamp(unitsToNodeIndex(z), 0, nodes.GetLength(2)-1));
     }
   public Vector3Int unitsToNodeIndexVec3(in Vector3 unitPos) { return unitsToNodeIndexVec3(unitPos.x, unitPos.y, unitPos.z);}
-  public float nodeIndexToUnits(int idx) { return idx*unitsPerNode(); }
+  public static float nodeIndexToUnits(int idx) { return idx*unitsPerNode(); }
   public Vector3 nodeIndexToUnitsVec3(int x, int y, int z) { return nodeIndexToUnitsVec3(new Vector3Int(x,y,z)); }
   public Vector3 nodeIndexToUnitsVec3(in Vector3Int nodeIdx) {
     var nodeUnitsVec = unitsPerNodeVec3(); return Vector3.Scale(nodeIdx, nodeUnitsVec); 
@@ -273,19 +271,14 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     if (levelData != null) {
       // When we load the nodes we are only loading their index and isovalue, the rest of
       // the information inside each node needs to be rebuilt (this is done in generateNodes).
-      var newNodes = levelData.getNodesAs3DArray(numNodesX(), numNodesY(), numNodesZ());
-      if (newNodes != null) { nodes = newNodes; }
+      nodes = levelData.getNodesAs3DArray();
       generateNodes();
-      // If the level data was empty then populate it with properly generated nodes
-      //if (updateLevelData) {
-      //  levelData.setNodesFrom3DArray(nodes);
-      //}
     }
   }
   public void OnBeforeSerialize() {
-    if (levelData != null) {
-      levelData.setNodesFrom3DArray(nodes);
-    }
+    //if (levelData != null) {
+    //  levelData.setNodesFrom3DArray(nodes);
+    //}
   }
   public void OnAfterDeserialize() {
     loadLevelDataNodes();
@@ -389,14 +382,14 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
           TerrainGridNode currNode = null;
           if (nodes != null && x < nodes.GetLength(0) && y < nodes.GetLength(1) && z < nodes.GetLength(2)) {
             currNode = nodes[x,y,z];
-            if (currNode == null) { currNode = new TerrainGridNode(unitPos, gridIdx, 0.0f); }
+            if (currNode == null) { currNode = new TerrainGridNode(unitPos, gridIdx); }
             else {
               currNode.position = unitPos;
               currNode.gridIndex = gridIdx;
             }
           }
           else {
-            currNode = new TerrainGridNode(unitPos, gridIdx, 0.0f);
+            currNode = new TerrainGridNode(unitPos, gridIdx);
           }
 
           // A grid node can have multiple associated TerrainColumns since they share nodes at the edges
@@ -605,8 +598,7 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
 
   private void updateNodesInGameOrEditor(in IEnumerable<TerrainGridNode> changedNodes) {
     #if UNITY_EDITOR
-    var appIsPlaying = Application.IsPlaying(gameObject);
-    if (!appIsPlaying) {
+    if (!Application.IsPlaying(gameObject)) {
       updateNodesInEditor(changedNodes);
       updateWaterGizmoMesh();
     }
@@ -785,32 +777,10 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
 
   public void updateNodesInEditor(in IEnumerable<TerrainGridNode> updateNodes) {
     if (Application.IsPlaying(gameObject)) { return; }
-
-    //Undo.RegisterFullObjectHierarchyUndo(this, "Terrain Grid Nodes Edited");
-    //Undo.FlushUndoRecordObjects();
     var affectedTCs = regenerateMeshes(updateNodes);
-    
-
     levelData.updateFromNodes(nodes, updateNodes);
     EditorUtility.SetDirty(levelData);
-    
-    //EditorUtility.SetDirty(this);
-
-    AssetDatabase.SaveAssets();
-    /*
-    // This is incredibly slow... not sure why.
-    // Update the serialized version of the terrain
-    var serializedObj = new SerializedObject(levelData);
-    serializedObj.Update();
-    var nodesProp = serializedObj.FindProperty("nodes");
-    foreach (var node in changedNodes) {
-      var gridIdx = node.gridIndex;
-      var flatIdx = LevelData.node3DIndexToFlatIndex(gridIdx.x, gridIdx.y, gridIdx.z, numNodesY(), numNodesZ());
-      var isoValProp = nodesProp.GetArrayElementAtIndex(flatIdx).FindPropertyRelative("isoVal");
-      isoValProp.floatValue = node.isoVal;
-    }
-    serializedObj.ApplyModifiedProperties();
-    */
+    EditorSceneManager.MarkSceneDirty(gameObject.scene);
   }
 
   public void fillCoreMaterial() {
@@ -834,7 +804,8 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
                 continue; 
               }
               else { 
-                currNode.materials.Clear(); 
+                currNode.materials.Clear();
+                // TODO: Change this based on the outer material!!
                 currNode.materials.Add(new NodeMaterialContrib(Resources.Load<Material>("Materials/DefaultCoreMat"), 1f));
               }
             }

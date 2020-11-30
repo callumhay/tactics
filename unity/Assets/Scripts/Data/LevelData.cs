@@ -14,7 +14,6 @@ public class LevelData : ScriptableObject {
   private void OnValidate() {
     var terrainGrid = FindObjectOfType<TerrainGrid>();
     if (terrainGrid != null) {
-      if (nodes == null) { nodes = new TerrainGridNode[terrainGrid.numNodes()]; }
       terrainGrid.OnValidate();
     }
   }
@@ -75,20 +74,20 @@ public class LevelData : ScriptableObject {
     }
   }
 
-  public TerrainGridNode[,,] getNodesAs3DArray(int numNodesX, int numNodesY, int numNodesZ) {
-    if (nodes == null || numNodesX*numNodesY*numNodesZ != nodes.Length) { return null; }
+  public TerrainGridNode[,,] getNodesAs3DArray() {
+    if (nodes == null) { return null; }
 
-    var maxX = numNodesX;
-    var maxY = numNodesY;
-    var maxZ = numNodesZ;
+    var numNodesX = sizeToNumNodes(xSize);
+    var numNodesY = sizeToNumNodes(ySize);
+    var numNodesZ = sizeToNumNodes(zSize);
 
     TerrainGridNode[,,] result = null;
     if (nodes != null) {
       result = new TerrainGridNode[numNodesX,numNodesY,numNodesZ];
-      for (int x = 0; x < maxX; x++) {
-        for (int y = 0; y < maxY; y++) {
-          for (int z = 0; z < maxZ; z++) {
-            var idx = node3DIndexToFlatIndex(x,y,z,maxY,maxZ);
+      for (int x = 0; x < numNodesX; x++) {
+        for (int y = 0; y < numNodesY; y++) {
+          for (int z = 0; z < numNodesZ; z++) {
+            var idx = node3DIndexToFlatIndex(x,y,z,numNodesY,numNodesZ);
             if (idx < nodes.GetLength(0)) { result[x,y,z] = nodes[idx]; }
           }
         }

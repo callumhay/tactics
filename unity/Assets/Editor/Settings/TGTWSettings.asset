@@ -17,8 +17,8 @@ MonoBehaviour:
   paintType: 0
   paintMode: 1
   brushType: 1
-  gridSnaping: 1
-  showGridOverlay: 1
+  gridSnaping: 0
+  showGridOverlay: 0
   groundUpOnly: 0
-  setLevelValue: 10
+  setLevelValue: 4
   paintMaterial: {fileID: 0}
