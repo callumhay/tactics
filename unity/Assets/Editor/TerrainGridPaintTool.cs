@@ -25,6 +25,13 @@ public class TerrainGridTool : EditorTool {
   // Free Paint Editing Mode Variables
   private bool editPtActive = false;
   private Vector3 lastEditPt = new Vector3();
+
+  // Column Editing Mode Variables
+  private Vector2 mouseDragStartPos;
+  private Vector2 mouseDragCurrentPos;
+  private bool isDragging = false;
+  //private Dictionary<int, float> selectedColumnCtrlIds = new Dictionary<int, float>();
+  private static readonly Color dragRectColour = new Color(0, 1.0f, 1.0f, 0.5f);
   
   private void OnEnable() {
     //EditorTools.activeToolChanged += activeToolChanged;
@@ -39,6 +46,10 @@ public class TerrainGridTool : EditorTool {
     settingsWindow = EditorWindow.GetWindow<TerrainGridToolWindow>();
   }
 
+  private bool noMouseEventModifiers(in Event e) {
+    return e.modifiers == EventModifiers.None || e.modifiers == EventModifiers.Control;
+  }
+
   public override void OnToolGUI(EditorWindow window) {
 
     var terrainGrid = target as TerrainGrid;
@@ -51,15 +62,16 @@ public class TerrainGridTool : EditorTool {
     HandleUtility.AddDefaultControl(GUIUtility.GetControlID(FocusType.Passive));
     
     var e = Event.current;
-
+  
     switch (settingsWindow.editorType) {
       case TGTWSettings.EditorType.FreePaintEditor: {
+        //HandleUtility.AddDefaultControl(GUIUtility.GetControlID(FocusType.Passive));
 
         var wsRay = HandleUtility.GUIPointToWorldRay(e.mousePosition);
         var yOffset = settingsWindow.paintMode == TGTWSettings.PaintMode.Floating ? 0.5f*settingsWindow.brushSize : 0;
         if (terrainGrid.intersectEditorRay(wsRay, yOffset, out lastEditPt)) {
           editPtActive = true;
-          if (e.type == EventType.MouseDown && (e.modifiers == EventModifiers.None || e.modifiers == EventModifiers.Control)) {
+          if (e.type == EventType.MouseDown && noMouseEventModifiers(e)) {
             // Grab all the nodes inside the brush
             List<TerrainGridNode> nodes = settingsWindow.getAffectedNodesAtPoint(lastEditPt, terrainGrid);
             if (nodes == null) { return; }
@@ -84,6 +96,22 @@ public class TerrainGridTool : EditorTool {
       }
 
       case TGTWSettings.EditorType.ColumnEditor: {
+         
+        if (noMouseEventModifiers(e)) {
+          if (e.type == EventType.MouseDrag) {
+            mouseDragCurrentPos = Event.current.mousePosition;
+            if (!isDragging) {
+              // Start dragging
+              isDragging = true;
+              mouseDragStartPos = mouseDragCurrentPos;
+            }
+          }
+          else if (e.type == EventType.MouseUp) {
+            // Stop dragging
+            isDragging = false;
+          }
+        }
+
         break;
       }
 
@@ -119,7 +147,19 @@ public class TerrainGridTool : EditorTool {
       }
 
       case TGTWSettings.EditorType.ColumnEditor: {
-        if (Event.current.type == EventType.Repaint) { drawTerrainColumnScaleHandles(terrainGrid); } 
+        drawTerrainColumnHeightEditHandles(terrainGrid);
+
+        if (isDragging) {
+          
+          /*
+          Handles.BeginGUI();
+          EditorGUI.DrawRect(new Rect(mouseDragStartPos.x, mouseDragStartPos.y, 
+            mouseDragCurrentPos.x - mouseDragStartPos.x, 
+            mouseDragCurrentPos.y - mouseDragStartPos.y), dragRectColour);
+          Handles.EndGUI();
+          */
+        }
+        
         break;
       }
 
@@ -135,7 +175,7 @@ public class TerrainGridTool : EditorTool {
     if (redraw) { sceneView.Repaint(); }
   }
 
-  private void drawTerrainColumnScaleHandles(in TerrainGrid terrainGrid) {
+  private void drawTerrainColumnHeightEditHandles(in TerrainGrid terrainGrid) {
     Handles.color = Color.green;
     Handles.zTest = UnityEngine.Rendering.CompareFunction.LessEqual;
 
@@ -147,12 +187,23 @@ public class TerrainGridTool : EditorTool {
       for (int z = 0; z < terrainGrid.zSize; z++) {
         var zPos = z*TerrainColumn.size + 0.5f*TerrainColumn.size;
         var yPos = terrainGrid.fastSampleHeight(x,z) + halfUnitsPerNode;
-        var handlePos = new Vector3(xPos, yPos, zPos) + translation;
-        var name = "ColScaleHandle(" + xPos + "," + zPos + ")";
+        var baseHandlePos = new Vector3(xPos, yPos, zPos) + translation;
+        var name = "TCHeightHandle(" + xPos + "," + zPos + ")";
         var controlId = EditorGUIUtility.GetControlID(name.GetHashCode(), FocusType.Keyboard);
-        var size = 0.05f*HandleUtility.GetHandleSize(handlePos);
-        Handles.DotHandleCap(controlId, handlePos, rot, size, EventType.Repaint);
-
+        
+        EditorGUI.BeginChangeCheck();
+        var newPos = Handles.Slider(baseHandlePos, Vector3.up, 0.1f, Handles.CubeHandleCap, TerrainGrid.unitsPerNode());
+        if (EditorGUI.EndChangeCheck()) {
+          Event.current.Use();
+          Undo.RecordObject(terrainGrid.levelData, "Edited Terrain Column Height");
+          terrainGrid.changeTerrainColumnHeight(x, z, newPos.y);
+        }
+        //var size = 0.05f*HandleUtility.GetHandleSize(baseHandlePos);
+        //var clicked = Handles.Button(baseHandlePos, rot, size, size, Handles.DotHandleCap);
+        //if (clicked) { 
+        //  selectedColumnCtrlIds.Clear();
+        //  selectedColumnCtrlIds.Add(controlId, yPos);
+        //}
       }
     }
   }

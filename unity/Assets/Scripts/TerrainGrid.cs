@@ -818,6 +818,45 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     }
   }
 
+  public void changeTerrainColumnHeight(int xIdx, int zIdx, float newYPos) {
+    var colIdx = new Vector3Int(xIdx, 0, zIdx);
+
+    TerrainColumn terrainCol;
+    if (!terrainColumns.TryGetValue(colIdx, out terrainCol)) { return; }
+
+    // Get the current height of the column
+    float currHeight = fastSampleHeight(xIdx, zIdx);
+    float heightChange = (newYPos - currHeight);
+    //Debug.Log("Prev scale: " + currScale + ", New scale: " + newScale);
+    if (Mathf.Abs(heightChange) >= halfUnitsPerNode()) {
+      // Adjust the height of the terrain column based on the given change
+      float newHeight = Mathf.Clamp(currHeight + heightChange, 0, TerrainColumn.size*ySize);
+      //Debug.Log("Prev Height: " + currHeight + ", New Height: " + newHeight);
+
+      var yStartNodeIdx = unitsToNodeIndex(currHeight);
+      var yEndNodeIdx = unitsToNodeIndex(newHeight);
+      float isoVal = 1f;
+      if (heightChange < 0) {
+        // Removing nodes... swap values
+        int temp = yStartNodeIdx;
+        yStartNodeIdx = yEndNodeIdx;
+        yEndNodeIdx = temp;
+        isoVal = -1f;
+      }
+
+      var editNodes = new List<TerrainGridNode>();
+      var idxRange = getIndexRangeForTerrainColumn(terrainCol);
+      for (int x = idxRange.xStartIdx; x <= idxRange.xEndIdx; x++) {
+        for (int y = yStartNodeIdx; y <= yEndNodeIdx; y++) {
+          for (int z = idxRange.zStartIdx; z <= idxRange.zEndIdx; z++) {
+            editNodes.Add(getNode(new Vector3Int(x,y,z)));
+          }
+        }
+      }
+      addIsoValuesToNodes(isoVal, editNodes);
+    }
+  }
+
   // Intersect the given ray with this grid, returns the closest relevant edit point
   // when there's a collision (on return true). Returns false on no collision.
   public bool intersectEditorRay(in Ray ray, float yOffset, out Vector3 editPt) {
