@@ -20,9 +20,20 @@ public class TerrainGridTool : EditorTool {
     }
   }
 
+  private TerrainGridToolWindow settingsWindow;
+
+  // Free Paint Editing Mode Variables
   private bool editPtActive = false;
   private Vector3 lastEditPt = new Vector3();
-  private TerrainGridToolWindow settingsWindow;
+  
+  private void OnEnable() {
+    //EditorTools.activeToolChanged += activeToolChanged;
+    SceneView.duringSceneGui += this.onSceneGUI;
+  }
+  private void OnDisable() {
+    //EditorTools.activeToolChanged -= activeToolChanged;
+    SceneView.duringSceneGui -= this.onSceneGUI;
+  }
 
   void Awake() {
     settingsWindow = EditorWindow.GetWindow<TerrainGridToolWindow>();
@@ -38,54 +49,47 @@ public class TerrainGridTool : EditorTool {
 
     // Take control of the mouse so that we can properly paint - this MUST be called first!
     HandleUtility.AddDefaultControl(GUIUtility.GetControlID(FocusType.Passive));
+    
+    var e = Event.current;
 
     switch (settingsWindow.editorType) {
       case TGTWSettings.EditorType.FreePaintEditor: {
 
+        var wsRay = HandleUtility.GUIPointToWorldRay(e.mousePosition);
+        var yOffset = settingsWindow.paintMode == TGTWSettings.PaintMode.Floating ? 0.5f*settingsWindow.brushSize : 0;
+        if (terrainGrid.intersectEditorRay(wsRay, yOffset, out lastEditPt)) {
+          editPtActive = true;
+          if (e.type == EventType.MouseDown && (e.modifiers == EventModifiers.None || e.modifiers == EventModifiers.Control)) {
+            // Grab all the nodes inside the brush
+            List<TerrainGridNode> nodes = settingsWindow.getAffectedNodesAtPoint(lastEditPt, terrainGrid);
+            if (nodes == null) { return; }
+
+            if (e.button == 1 || (e.button == 0 && e.modifiers == EventModifiers.Control)) {
+              Undo.RecordObject(terrainGrid.levelData, "Erased Terrain Nodes");
+              settingsWindow.eraseNodes(nodes, terrainGrid);
+              GUI.changed = true;
+            }
+            else if (e.button == 0) {
+              Undo.RecordObject(terrainGrid.levelData, "Painted Terrain Nodes");
+              settingsWindow.paintNodes(nodes, terrainGrid);
+              GUI.changed = true;
+            }
+          }
+        }
+        else {
+          editPtActive = false;
+        }
+
         break;
       }
+
       case TGTWSettings.EditorType.ColumnEditor: {
         break;
       }
-      default: break;
+
+      default:
+        break;
     }
-
-    var e = Event.current;
-    var wsRay = HandleUtility.GUIPointToWorldRay(e.mousePosition);
-    var yOffset = settingsWindow.paintMode == TGTWSettings.PaintMode.Floating ? 0.5f*settingsWindow.brushSize : 0;
-
-    if (terrainGrid.intersectEditorRay(wsRay, yOffset, out lastEditPt)) { editPtActive = true; }
-    else { editPtActive = false; }
-
-    if (editPtActive) {
-
-      if (e.type == EventType.MouseDown && (e.modifiers == EventModifiers.None || e.modifiers == EventModifiers.Control)) {
-        // Grab all the nodes inside the brush
-        List<TerrainGridNode> nodes = settingsWindow.getAffectedNodesAtPoint(lastEditPt, terrainGrid);
-        if (nodes == null) { return; }
-
-        if (e.button == 1 || (e.button == 0 && e.modifiers == EventModifiers.Control)) {
-          Undo.RecordObject(terrainGrid.levelData, "Erased Terrain Nodes");
-          settingsWindow.eraseNodes(nodes, terrainGrid);
-          GUI.changed = true;
-        }
-        else if (e.button == 0) {
-          Undo.RecordObject(terrainGrid.levelData, "Painted Terrain Nodes");
-          settingsWindow.paintNodes(nodes, terrainGrid);
-          GUI.changed = true;
-        }
-        
-      }
-    }
-  }
-
-  private void OnEnable() {
-    //EditorTools.activeToolChanged += activeToolChanged;
-    SceneView.duringSceneGui += this.onSceneGUI;
-  }
-  private void OnDisable() {
-    //EditorTools.activeToolChanged -= activeToolChanged;
-    SceneView.duringSceneGui -= this.onSceneGUI;
   }
 
   void onSceneGUI(SceneView sceneView) {
@@ -94,44 +98,89 @@ public class TerrainGridTool : EditorTool {
 
     bool redraw = false;
     var rot = new Quaternion(0,0,0,1);
-    if (editPtActive) {
-      // Draw all the nodes that the tool is colliding with / affecting
-      List<TerrainGridNode> nodes = settingsWindow.getAffectedNodesAtPoint(lastEditPt, terrainGrid);
-      if (nodes != null) {
-        redraw = nodes.Count > 0;
-        foreach (var node in nodes) {
-          var currColour = node.editorUnselectedColour();
-          currColour.a = 0.5f;
-          Handles.color = currColour;
-          Handles.CubeHandleCap(GUIUtility.GetControlID(FocusType.Passive), node.position, rot, terrainGrid.halfUnitsPerNode(), EventType.Repaint);
-        }
-      }
-    }
-    if (settingsWindow.showGridOverlay) {
-      redraw = true;
-      Handles.color = new Color(0.4f, 0.4f, 1.0f, 0.25f);
-      Handles.zTest = UnityEngine.Rendering.CompareFunction.LessEqual;
-      
-      var faceColour = new Color(0.5f, 0.5f, 1.0f, 0.5f);
-      var outlineColour = new Color(1, 1, 1, 0.75f);
-      var halfUnitsPerNode = terrainGrid.halfUnitsPerNode();
-      for (int x = 0; x < terrainGrid.xSize; x++) {
-        var xPos = x*TerrainColumn.size;
-        for (int z = 0; z < terrainGrid.zSize; z++) {
-          if ((x+z) % 2 == 0) {
-            var zPos = z*TerrainColumn.size;
-            var yPos = terrainGrid.fastSampleHeight(x,z) + halfUnitsPerNode + 1e-4f;
-            var quadVerts = new Vector3[4];
-            quadVerts[0] = new Vector3(xPos, yPos, zPos);
-            quadVerts[1] = new Vector3(xPos+TerrainColumn.size, yPos, zPos);
-            quadVerts[2] = new Vector3(xPos+TerrainColumn.size, yPos, zPos+TerrainColumn.size);
-            quadVerts[3] = new Vector3(xPos, yPos, zPos+TerrainColumn.size);
-            Handles.DrawSolidRectangleWithOutline(quadVerts, faceColour, outlineColour);
+
+    switch (settingsWindow.editorType) {
+      case TGTWSettings.EditorType.FreePaintEditor: {
+        if (editPtActive && Event.current.type == EventType.Repaint) {
+          // Draw all the nodes that the tool is colliding with / affecting
+          List<TerrainGridNode> nodes = settingsWindow.getAffectedNodesAtPoint(lastEditPt, terrainGrid);
+          if (nodes != null) {
+            redraw = nodes.Count > 0;
+            var halfUnitsPerNode = TerrainGrid.halfUnitsPerNode();
+            foreach (var node in nodes) {
+              var currColour = node.editorUnselectedColour();
+              currColour.a = 0.5f;
+              Handles.color = currColour;
+              Handles.CubeHandleCap(GUIUtility.GetControlID(FocusType.Passive), node.position, rot, halfUnitsPerNode, EventType.Repaint);
+            }
           }
         }
+        break;
       }
+
+      case TGTWSettings.EditorType.ColumnEditor: {
+        if (Event.current.type == EventType.Repaint) { drawTerrainColumnScaleHandles(terrainGrid); } 
+        break;
+      }
+
+      default:
+        break;
+    }
+
+    if (settingsWindow.showGridOverlay) {
+      redraw = true;
+      drawTerrainGridOverlay(terrainGrid);
     }
 
     if (redraw) { sceneView.Repaint(); }
   }
+
+  private void drawTerrainColumnScaleHandles(in TerrainGrid terrainGrid) {
+    Handles.color = Color.green;
+    Handles.zTest = UnityEngine.Rendering.CompareFunction.LessEqual;
+
+    var translation = terrainGrid.transform.position;
+    var rot = new Quaternion(0,0,0,1);
+    var halfUnitsPerNode = TerrainGrid.halfUnitsPerNode();
+    for (int x = 0; x < terrainGrid.xSize; x++) {
+      var xPos = x*TerrainColumn.size + 0.5f*TerrainColumn.size;
+      for (int z = 0; z < terrainGrid.zSize; z++) {
+        var zPos = z*TerrainColumn.size + 0.5f*TerrainColumn.size;
+        var yPos = terrainGrid.fastSampleHeight(x,z) + halfUnitsPerNode;
+        var handlePos = new Vector3(xPos, yPos, zPos) + translation;
+        var name = "ColScaleHandle(" + xPos + "," + zPos + ")";
+        var controlId = EditorGUIUtility.GetControlID(name.GetHashCode(), FocusType.Keyboard);
+        var size = 0.05f*HandleUtility.GetHandleSize(handlePos);
+        Handles.DotHandleCap(controlId, handlePos, rot, size, EventType.Repaint);
+
+      }
+    }
+  }
+
+  private void drawTerrainGridOverlay(in TerrainGrid terrainGrid) {
+    Handles.color = new Color(0.4f, 0.4f, 1.0f, 0.25f);
+    Handles.zTest = UnityEngine.Rendering.CompareFunction.LessEqual;
+    
+    var faceColour = new Color(0.5f, 0.5f, 1.0f, 0.5f);
+    var outlineColour = new Color(1, 1, 1, 0.75f);
+    var halfUnitsPerNode = TerrainGrid.halfUnitsPerNode();
+
+    var translation = terrainGrid.transform.position;
+    for (int x = 0; x < terrainGrid.xSize; x++) {
+      var xPos = x*TerrainColumn.size;
+      for (int z = 0; z < terrainGrid.zSize; z++) {
+        if ((x+z) % 2 == 0) {
+          var zPos = z*TerrainColumn.size;
+          var yPos = terrainGrid.fastSampleHeight(x,z) + halfUnitsPerNode + 1e-4f;
+          var quadVerts = new Vector3[4];
+          quadVerts[0] = new Vector3(xPos, yPos, zPos) + translation;
+          quadVerts[1] = new Vector3(xPos+TerrainColumn.size, yPos, zPos) + translation;
+          quadVerts[2] = new Vector3(xPos+TerrainColumn.size, yPos, zPos+TerrainColumn.size) + translation;
+          quadVerts[3] = new Vector3(xPos, yPos, zPos+TerrainColumn.size) + translation;
+          Handles.DrawSolidRectangleWithOutline(quadVerts, faceColour, outlineColour);
+        }
+      }
+    }
+  }
+
 }

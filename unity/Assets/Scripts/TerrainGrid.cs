@@ -30,7 +30,7 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
   public int numNodes()  { return numNodesX()*numNodesY()*numNodesZ(); }
 
   public static float unitsPerNode() { return (((float)TerrainColumn.size) / ((float)TerrainGrid.nodesPerUnit-1)); }
-  public float halfUnitsPerNode() { return (0.5f * unitsPerNode()); }
+  public static float halfUnitsPerNode() { return (0.5f * unitsPerNode()); }
   public Vector3 unitsPerNodeVec3() { var u = unitsPerNode(); return new Vector3(u,u,u); }
   public Vector3 halfUnitsPerNodeVec3() { var v = unitsPerNodeVec3(); return 0.5f*v; }
 

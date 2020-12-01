@@ -42,6 +42,7 @@ public class TerrainGridToolWindow : EditorWindow {
     var serializedObj = new SerializedObject(settings);
     serializedObj.Update();
 
+    var showGridProp = serializedObj.FindProperty("showGridOverlay");
     var editorTypeProp = serializedObj.FindProperty("editorType");
     var editorTypeEnumVal = (TGTWSettings.EditorType)editorTypeProp.intValue;
     var prevFreePaintEditToggled = editorTypeEnumVal == TGTWSettings.EditorType.FreePaintEditor;
@@ -52,6 +53,7 @@ public class TerrainGridToolWindow : EditorWindow {
     var freePaintEditToggled = GUILayout.Toggle(prevFreePaintEditToggled, "Paint", "button", GUILayout.ExpandWidth(false));
     var columnEditToggled    = GUILayout.Toggle(prevColumnEditToggled, "Column Edit", "button", GUILayout.ExpandWidth(false));
     GUILayout.FlexibleSpace();
+    EditorGUILayout.PropertyField(showGridProp);
     EditorGUILayout.EndHorizontal();
     EditorGUILayout.Space();
 
@@ -63,10 +65,12 @@ public class TerrainGridToolWindow : EditorWindow {
     }
     editorTypeEnumVal = (TGTWSettings.EditorType)editorTypeProp.intValue;
 
+
     var setLevelValProp  = serializedObj.FindProperty("setLevelValue");
     var paintMatProp = serializedObj.FindProperty("paintMaterial");
 
     switch (editorTypeEnumVal) {
+      
       case TGTWSettings.EditorType.FreePaintEditor: {
         var paintTypeProp = serializedObj.FindProperty("paintType");
         var paintModeProp = serializedObj.FindProperty("paintMode");
@@ -74,7 +78,7 @@ public class TerrainGridToolWindow : EditorWindow {
         var brushSizeProp = serializedObj.FindProperty("brushSize");
         var matIntensityProp = serializedObj.FindProperty("matPaintIntensity");
         var gridSnapProp = serializedObj.FindProperty("gridSnaping");
-        var showGridProp = serializedObj.FindProperty("showGridOverlay");
+        
         var groundUpOnlyProp = serializedObj.FindProperty("groundUpOnly");
         
         EditorGUILayout.PropertyField(paintTypeProp);
@@ -82,8 +86,7 @@ public class TerrainGridToolWindow : EditorWindow {
         EditorGUILayout.PropertyField(brushTypeProp);
         EditorGUILayout.Slider(brushSizeProp, 0.25f, 5.0f,  "Brush Size");
         EditorGUILayout.PropertyField(gridSnapProp);
-        EditorGUILayout.PropertyField(showGridProp);
-
+        
         EditorGUILayout.Space();
         EditorGUILayout.PropertyField(groundUpOnlyProp);
         EditorGUILayout.Slider(setLevelValProp, 1.0f, terrainGrid.ySize*TerrainColumn.size, "Set Level", GUILayout.ExpandWidth(true));
@@ -93,11 +96,13 @@ public class TerrainGridToolWindow : EditorWindow {
         EditorGUILayout.PropertyField(paintMatProp);
         break;
       }
+
       case TGTWSettings.EditorType.ColumnEditor:
         EditorGUILayout.Slider(setLevelValProp, 1.0f, terrainGrid.ySize*TerrainColumn.size, "Set Level", GUILayout.ExpandWidth(true));
         EditorGUILayout.Space();
         EditorGUILayout.PropertyField(paintMatProp);
         break;
+
       default:
         break;
     }

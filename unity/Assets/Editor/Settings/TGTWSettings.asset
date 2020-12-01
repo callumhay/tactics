@@ -15,10 +15,10 @@ MonoBehaviour:
   brushSize: 1
   matPaintIntensity: 0.25
   paintType: 0
-  paintMode: 1
+  paintMode: 0
   brushType: 1
   gridSnaping: 0
   showGridOverlay: 0
   groundUpOnly: 0
-  setLevelValue: 4
+  setLevelValue: 1
   paintMaterial: {fileID: 0}
