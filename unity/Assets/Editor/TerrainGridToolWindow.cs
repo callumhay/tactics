@@ -14,6 +14,15 @@ public class TerrainGridToolWindow : EditorWindow {
     }
   }
 
+  public static int maxInset() { return (TerrainGrid.nodesPerUnit-1)/2 - 1; }
+  private void updateSettingsIntValue(string settingName, int value) {
+      var serializedObj = new SerializedObject(settings);
+      serializedObj.Update();
+      serializedObj.FindProperty(settingName).intValue = value;
+      serializedObj.ApplyModifiedProperties();
+      Repaint();
+  }
+
   public TGTWSettings.EditorType editorType { get { return settings.editorType; } }
   public TGTWSettings.PaintType paintType { get { return settings.paintType; } }
   public TGTWSettings.PaintMode paintMode { get { return settings.paintMode; } }
@@ -25,10 +34,27 @@ public class TerrainGridToolWindow : EditorWindow {
   public bool showGridOverlay { get { return settings.showGridOverlay; } }
   public bool groundUpOnly { get { return settings.groundUpOnly; } }
   public float setLevelValue { get { return settings.setLevelValue; } }
-  public int columnInsetXAmount { get { return settings.columnInsetXAmount; } }
-  public int columnInsetZAmount { get { return settings.columnInsetZAmount; } }
+  public int columnInsetXAmount { 
+    get { return settings.columnInsetXAmount; }
+    set { updateSettingsIntValue("columnInsetXAmount", value); }
+   }
+  public int columnInsetNegXAmount { 
+    get { return settings.columnInsetNegXAmount; } 
+    set { updateSettingsIntValue("columnInsetNegXAmount", value); }
+  }
+  public int columnInsetZAmount { 
+    get { return settings.columnInsetZAmount; } 
+    set { updateSettingsIntValue("columnInsetZAmount", value); }
+  }
+  public int columnInsetNegZAmount { 
+    get { return settings.columnInsetNegZAmount; } 
+    set { updateSettingsIntValue("columnInsetNegZAmount", value); }
+  }
+
   public bool showTerrainNodes { get { return settings.showTerrainNodes; } }
   public bool showEmptyNodes { get { return settings.showEmptyNodes; } }
+  public bool showSurfaceNodes { get { return settings.showSurfaceNodes; } }
+  public bool showAboveSurfaceNodes { get { return settings.showAboveSurfaceNodes; } }
 
   [MenuItem("Window/Terrain Grid Tool")]
   static void Open() {
@@ -108,9 +134,15 @@ public class TerrainGridToolWindow : EditorWindow {
 
       case TGTWSettings.EditorType.ColumnEditor: {
         var colInsetXAmtProp = serializedObj.FindProperty("columnInsetXAmount");
+        var colInsetNegXAmtProp = serializedObj.FindProperty("columnInsetNegXAmount");
         var colInsetZAmtProp = serializedObj.FindProperty("columnInsetZAmount");
-        EditorGUILayout.IntSlider(colInsetXAmtProp, -TerrainGrid.nodesPerUnit/2, TerrainGrid.nodesPerUnit/2, "Column Inset/Outset X", GUILayout.ExpandWidth(true));
-        EditorGUILayout.IntSlider(colInsetZAmtProp, -TerrainGrid.nodesPerUnit/2, TerrainGrid.nodesPerUnit/2, "Column Inset/Outset Z", GUILayout.ExpandWidth(true));
+        var colInsetNegZAmtProp = serializedObj.FindProperty("columnInsetNegZAmount");
+
+        int maxAllowableInset = maxInset();
+        EditorGUILayout.IntSlider(colInsetXAmtProp, 0, maxAllowableInset, "Column Inset/Outset +X", GUILayout.ExpandWidth(true));
+        EditorGUILayout.IntSlider(colInsetNegXAmtProp, 0, maxAllowableInset, "Column Inset/Outset -X", GUILayout.ExpandWidth(true));
+        EditorGUILayout.IntSlider(colInsetZAmtProp, 0, maxAllowableInset, "Column Inset/Outset +Z", GUILayout.ExpandWidth(true));
+        EditorGUILayout.IntSlider(colInsetNegZAmtProp, 0, maxAllowableInset, "Column Inset/Outset -Z", GUILayout.ExpandWidth(true));
         EditorGUILayout.Slider(setLevelValProp, 1.0f, terrainGrid.ySize*TerrainColumn.size, "Set Level", GUILayout.ExpandWidth(true));
         EditorGUILayout.Space();
         EditorGUILayout.PropertyField(paintMatProp);
@@ -120,8 +152,16 @@ public class TerrainGridToolWindow : EditorWindow {
       case TGTWSettings.EditorType.NodeEditor: {
         var showTerrainNodesProp = serializedObj.FindProperty("showTerrainNodes");
         var showEmptyNodesProp = serializedObj.FindProperty("showEmptyNodes");
-        EditorGUILayout.PropertyField(showTerrainNodesProp);
-        EditorGUILayout.PropertyField(showEmptyNodesProp);
+        var showSurfaceNodesProp = serializedObj.FindProperty("showSurfaceNodes");
+        var showAboveSurfaceNodesProp = serializedObj.FindProperty("showAboveSurfaceNodes");
+
+        EditorGUILayout.PropertyField(showTerrainNodesProp, GUILayout.ExpandWidth(true));
+        EditorGUILayout.PropertyField(showEmptyNodesProp, GUILayout.ExpandWidth(true));
+        EditorGUILayout.PropertyField(showSurfaceNodesProp, GUILayout.ExpandWidth(true));
+        EditorGUILayout.PropertyField(showAboveSurfaceNodesProp, GUILayout.ExpandWidth(true));
+        EditorGUILayout.Slider(setLevelValProp, 1.0f, terrainGrid.ySize*TerrainColumn.size, "Set Level", GUILayout.ExpandWidth(true));
+        EditorGUILayout.Space();
+        EditorGUILayout.PropertyField(paintMatProp);
 
         break;
       } 

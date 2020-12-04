@@ -20,8 +20,14 @@ public class TGTWSettings : ScriptableObject {
   public bool groundUpOnly = false;
   public float setLevelValue = 1.0f;
   public Material paintMaterial;
+  
   public int columnInsetXAmount = 0;
+  public int columnInsetNegXAmount = 0;
   public int columnInsetZAmount = 0;
-  public bool showTerrainNodes = false;
+  public int columnInsetNegZAmount = 0;
+
+  public bool showTerrainNodes = true;
   public bool showEmptyNodes = true;
+  public bool showSurfaceNodes = true;
+  public bool showAboveSurfaceNodes = true;
 }

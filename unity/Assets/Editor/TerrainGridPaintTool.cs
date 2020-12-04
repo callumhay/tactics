@@ -186,11 +186,15 @@ public class TerrainGridTool : EditorTool {
 
     var translation = terrainGrid.transform.position;
     var rot = new Quaternion(0,0,0,1);
+    var maxInset = TerrainGridToolWindow.maxInset();
     var halfUnitsPerNode = TerrainGrid.halfUnitsPerNode();
     var insetFaceColour = new Color(1.0f, 1.0f, 0.0f, 0.5f);
     var insetOutlineColour = new Color(1f,1f,1f,0.5f);
     var insetXUnits = settingsWindow.columnInsetXAmount*TerrainGrid.unitsPerNode();
+    var insetNegXUnits = settingsWindow.columnInsetNegXAmount*TerrainGrid.unitsPerNode();
     var insetZUnits = settingsWindow.columnInsetZAmount*TerrainGrid.unitsPerNode();
+    var insetNegZUnits = settingsWindow.columnInsetNegZAmount*TerrainGrid.unitsPerNode();
+    var insetHandleSnap = TerrainGrid.unitsPerNode()*1.5f;
 
     for (int x = 0; x < terrainGrid.xSize; x++) {
       float insetXPos = x*TerrainColumn.size;
@@ -199,7 +203,7 @@ public class TerrainGridTool : EditorTool {
 
         var zPos = z*TerrainColumn.size + 0.5f*TerrainColumn.size;
         var yPos = terrainGrid.fastSampleHeight(x,z) + halfUnitsPerNode;
-        var baseHandlePos = new Vector3(xPos, yPos, zPos) + translation;
+        var baseHandlePos = new Vector3(xPos, yPos+TerrainGrid.unitsPerNode(), zPos) + translation;
         var name = "TCHeightHandle(" + xPos + "," + zPos + ")";
         var controlId = EditorGUIUtility.GetControlID(name.GetHashCode(), FocusType.Keyboard);
 
@@ -208,11 +212,46 @@ public class TerrainGridTool : EditorTool {
         float insetYPos = yPos + halfUnitsPerNode*0.5f;
         var quadVerts = new Vector3[4];
         quadVerts[0] = new Vector3(insetXPos+insetXUnits, insetYPos, insetZPos+insetZUnits) + translation;
-        quadVerts[1] = new Vector3(insetXPos+TerrainColumn.size-insetXUnits, insetYPos, insetZPos+insetZUnits) + translation;
-        quadVerts[2] = new Vector3(insetXPos+TerrainColumn.size-insetXUnits, insetYPos, insetZPos+TerrainColumn.size-insetZUnits) + translation;
-        quadVerts[3] = new Vector3(insetXPos+insetXUnits, insetYPos, insetZPos+TerrainColumn.size-insetZUnits) + translation;
+        quadVerts[1] = new Vector3(insetXPos+TerrainColumn.size-insetNegXUnits, insetYPos, insetZPos+insetZUnits) + translation;
+        quadVerts[2] = new Vector3(insetXPos+TerrainColumn.size-insetNegXUnits, insetYPos, insetZPos+TerrainColumn.size-insetNegZUnits) + translation;
+        quadVerts[3] = new Vector3(insetXPos+insetXUnits, insetYPos, insetZPos+TerrainColumn.size-insetNegZUnits) + translation;
         Handles.color = insetFaceColour;
         Handles.DrawSolidRectangleWithOutline(quadVerts, insetFaceColour, insetOutlineColour);
+
+        // Draw handles for adjusting the insets
+        // Positive X Handle
+        Handles.color = Color.blue;
+        var xInsetBaseHandlePos = (quadVerts[0] + quadVerts[3]) / 2f;
+        EditorGUI.BeginChangeCheck();
+        var xInsetVal = Handles.Slider(xInsetBaseHandlePos, Vector3.right, 0.1f, Handles.SphereHandleCap, insetHandleSnap);
+        if (EditorGUI.EndChangeCheck()) {
+          Event.current.Use();
+          settingsWindow.columnInsetXAmount = Mathf.RoundToInt(Mathf.Clamp((xInsetVal.x-xInsetBaseHandlePos.x) / insetHandleSnap, 0, maxInset));
+        }
+        // Negative X Handle
+        var negXInsetBaseHandlePos = (quadVerts[1] + quadVerts[2]) / 2f;
+        EditorGUI.BeginChangeCheck();
+        var negXInsetVal = Handles.Slider(negXInsetBaseHandlePos, Vector3.left, 0.1f, Handles.SphereHandleCap, insetHandleSnap);
+        if (EditorGUI.EndChangeCheck()) {
+          Event.current.Use();
+          settingsWindow.columnInsetNegXAmount = Mathf.RoundToInt(Mathf.Clamp((negXInsetBaseHandlePos.x-negXInsetVal.x) / insetHandleSnap, 0, maxInset));
+        }
+        // Positive Z Handle
+        var zInsetBaseHandlePos = (quadVerts[0] + quadVerts[1]) / 2f;
+        EditorGUI.BeginChangeCheck();
+        var zInsetVal = Handles.Slider(zInsetBaseHandlePos, Vector3.forward, 0.1f, Handles.SphereHandleCap, insetHandleSnap);
+        if (EditorGUI.EndChangeCheck()) {
+          Event.current.Use();
+          settingsWindow.columnInsetZAmount = Mathf.RoundToInt(Mathf.Clamp((zInsetVal.z-zInsetBaseHandlePos.x) / insetHandleSnap, 0, maxInset));
+        }
+        // Negative Z Handle
+        var negZInsetBaseHandlePos = (quadVerts[2] + quadVerts[3]) / 2f;
+        EditorGUI.BeginChangeCheck();
+        var negZInsetVal = Handles.Slider(negZInsetBaseHandlePos, Vector3.back, 0.1f, Handles.SphereHandleCap, insetHandleSnap);
+        if (EditorGUI.EndChangeCheck()) {
+          Event.current.Use();
+          settingsWindow.columnInsetNegZAmount = Mathf.RoundToInt(Mathf.Clamp((negZInsetBaseHandlePos.z-negZInsetVal.z) / insetHandleSnap, 0, maxInset));
+        }
         
         // Draw and allow for manipulation of the column height
         EditorGUI.BeginChangeCheck();
@@ -223,9 +262,9 @@ public class TerrainGridTool : EditorTool {
           Event.current.Use();
           Undo.RecordObject(terrainGrid.levelData, "Edited Terrain Column Height");
           terrainGrid.changeTerrainColumnHeight(x, z, newPos.y, settingsWindow.setLevelValue, 
-            settingsWindow.columnInsetXAmount, settingsWindow.columnInsetZAmount, settingsWindow.paintMaterial);
+            settingsWindow.columnInsetXAmount, settingsWindow.columnInsetNegXAmount,
+            settingsWindow.columnInsetZAmount, settingsWindow.columnInsetNegZAmount, settingsWindow.paintMaterial);
         }
-
       }
     }
   }
@@ -248,7 +287,7 @@ public class TerrainGridTool : EditorTool {
         var yPos = terrainGrid.fastSampleHeight(x,z) + halfUnitsPerNode;
         var pos = new Vector3(xPos, yPos, zPos) + translation;
 
-        var size = 0.1f*HandleUtility.GetHandleSize(pos);
+        var size = TerrainGrid.unitsPerNode();
         if (Handles.Button(pos, rot, size, size, Handles.SphereHandleCap)) { 
           if (Event.current.modifiers != EventModifiers.Shift) {
             nodeEditSelectedColumns.Clear();
@@ -267,11 +306,17 @@ public class TerrainGridTool : EditorTool {
     var rot = new Quaternion(0,0,0,1);
 
     var terrainColour = new Color(1f,0.5f,0f,0.33f);
-    var emptyColour   = new Color(0.5f,0.5f,0.5f,0.33f);
+    var emptyColour   = new Color(1f,0f,1f,0.33f);
 
+    var nodeSelector = TerrainGrid.TerrainNodeSelectors.None;
+    if (settingsWindow.showSurfaceNodes) { nodeSelector |= TerrainGrid.TerrainNodeSelectors.Surface; }
+    if (settingsWindow.showAboveSurfaceNodes) { nodeSelector |= TerrainGrid.TerrainNodeSelectors.AboveSurface; }
+    if (nodeSelector == TerrainGrid.TerrainNodeSelectors.None) { nodeSelector = TerrainGrid.TerrainNodeSelectors.All; }
+    
     var tempList = new List<TerrainGridNode>();
     foreach (var terrainColIdx in nodeEditSelectedColumns) {
-      var nodes = terrainGrid.getNodesInTerrainColumn(new Vector3Int(terrainColIdx.x, 0, terrainColIdx.y));
+      var nodes = terrainGrid.getNodesInTerrainColumn(new Vector3Int(terrainColIdx.x, 0, terrainColIdx.y), 
+        TerrainGrid.unitsToNodeIndex(settingsWindow.setLevelValue), nodeSelector);
       
       foreach (var node in nodes) {
         float toggleIsoVal = 1f;
