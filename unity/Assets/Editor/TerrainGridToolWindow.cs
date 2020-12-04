@@ -18,12 +18,17 @@ public class TerrainGridToolWindow : EditorWindow {
   public TGTWSettings.PaintType paintType { get { return settings.paintType; } }
   public TGTWSettings.PaintMode paintMode { get { return settings.paintMode; } }
   public TGTWSettings.BrushType brushType { get { return settings.brushType; } }
+  public Material paintMaterial { get { return settings.paintMaterial; } }
   public float brushSize { get { return settings.brushSize; } }
   public float matPaintIntensity { get { return settings.matPaintIntensity; } }
   public bool gridSnaping { get { return settings.gridSnaping; } }
   public bool showGridOverlay { get { return settings.showGridOverlay; } }
   public bool groundUpOnly { get { return settings.groundUpOnly; } }
   public float setLevelValue { get { return settings.setLevelValue; } }
+  public int columnInsetXAmount { get { return settings.columnInsetXAmount; } }
+  public int columnInsetZAmount { get { return settings.columnInsetZAmount; } }
+  public bool showTerrainNodes { get { return settings.showTerrainNodes; } }
+  public bool showEmptyNodes { get { return settings.showEmptyNodes; } }
 
   [MenuItem("Window/Terrain Grid Tool")]
   static void Open() {
@@ -47,11 +52,13 @@ public class TerrainGridToolWindow : EditorWindow {
     var editorTypeEnumVal = (TGTWSettings.EditorType)editorTypeProp.intValue;
     var prevFreePaintEditToggled = editorTypeEnumVal == TGTWSettings.EditorType.FreePaintEditor;
     var prevColumnEditToggled    = editorTypeEnumVal == TGTWSettings.EditorType.ColumnEditor;
+    var prevNodeEditToggled      = editorTypeEnumVal == TGTWSettings.EditorType.NodeEditor;
 
     EditorGUILayout.BeginHorizontal();
     GUILayout.FlexibleSpace();
     var freePaintEditToggled = GUILayout.Toggle(prevFreePaintEditToggled, "Paint", "button", GUILayout.ExpandWidth(false));
     var columnEditToggled    = GUILayout.Toggle(prevColumnEditToggled, "Column Edit", "button", GUILayout.ExpandWidth(false));
+    var nodeEditToggled      = GUILayout.Toggle(prevNodeEditToggled, "Node Edit", "button", GUILayout.ExpandWidth(false));
     GUILayout.FlexibleSpace();
     EditorGUILayout.PropertyField(showGridProp);
     EditorGUILayout.EndHorizontal();
@@ -63,8 +70,10 @@ public class TerrainGridToolWindow : EditorWindow {
     else if (columnEditToggled != prevColumnEditToggled) {
       editorTypeProp.intValue = (int)TGTWSettings.EditorType.ColumnEditor;
     }
+    else if (nodeEditToggled != prevNodeEditToggled) {
+      editorTypeProp.intValue = (int)TGTWSettings.EditorType.NodeEditor;
+    }
     editorTypeEnumVal = (TGTWSettings.EditorType)editorTypeProp.intValue;
-
 
     var setLevelValProp  = serializedObj.FindProperty("setLevelValue");
     var paintMatProp = serializedObj.FindProperty("paintMaterial");
@@ -97,11 +106,25 @@ public class TerrainGridToolWindow : EditorWindow {
         break;
       }
 
-      case TGTWSettings.EditorType.ColumnEditor:
+      case TGTWSettings.EditorType.ColumnEditor: {
+        var colInsetXAmtProp = serializedObj.FindProperty("columnInsetXAmount");
+        var colInsetZAmtProp = serializedObj.FindProperty("columnInsetZAmount");
+        EditorGUILayout.IntSlider(colInsetXAmtProp, -TerrainGrid.nodesPerUnit/2, TerrainGrid.nodesPerUnit/2, "Column Inset/Outset X", GUILayout.ExpandWidth(true));
+        EditorGUILayout.IntSlider(colInsetZAmtProp, -TerrainGrid.nodesPerUnit/2, TerrainGrid.nodesPerUnit/2, "Column Inset/Outset Z", GUILayout.ExpandWidth(true));
         EditorGUILayout.Slider(setLevelValProp, 1.0f, terrainGrid.ySize*TerrainColumn.size, "Set Level", GUILayout.ExpandWidth(true));
         EditorGUILayout.Space();
         EditorGUILayout.PropertyField(paintMatProp);
         break;
+      }
+
+      case TGTWSettings.EditorType.NodeEditor: {
+        var showTerrainNodesProp = serializedObj.FindProperty("showTerrainNodes");
+        var showEmptyNodesProp = serializedObj.FindProperty("showEmptyNodes");
+        EditorGUILayout.PropertyField(showTerrainNodesProp);
+        EditorGUILayout.PropertyField(showEmptyNodesProp);
+
+        break;
+      } 
 
       default:
         break;
@@ -160,7 +183,7 @@ public class TerrainGridToolWindow : EditorWindow {
         else { terrainGrid?.addIsoValuesToNodes(1f, nodes); }
         break;
       case TGTWSettings.PaintType.MaterialsOnly:
-        paintMaterial(nodes, matPaintIntensity);
+        paintNodesWithMaterial(nodes, matPaintIntensity);
         terrainGrid?.updateNodesInEditor(nodes);
         break;
       case TGTWSettings.PaintType.Water:
@@ -178,7 +201,7 @@ public class TerrainGridToolWindow : EditorWindow {
         else { terrainGrid?.addIsoValuesToNodes(-1f, nodes); }
         break;
       case TGTWSettings.PaintType.MaterialsOnly:
-        paintMaterial(nodes, -matPaintIntensity);
+        paintNodesWithMaterial(nodes, -matPaintIntensity);
         terrainGrid?.updateNodesInEditor(nodes);
         break;
       case TGTWSettings.PaintType.Water:
@@ -189,7 +212,7 @@ public class TerrainGridToolWindow : EditorWindow {
     }
   }
 
-  private void paintMaterial(in List<TerrainGridNode> nodes, float paintAmount) {
+  private void paintNodesWithMaterial(in List<TerrainGridNode> nodes, float paintAmount) {
     if (!settings.paintMaterial) { return; }
 
     var clampedPaintAmt = Mathf.Clamp(paintAmount, 0f, 1f);    

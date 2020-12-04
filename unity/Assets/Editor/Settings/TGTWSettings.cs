@@ -1,9 +1,9 @@
 ﻿using UnityEngine;
 
 public class TGTWSettings : ScriptableObject {
-  public static string assetPath = "Assets/Editor/Settings/TGTWSettings.asset";
+  public static readonly string assetPath = "Assets/Editor/Settings/TGTWSettings.asset";
 
-  public enum EditorType  { FreePaintEditor = 0, ColumnEditor = 1 };
+  public enum EditorType  { FreePaintEditor = 0, ColumnEditor = 1, NodeEditor = 2 };
   public enum PaintType { Terrain = 0, MaterialsOnly = 1, Water = 2 };
   public enum PaintMode { Projection = 0, Floating = 1 };
   public enum BrushType { Sphere = 0, Cube = 1 };
@@ -20,4 +20,8 @@ public class TGTWSettings : ScriptableObject {
   public bool groundUpOnly = false;
   public float setLevelValue = 1.0f;
   public Material paintMaterial;
+  public int columnInsetXAmount = 0;
+  public int columnInsetZAmount = 0;
+  public bool showTerrainNodes = false;
+  public bool showEmptyNodes = true;
 }

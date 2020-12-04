@@ -26,12 +26,15 @@ public class TerrainGridTool : EditorTool {
   private bool editPtActive = false;
   private Vector3 lastEditPt = new Vector3();
 
-  // Column Editing Mode Variables
+  // Mouse Dragging functionality (NOT IMPLEMENTED YET)
+  private static readonly Color dragRectColour = new Color(0, 1.0f, 1.0f, 0.5f);
   private Vector2 mouseDragStartPos;
   private Vector2 mouseDragCurrentPos;
   private bool isDragging = false;
-  //private Dictionary<int, float> selectedColumnCtrlIds = new Dictionary<int, float>();
-  private static readonly Color dragRectColour = new Color(0, 1.0f, 1.0f, 0.5f);
+
+  // Node Editing Mode Variables
+  private HashSet<Vector2Int> nodeEditSelectedColumns = new HashSet<Vector2Int>();
+  
   
   private void OnEnable() {
     //EditorTools.activeToolChanged += activeToolChanged;
@@ -96,7 +99,7 @@ public class TerrainGridTool : EditorTool {
       }
 
       case TGTWSettings.EditorType.ColumnEditor: {
-         
+        drawTerrainColumnHeightEditHandles(terrainGrid);
         if (noMouseEventModifiers(e)) {
           if (e.type == EventType.MouseDrag) {
             mouseDragCurrentPos = Event.current.mousePosition;
@@ -110,8 +113,24 @@ public class TerrainGridTool : EditorTool {
             // Stop dragging
             isDragging = false;
           }
-        }
 
+          if (isDragging) {
+            /*
+            Handles.BeginGUI();
+            EditorGUI.DrawRect(new Rect(mouseDragStartPos.x, mouseDragStartPos.y, 
+              mouseDragCurrentPos.x - mouseDragStartPos.x, 
+              mouseDragCurrentPos.y - mouseDragStartPos.y), dragRectColour);
+            Handles.EndGUI();
+            */
+          }
+
+        }
+        break;
+      }
+
+      case TGTWSettings.EditorType.NodeEditor: {
+        drawTerrainColumnSelectionHandles(terrainGrid);
+        drawTerrainColumnNodeEditHandles(terrainGrid);
         break;
       }
 
@@ -146,20 +165,7 @@ public class TerrainGridTool : EditorTool {
         break;
       }
 
-      case TGTWSettings.EditorType.ColumnEditor: {
-        drawTerrainColumnHeightEditHandles(terrainGrid);
-
-        if (isDragging) {
-          
-          /*
-          Handles.BeginGUI();
-          EditorGUI.DrawRect(new Rect(mouseDragStartPos.x, mouseDragStartPos.y, 
-            mouseDragCurrentPos.x - mouseDragStartPos.x, 
-            mouseDragCurrentPos.y - mouseDragStartPos.y), dragRectColour);
-          Handles.EndGUI();
-          */
-        }
-        
+      case TGTWSettings.EditorType.ColumnEditor: {        
         break;
       }
 
@@ -176,34 +182,113 @@ public class TerrainGridTool : EditorTool {
   }
 
   private void drawTerrainColumnHeightEditHandles(in TerrainGrid terrainGrid) {
-    Handles.color = Color.green;
-    Handles.zTest = UnityEngine.Rendering.CompareFunction.LessEqual;
+    Handles.zTest = UnityEngine.Rendering.CompareFunction.Always;
 
     var translation = terrainGrid.transform.position;
     var rot = new Quaternion(0,0,0,1);
     var halfUnitsPerNode = TerrainGrid.halfUnitsPerNode();
+    var insetFaceColour = new Color(1.0f, 1.0f, 0.0f, 0.5f);
+    var insetOutlineColour = new Color(1f,1f,1f,0.5f);
+    var insetXUnits = settingsWindow.columnInsetXAmount*TerrainGrid.unitsPerNode();
+    var insetZUnits = settingsWindow.columnInsetZAmount*TerrainGrid.unitsPerNode();
+
     for (int x = 0; x < terrainGrid.xSize; x++) {
+      float insetXPos = x*TerrainColumn.size;
       var xPos = x*TerrainColumn.size + 0.5f*TerrainColumn.size;
       for (int z = 0; z < terrainGrid.zSize; z++) {
+
         var zPos = z*TerrainColumn.size + 0.5f*TerrainColumn.size;
         var yPos = terrainGrid.fastSampleHeight(x,z) + halfUnitsPerNode;
         var baseHandlePos = new Vector3(xPos, yPos, zPos) + translation;
         var name = "TCHeightHandle(" + xPos + "," + zPos + ")";
         var controlId = EditorGUIUtility.GetControlID(name.GetHashCode(), FocusType.Keyboard);
+
+        // Draw the inset as a rectangle on the column
+        float insetZPos = z*TerrainColumn.size;
+        float insetYPos = yPos + halfUnitsPerNode*0.5f;
+        var quadVerts = new Vector3[4];
+        quadVerts[0] = new Vector3(insetXPos+insetXUnits, insetYPos, insetZPos+insetZUnits) + translation;
+        quadVerts[1] = new Vector3(insetXPos+TerrainColumn.size-insetXUnits, insetYPos, insetZPos+insetZUnits) + translation;
+        quadVerts[2] = new Vector3(insetXPos+TerrainColumn.size-insetXUnits, insetYPos, insetZPos+TerrainColumn.size-insetZUnits) + translation;
+        quadVerts[3] = new Vector3(insetXPos+insetXUnits, insetYPos, insetZPos+TerrainColumn.size-insetZUnits) + translation;
+        Handles.color = insetFaceColour;
+        Handles.DrawSolidRectangleWithOutline(quadVerts, insetFaceColour, insetOutlineColour);
         
+        // Draw and allow for manipulation of the column height
         EditorGUI.BeginChangeCheck();
+        Handles.color = Color.green;
+        //Handles.zTest = UnityEngine.Rendering.CompareFunction.LessEqual;
         var newPos = Handles.Slider(baseHandlePos, Vector3.up, 0.1f, Handles.CubeHandleCap, TerrainGrid.unitsPerNode());
         if (EditorGUI.EndChangeCheck()) {
           Event.current.Use();
           Undo.RecordObject(terrainGrid.levelData, "Edited Terrain Column Height");
-          terrainGrid.changeTerrainColumnHeight(x, z, newPos.y);
+          terrainGrid.changeTerrainColumnHeight(x, z, newPos.y, settingsWindow.setLevelValue, 
+            settingsWindow.columnInsetXAmount, settingsWindow.columnInsetZAmount, settingsWindow.paintMaterial);
         }
-        //var size = 0.05f*HandleUtility.GetHandleSize(baseHandlePos);
-        //var clicked = Handles.Button(baseHandlePos, rot, size, size, Handles.DotHandleCap);
-        //if (clicked) { 
-        //  selectedColumnCtrlIds.Clear();
-        //  selectedColumnCtrlIds.Add(controlId, yPos);
-        //}
+
+      }
+    }
+  }
+
+  private void drawTerrainColumnSelectionHandles(in TerrainGrid terrainGrid) {
+    Handles.color = Color.green;
+    Handles.zTest = UnityEngine.Rendering.CompareFunction.Always;
+
+    var translation = terrainGrid.transform.position;
+    var rot = new Quaternion(0,0,0,1);
+    var halfUnitsPerNode = TerrainGrid.halfUnitsPerNode();
+
+    for (int x = 0; x < terrainGrid.xSize; x++) {
+      var xPos = x*TerrainColumn.size + 0.5f*TerrainColumn.size;
+      for (int z = 0; z < terrainGrid.zSize; z++) {
+        var currIdx = new Vector2Int(x,z);
+        if (nodeEditSelectedColumns.Contains(currIdx)) { continue; }
+
+        var zPos = z*TerrainColumn.size + 0.5f*TerrainColumn.size;
+        var yPos = terrainGrid.fastSampleHeight(x,z) + halfUnitsPerNode;
+        var pos = new Vector3(xPos, yPos, zPos) + translation;
+
+        var size = 0.1f*HandleUtility.GetHandleSize(pos);
+        if (Handles.Button(pos, rot, size, size, Handles.SphereHandleCap)) { 
+          if (Event.current.modifiers != EventModifiers.Shift) {
+            nodeEditSelectedColumns.Clear();
+          }
+          nodeEditSelectedColumns.Add(currIdx);
+        }
+      }
+    }
+  }
+
+  private void drawTerrainColumnNodeEditHandles(in TerrainGrid terrainGrid) {
+    
+    Handles.zTest = UnityEngine.Rendering.CompareFunction.Always;
+    var nodeDrawSize = TerrainGrid.halfUnitsPerNode();
+    var translation = terrainGrid.transform.position;
+    var rot = new Quaternion(0,0,0,1);
+
+    var terrainColour = new Color(1f,0.5f,0f,0.33f);
+    var emptyColour   = new Color(0.5f,0.5f,0.5f,0.33f);
+
+    var tempList = new List<TerrainGridNode>();
+    foreach (var terrainColIdx in nodeEditSelectedColumns) {
+      var nodes = terrainGrid.getNodesInTerrainColumn(new Vector3Int(terrainColIdx.x, 0, terrainColIdx.y));
+      
+      foreach (var node in nodes) {
+        float toggleIsoVal = 1f;
+        if (node.isTerrain()) {
+          toggleIsoVal = -1f;
+          if (!settingsWindow.showTerrainNodes) { continue; }
+          Handles.color = terrainColour;
+        }
+        else {
+          if (!settingsWindow.showEmptyNodes) { continue; }
+          Handles.color = emptyColour;
+        }
+        if (Handles.Button(node.position + translation, rot, nodeDrawSize, nodeDrawSize, Handles.CubeHandleCap)) {
+          tempList.Clear(); tempList.Add(node);
+          Undo.RecordObject(terrainGrid.levelData, "Edited Terrain Node");
+          terrainGrid.addIsoValuesToNodes(toggleIsoVal, tempList);
+        }
       }
     }
   }

@@ -5,14 +5,16 @@ using UnityEngine;
 
 public partial class TerrainGrid : MonoBehaviour {
 
+
+
   // Class containing various static helper methods for traversing TerrainGridNodes
   public static class TerrainNodeTraverser {
 
     public static void updateGroundedNodes(in TerrainGrid terrainGrid) {
       TerrainNodeTraverser.updateGroundedNodes(terrainGrid, new List<TerrainColumn>());
     }
-    public static void updateGroundedNodes(in TerrainGrid terrainGrid, in IEnumerable<TerrainColumn> affectedTCs) {
 
+    public static void updateGroundedNodes(in TerrainGrid terrainGrid, in IEnumerable<TerrainColumn> affectedTCs) {
       var queue = new Queue<TerrainGridNode>();
       if (affectedTCs.Count() > 0) {
         // When TerrainColumns are provided we only focus on traversing the nodes 
@@ -21,7 +23,7 @@ public partial class TerrainGrid : MonoBehaviour {
         // Get a list of all nodes connected to (and including) affected TerrainColumns
         // Have a seperate set of all the grounded nodes that are connected
         foreach (var terrainCol in affectedTCs) {
-          terrainGrid.enqueueNodesInTerrainColumn(terrainCol, ref queue);
+          enqueueNodesInTerrainColumn(terrainGrid, terrainCol, ref queue);
         }
         var allAffectedNodes = new HashSet<TerrainGridNode>(queue);
         var allAffectedGroundedNodes = new HashSet<TerrainGridNode>();
@@ -132,5 +134,19 @@ public partial class TerrainGrid : MonoBehaviour {
       return islands;
     }
 
+    private static void enqueueNodesInTerrainColumn(in TerrainGrid terrainGrid, in TerrainColumn terrainCol, ref Queue<TerrainGridNode> tcNodes) {
+      var tcIndices = terrainGrid.getIndexRangeForTerrainColumn(terrainCol);
+      for (var x = tcIndices.xStartIdx; x <= tcIndices.xEndIdx; x++) {
+        for (var y = tcIndices.yStartIdx; y <= tcIndices.yEndIdx; y++) {
+          for (var z = tcIndices.zStartIdx; z < tcIndices.zEndIdx; z++) {
+            tcNodes.Enqueue(terrainGrid.nodes[x,y,z]);
+          }
+        }
+      }
+    }
+
   }
+
+
+
 }

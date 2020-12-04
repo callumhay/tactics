@@ -98,10 +98,14 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
       zEndIdx   = Mathf.Clamp(unitsToNodeIndex(max.z), 0, nodes.GetLength(2)-1)
     };
   }
+
   private IndexRange getIndexRangeForTerrainColumn(in TerrainColumn terrainCol) {
+    return getIndexRangeForTerrainColumn(terrainCol.index);
+  }
+  private IndexRange getIndexRangeForTerrainColumn(in Vector3Int terrainColIdx) {
     var numNodesPerTCMinus1 = TerrainColumn.size*TerrainGrid.nodesPerUnit-1;
-    var nodeXIdxStart = terrainCol.index.x * numNodesPerTCMinus1;
-    var nodeZIdxStart = terrainCol.index.z * numNodesPerTCMinus1;
+    var nodeXIdxStart = terrainColIdx.x * numNodesPerTCMinus1;
+    var nodeZIdxStart = terrainColIdx.z * numNodesPerTCMinus1;
     return new IndexRange {
       xStartIdx = nodeXIdxStart,
       xEndIdx   = nodeXIdxStart + numNodesPerTCMinus1,
@@ -112,15 +116,29 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     };
   }
 
-  public void enqueueNodesInTerrainColumn(in TerrainColumn terrainCol, ref Queue<TerrainGridNode> tcNodes) {
-    var tcIndices = getIndexRangeForTerrainColumn(terrainCol);
-    for (var x = tcIndices.xStartIdx; x <= tcIndices.xEndIdx; x++) {
+  public List<TerrainGridNode> getNodesInTerrainColumn(in Vector3Int terrainColIdx, bool surfaceOnly=false) {
+    var tcNodes = new List<TerrainGridNode>();
+    var tcIndices = getIndexRangeForTerrainColumn(terrainColIdx);
+    
+    for (var x = tcIndices.xStartIdx; x <= tcIndices.xEndIdx; x++) {    
       for (var y = tcIndices.yStartIdx; y <= tcIndices.yEndIdx; y++) {
-        for (var z = tcIndices.zStartIdx; z < tcIndices.zEndIdx; z++) {
-          tcNodes.Enqueue(nodes[x,y,z]);
+        for (var z = tcIndices.zStartIdx; z <= tcIndices.zEndIdx; z++) {
+          var currNode = nodes[x,y,z];
+          if (surfaceOnly) {
+            // If any of the neighbours are empty then this is a surface node
+            var neighbours = getNeighboursForNode(currNode);
+            foreach (var neighbour in neighbours) {
+              if (!neighbour.isTerrain()) { tcNodes.Add(currNode); break; }
+            }
+          }
+          else {
+            tcNodes.Add(currNode);
+          }
         }
       }
     }
+
+    return tcNodes;
   }
 
   public List<TerrainGridNode> getNeighboursForNode(in TerrainGridNode node) {
@@ -818,7 +836,7 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     }
   }
 
-  public void changeTerrainColumnHeight(int xIdx, int zIdx, float newYPos) {
+  public void changeTerrainColumnHeight(int xIdx, int zIdx, float newYPos, float maxHeight, int insetXAmount, int insetZAmount, Material mat) {
     var colIdx = new Vector3Int(xIdx, 0, zIdx);
 
     TerrainColumn terrainCol;
@@ -830,7 +848,7 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     //Debug.Log("Prev scale: " + currScale + ", New scale: " + newScale);
     if (Mathf.Abs(heightChange) >= halfUnitsPerNode()) {
       // Adjust the height of the terrain column based on the given change
-      float newHeight = Mathf.Clamp(currHeight + heightChange, 0, TerrainColumn.size*ySize);
+      float newHeight = Mathf.Clamp(currHeight + heightChange, 0, Mathf.Min(maxHeight, TerrainColumn.size*ySize));
       //Debug.Log("Prev Height: " + currHeight + ", New Height: " + newHeight);
 
       var yStartNodeIdx = unitsToNodeIndex(currHeight);
@@ -846,6 +864,11 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
 
       var editNodes = new List<TerrainGridNode>();
       var idxRange = getIndexRangeForTerrainColumn(terrainCol);
+      idxRange.xStartIdx = (int)Mathf.Clamp(idxRange.xStartIdx + insetXAmount, 0, numNodesX()-1); 
+      idxRange.xEndIdx   = (int)Mathf.Clamp(idxRange.xEndIdx - insetXAmount, 0, numNodesX()-1);
+      idxRange.zStartIdx = (int)Mathf.Clamp(idxRange.zStartIdx + insetZAmount, 0, numNodesZ()-1); 
+      idxRange.zEndIdx   = (int)Mathf.Clamp(idxRange.zEndIdx - insetZAmount, 0, numNodesZ()-1);
+
       for (int x = idxRange.xStartIdx; x <= idxRange.xEndIdx; x++) {
         for (int y = yStartNodeIdx; y <= yEndNodeIdx; y++) {
           for (int z = idxRange.zStartIdx; z <= idxRange.zEndIdx; z++) {
@@ -853,7 +876,8 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
           }
         }
       }
-      addIsoValuesToNodes(isoVal, editNodes);
+      if (mat) { addIsoValuesAndMaterialToNodes(isoVal, 1f, mat, editNodes); }
+      else { addIsoValuesToNodes(isoVal, editNodes); }
     }
   }
 
