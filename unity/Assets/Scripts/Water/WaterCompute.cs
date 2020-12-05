@@ -13,6 +13,11 @@ struct LiquidNodeUpdate {
   public static int flattenedNodeIdx(in Vector3Int nodeIdx, in Vector3Int borderFront, int size) {
     return LevelData.node3DIndexToFlatIndex(borderFront.x+nodeIdx.x, borderFront.y+nodeIdx.y, borderFront.z+nodeIdx.z, size, size);
   }
+  public static Vector3Int unflattenedNodeIdx(int flatIdx, in Vector3Int borderFront, int size) {
+    var result = LevelData.flatIndexToNode3DIndex(flatIdx, size, size);
+    result.x -= borderFront.x; result.y -= borderFront.y; result.z -= borderFront.z;
+    return result;
+  }
 };
 
 /// <summary>
@@ -31,19 +36,19 @@ public class WaterCompute : MonoBehaviour {
   [Range(1,10000)]
   public float liquidDensity = 1000.0f;   // kg/m^3
   [Range(0,101325)]
-  public float atmosphericPressure = 1000.0f;
+  public float atmosphericPressure = 101325.0f;
   [Range(0,100)]
   public float maxGravityVelocity = 100.0f;    // m/s
   [Range(0,100)]
   public float maxPressureVelocity = 100.0f;     // m/s
   [Range(0,100)]
-  public float friction = 1.0f;
+  public float friction = 0.0f;
   [Range(0,10000)]
   public float gravityMagnitude = 200f;
   [Range(0,1)]
   public float vorticityConfinement = 0.012f;
   [Range(1,100)]
-  public float flowMultiplier = 1.0f;
+  public float flowMultiplier = 100.0f;
   [Range(1,128)]
   public int numPressureIters = 20;
   
@@ -60,8 +65,10 @@ public class WaterCompute : MonoBehaviour {
   private int sumFlowsKernelId;
   private int adjustVolFromFlowsKernelId;
   private int updateNodesKernelId;
+  private int readNodesKernelId;
 
   private bool isInit = false;
+  //private Texture3D nodeDataReadTex;
   private RenderTexture nodeDataRT;
   private RenderTexture velRT;
   private RenderTexture temp3DFloat4RT1;
@@ -71,7 +78,9 @@ public class WaterCompute : MonoBehaviour {
   private RenderTexture tempPressurePong;
   private ComputeBuffer flowsBuffer;
 
-  ComputeBuffer updateNodeComputeBuf; // CPU <-> GPU buffer - this allows us to tell the water simulation about the terrain and vice-versa
+  ComputeBuffer updateNodeComputeBuf; // CPU -> GPU buffer - allows us to tell the water simulation about the terrain
+  ComputeBuffer readNodeComputeBuf;   // GPU -> CPU buffer - allows us to tell the terrain about the water simulation
+  float[] readNodeCPUArr;
 
   private VolumeRaymarcher volComponent;
 
@@ -89,6 +98,7 @@ public class WaterCompute : MonoBehaviour {
     sumFlowsKernelId = liquidComputeShader.FindKernel("CSSumFlowsKernel");
     adjustVolFromFlowsKernelId = liquidComputeShader.FindKernel("CSAdjustNodeFlowsKernel");
     updateNodesKernelId = liquidComputeShader.FindKernel("CSUpdateNodeData");
+    readNodesKernelId = liquidComputeShader.FindKernel("CSReadNodeData");
 
     initUniforms();
 
@@ -122,6 +132,7 @@ public class WaterCompute : MonoBehaviour {
   }
 
   private void initBuffersAndRTs(int fullResSize) {
+    //nodeDataReadTex = new Texture3D(fullResSize, fullResSize, fullResSize, TextureFormat.ARGB32, false);
     nodeDataRT = init3DRenderTexture(fullResSize, RenderTextureFormat.ARGBFloat);
     velRT = init3DRenderTexture(fullResSize, RenderTextureFormat.ARGBFloat);
     temp3DFloat4RT1 = init3DRenderTexture(fullResSize, RenderTextureFormat.ARGBFloat);
@@ -133,7 +144,8 @@ public class WaterCompute : MonoBehaviour {
     int flattenedBufSize = fullResSize*fullResSize*fullResSize;
     flowsBuffer = new ComputeBuffer(flattenedBufSize, 6*sizeof(float)); // Uses the NodeFlowInfo struct
     updateNodeComputeBuf = new ComputeBuffer(flattenedBufSize, 2*sizeof(float), ComputeBufferType.Default, ComputeBufferMode.SubUpdates); // Uses the LiquidNodeUpdate struct
-    
+    readNodeComputeBuf = new ComputeBuffer(flattenedBufSize, sizeof(float), ComputeBufferType.Default, ComputeBufferMode.Dynamic);
+    readNodeCPUArr = new float[flattenedBufSize];
   }
   private void initUniforms() {
     if (liquidComputeShader == null) { return; }
@@ -165,9 +177,9 @@ public class WaterCompute : MonoBehaviour {
     tempPressurePong?.Release();
     flowsBuffer?.Release();
     updateNodeComputeBuf?.Release();
+    readNodeComputeBuf?.Release();
   }
   
-
   private RenderTexture init3DRenderTexture(int resSize, RenderTextureFormat format) {
     var result = new RenderTexture(resSize, resSize, 0, format);
     result.dimension = UnityEngine.Rendering.TextureDimension.Tex3D;
@@ -178,7 +190,6 @@ public class WaterCompute : MonoBehaviour {
   }
 
   private void FixedUpdate() {
-
     liquidComputeShader.SetFloat("dt", Time.fixedDeltaTime);
     advectVelocity();
     applyExternalForces();
@@ -282,7 +293,7 @@ public class WaterCompute : MonoBehaviour {
   }
 
   private float applyCFL(float dt) {
-    return dt;// Mathf.Min(dt, 0.3f*TerrainGrid.unitsPerNode()/(Mathf.Max(maxGravityVelocity, maxPressureVelocity)));
+    return Mathf.Min(dt, 0.1f);
   }
 
   private void swapRTs(ref RenderTexture rt1, ref RenderTexture rt2) {
@@ -309,10 +320,14 @@ public class WaterCompute : MonoBehaviour {
     liquidComputeShader.Dispatch(clearKernelId, numThreadGroups, numThreadGroups, numThreadGroups);
   }
 
-  public void updateNodes(in TerrainGridNode[,,] nodes) {
+  /// <summary>
+  /// Writes the data from the given nodes (specifically the liquid and barrier values of each node)
+  /// into the necessary GPU buffers so that it can be simulated by the Compute shaders.
+  /// </summary>
+  /// <param name="nodes">The current state of the nodes to be written for simulation.</param>
+  public void writeUpdateNodesToLiquid(in TerrainGridNode[,,] nodes) {
     if (updateNodeComputeBuf == null) { return; }
 
-    //var totalNodes = nodes.GetLength(0)*nodes.GetLength(1)*nodes.GetLength(2);
     var borderFront = volComponent.getBorderFront();
     var fullResSize = volComponent.getFullResSize();
     var bufferCount = fullResSize*fullResSize*fullResSize;
@@ -331,6 +346,34 @@ public class WaterCompute : MonoBehaviour {
     liquidComputeShader.SetBuffer(updateNodesKernelId, "updates", updateNodeComputeBuf);
     liquidComputeShader.SetTexture(updateNodesKernelId, "nodeData", nodeDataRT);
     liquidComputeShader.Dispatch(updateNodesKernelId, numThreadGroups, numThreadGroups, numThreadGroups);
+  }
+
+  // TODO: Optimize so that we only read the interior of the 3D buffer?
+  public void readUpdateNodesFromLiquid(ref TerrainGridNode[,,] nodes) {
+    if (nodeDataRT == null || readNodeComputeBuf == null) { return; }
+    //RenderTexture.active = nodeDataRT;
+    //nodeDataReadTex.Read
+
+    // Read the nodeData texture into the readNodeComputeBuf compute buffer
+    liquidComputeShader.SetBuffer(readNodesKernelId, "liquidReadValues", readNodeComputeBuf);
+    liquidComputeShader.SetTexture(readNodesKernelId, "nodeData", nodeDataRT);
+    liquidComputeShader.Dispatch(readNodesKernelId, numThreadGroups, numThreadGroups, numThreadGroups);
+
+    // Convert the compute buffer into a CPU buffer
+    readNodeComputeBuf.GetData(readNodeCPUArr);
+
+    // Appropriately convert the CPU buffer into the given node liquid values
+    var borderFront = volComponent.getBorderFront();
+    var fullResSize = volComponent.getFullResSize();
+    for (int i = 0; i < readNodeCPUArr.Length; i++) {
+      var nodeIdx = LiquidNodeUpdate.unflattenedNodeIdx(i, borderFront, fullResSize);
+
+      // Make sure we are only reading the interior (non-border) portion of the array
+      if (nodeIdx.x < 0 || nodeIdx.y < 0 || nodeIdx.z < 0 || nodeIdx.x >= nodes.GetLength(0) ||
+          nodeIdx.y >= nodes.GetLength(1) || nodeIdx.z >= nodes.GetLength(2)) { continue; }
+
+      nodes[nodeIdx.x, nodeIdx.y, nodeIdx.z].liquidVol = readNodeCPUArr[i];
+    }
   }
 
 }

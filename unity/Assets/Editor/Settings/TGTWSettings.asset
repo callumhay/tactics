@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 98d9b1dd3dee9476ba6c0f6586489315, type: 3}
   m_Name: TGTWSettings
   m_EditorClassIdentifier: 
-  editorType: 2
+  editorType: 1
   paintType: 0
   paintMode: 0
   brushType: 1
@@ -24,6 +24,10 @@ MonoBehaviour:
   setLevelValue: 4
   paintMaterial: {fileID: 2100000, guid: 0c08151f71d884a9b87a37d2234ff25b, type: 2}
   columnInsetXAmount: 0
+  columnInsetNegXAmount: 0
   columnInsetZAmount: 0
-  showTerrainNodes: 1
-  showEmptyNodes: 0
+  columnInsetNegZAmount: 0
+  showTerrainNodes: 0
+  showEmptyNodes: 1
+  showSurfaceNodes: 1
+  showAboveSurfaceNodes: 1

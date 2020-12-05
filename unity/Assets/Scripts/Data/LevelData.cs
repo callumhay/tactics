@@ -21,6 +21,12 @@ public class LevelData : ScriptableObject {
   public static int node3DIndexToFlatIndex(int x, int y, int z, int numNodesY, int numNodesZ) {
     return z + (y*numNodesZ) + (x*numNodesZ*numNodesY);
   }
+  public static Vector3Int flatIndexToNode3DIndex(int flatIdx, int numNodesY, int numNodesZ) {
+    int x = flatIdx / (numNodesZ*numNodesY);
+    int y = (flatIdx - x*numNodesZ*numNodesY) / numNodesZ;
+    int z = flatIdx - x*numNodesY*numNodesY - y*numNodesZ;
+    return new Vector3Int(x,y,z);
+  }
   public static int numNodesToSize(int numNodes) {
     return (numNodes - 1)/(TerrainGrid.nodesPerUnit*TerrainColumn.size - 1);
   }

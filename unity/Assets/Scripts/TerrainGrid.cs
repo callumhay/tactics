@@ -359,8 +359,12 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
       // Setup liquid computation/simulation stuff
       waterCompute = GetComponent<WaterCompute>();
       if (waterCompute == null) { Debug.LogError("Could not find WaterCompute in GameObject."); }
-      else { waterCompute.initAll(); }
-
+      else { 
+        // First-time initialization of the liquid compute - all nodes MUST be already initialized from LevelData
+        // (NOTE: Node initialization is done in Awake)
+        waterCompute.initAll();
+        waterCompute.writeUpdateNodesToLiquid(nodes);
+      }
       // Build all the assets for the game that aren't stored in the level data
       buildBedrock();
       buildTerrainColumns();
@@ -500,19 +504,25 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
       terrainCol.regenerateMesh();
     }
     bedrock.regenerateMesh();
-    // TODO: Update the compute buffer HERE for every node.
+    
+    // Read/write from/to the liquid simulation
+    waterCompute?.readUpdateNodesFromLiquid(ref nodes);
+    waterCompute?.writeUpdateNodesToLiquid(nodes);
   }
 
   private void regenerateMeshes(in ICollection<TerrainColumn> terrainCols) {
     foreach (var terrainCol in terrainCols) {
       terrainCol.regenerateMesh();
     }
-    waterCompute?.updateNodes(nodes); // Update the compute buffer HERE for every node in the given set of TerrainColumns.
+
+    // Read/write from/to the liquid simulation
+    waterCompute?.readUpdateNodesFromLiquid(ref nodes);
+    waterCompute?.writeUpdateNodesToLiquid(nodes);
   }
+
   private HashSet<TerrainColumn> regenerateMeshes(in IEnumerable<TerrainGridNode> nodes) {
     var terrainCols = findAllAffectedTCs(nodes);
     regenerateMeshes(terrainCols);
-     // TODO: Update the compute buffer HERE for every node, make sure not to do this in the other regenerateMeshes method
     return terrainCols;
   }
 
