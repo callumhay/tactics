@@ -82,8 +82,8 @@ void Raymarch_float(
   // March back-to-front along the ray, sample and accumulate color at each step
   colour = float4(0,0,0,0);
   float3 uvw;
-  [unroll(MAX_ITERATIONS)]
   int i = 0;
+  [unroll(MAX_ITERATIONS)]
   for (; i < nSamples; i++) {
     uvw = calcUVW(borderFront, resNoBorderLen, currPos, boxMin, boxMinMaxLen);
     DoSample(volumeTex, volumeSampler, uvw, 1, opacityMultiplier, nodeVolume, colour);
