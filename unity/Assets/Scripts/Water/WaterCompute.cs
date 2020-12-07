@@ -36,21 +36,21 @@ public class WaterCompute : MonoBehaviour {
   [Range(1,10000)]
   public float liquidDensity = 1000.0f;   // kg/m^3
   [Range(0,101325)]
-  public float atmosphericPressure = 101325.0f;
+  public float atmosphericPressure = 1000.0f;
+  [Range(0,1000)]
+  public float maxGravityVelocity = 12.0f;    // m/s
+  [Range(0,1000)]
+  public float maxPressureVelocity = 11.0f;     // m/s
   [Range(0,100)]
-  public float maxGravityVelocity = 100.0f;    // m/s
-  [Range(0,100)]
-  public float maxPressureVelocity = 100.0f;     // m/s
-  [Range(0,100)]
-  public float friction = 0.0f;
+  public float friction = 60.0f;
   [Range(0,10000)]
-  public float gravityMagnitude = 200f;
+  public float gravityMagnitude = 9.81f;
   [Range(0,1)]
   public float vorticityConfinement = 0.012f;
   [Range(1,100)]
-  public float flowMultiplier = 100.0f;
+  public float flowMultiplier = 1.0f;
   [Range(1,128)]
-  public int numPressureIters = 20;
+  public int numPressureIters = 40;
   
   private int numThreadGroups;
   private ComputeShader liquidComputeShader;
