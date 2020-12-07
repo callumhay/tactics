@@ -5,15 +5,18 @@
 /// in special circumstances.
 /// </summary>
 public class DebrisCollisionMonitor : MonoBehaviour {
-  public static float ySqrDistToFalloff = 25.0f; // Squared distance below the y-axis before the mesh has "fallen off" the map
-  public static float minVelForSleep    = 1e-4f; // Minimum velocity on each axis of a rigidbody, below this assumes it's no longer active
-  public static float minAngVelForSleep = 1e-3f; // Min angular vel on each axis (see above)
+  public static readonly float ySqrDistToFalloff = 25.0f; // Squared distance below the y-axis before the mesh has "fallen off" the map
+  public static readonly float minVelForSleep    = 1e-4f; // Minimum velocity on each axis of a rigidbody, below this assumes it's no longer active
+  public static readonly float minAngVelForSleep = 1e-3f; // Min angular vel on each axis (see above)
+  public static readonly float moveEventUpdateTime = 1f/15f;
 
   public GameEvent onSleepEvent;    // Called when debris slows/stops and comes to rest within the terrain
   public GameEvent onFellOffEvent;  // Called when the debris falls off and goes below the terrain
   
   public float sleepTime = 2.0f;    // Time in seconds where 'IsSleeping' is true until the debris is considered fully asleep
   private float sleepTimeCount = 0;
+
+  private float moveTimeCount = 0;
 
   private bool sleepEventFired = false;
   private bool fellOffEventFired = false;
@@ -49,10 +52,21 @@ public class DebrisCollisionMonitor : MonoBehaviour {
         onSleepEvent?.FireEvent(gameObject);
         sleepEventFired = true;
       }
-      sleepTimeCount += Time.deltaTime;
+      sleepTimeCount += Time.fixedDeltaTime;
     }
     else {
       sleepTimeCount = 0;
+
+      // As the debris falls it may displace liquid, we need to figure out where to displace the liquid
+      // and update the liquid simulation so that it knows about this and the velocity of the debris
+      // Since this is an expensive operation (and accuracy is not super important) we only do it once every 15 frames
+
+      // TODO: Have an event for falling debris
+      moveTimeCount += Time.fixedDeltaTime;
+      if (moveTimeCount >= moveEventUpdateTime) {
+        //onDebrisMoveTickEvent?.FireEvent(gameObject);
+        moveTimeCount -= moveEventUpdateTime;
+      }
     }
   }
 

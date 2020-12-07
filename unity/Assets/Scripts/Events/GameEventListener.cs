@@ -14,7 +14,8 @@ public class GameEventListener : MonoBehaviour {
     }
 
     private void OnEnable() {
-      Debug.Assert(gameEvent != null, "Attempting to register a listener with a GameEvent that doesn't exist. Did you forget to call SetActive(false) on the GameObject first?");
+      Debug.Assert(gameEvent != null, "Attempting to register a listener with a GameEvent that doesn't exist.\n" +
+        "Did you forget to call SetActive(false) on the GameObject first?");
       gameEvent += this;
     }
 
