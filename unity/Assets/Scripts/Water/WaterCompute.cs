@@ -36,13 +36,13 @@ public class WaterCompute : MonoBehaviour {
   [Range(1,10000)]
   public float liquidDensity = 1000.0f;   // kg/m^3
   [Range(0,101325)]
-  public float atmosphericPressure = 1000.0f;
+  public float atmosphericPressure = 100.0f;
   [Range(0,1000)]
   public float maxGravityVelocity = 12.0f;    // m/s
   [Range(0,1000)]
   public float maxPressureVelocity = 11.0f;     // m/s
   [Range(0,100)]
-  public float friction = 60.0f;
+  public float friction = 6.0f;
   [Range(0,10000)]
   public float gravityMagnitude = 9.81f;
   [Range(0,1)]
@@ -65,6 +65,7 @@ public class WaterCompute : MonoBehaviour {
   private int sumFlowsKernelId;
   private int adjustVolFromFlowsKernelId;
   private int updateNodesKernelId;
+  private int updateNodeTypeDiffKernelId;
   private int readNodesKernelId;
 
   private bool isInit = false;
@@ -98,6 +99,7 @@ public class WaterCompute : MonoBehaviour {
     sumFlowsKernelId = liquidComputeShader.FindKernel("CSSumFlowsKernel");
     adjustVolFromFlowsKernelId = liquidComputeShader.FindKernel("CSAdjustNodeFlowsKernel");
     updateNodesKernelId = liquidComputeShader.FindKernel("CSUpdateNodeData");
+    updateNodeTypeDiffKernelId = liquidComputeShader.FindKernel("CSUpdateNodeTypeDiff");
     readNodesKernelId = liquidComputeShader.FindKernel("CSReadNodeData");
 
     initUniforms();
@@ -326,10 +328,10 @@ public class WaterCompute : MonoBehaviour {
   /// </summary>
   /// <param name="nodes">The current state of the nodes to be written for simulation.</param>
   public void writeUpdateNodesToLiquid(in TerrainGridNode[,,] nodes) {
-    this.writeUpdateNodesAndDebrisToLiquid(nodes, new Dictionary<GameObject, HashSet<TerrainGridNode>>());
+    this.writeUpdateNodesAndDebrisToLiquid(nodes, new Dictionary<GameObject, TerrainDebrisDiff>());
   }
 
-  public void writeUpdateNodesAndDebrisToLiquid(in TerrainGridNode[,,] nodes, in Dictionary<GameObject, HashSet<TerrainGridNode>> debrisNodeDict) {
+  public void writeUpdateNodesAndDebrisToLiquid(in TerrainGridNode[,,] nodes, in Dictionary<GameObject, TerrainDebrisDiff> debrisNodeDict) {
     if (updateNodeComputeBuf == null) { return; }
 
     var borderFront = volComponent.getBorderFront();
@@ -344,9 +346,8 @@ public class WaterCompute : MonoBehaviour {
       nodeUpdate.liquidVolume = node.liquidVol;
       nodeCBArr[idx] = nodeUpdate;
     }
-    /*
-    foreach (var debrisNodes in debrisNodeDict.Values) {
-      foreach (var debrisNode in debrisNodes) {
+    foreach (var debrisDiffs in debrisNodeDict.Values) {
+      foreach (var debrisNode in debrisDiffs.currDebrisNodes) {
         var idx = LiquidNodeUpdate.flattenedNodeIdx(debrisNode.gridIndex, borderFront, fullResSize);
         LiquidNodeUpdate nodeUpdate;
         nodeUpdate.terrainIsoVal = 1;
@@ -354,13 +355,52 @@ public class WaterCompute : MonoBehaviour {
         nodeCBArr[idx] = nodeUpdate;
       }
     }
-    */
     updateNodeComputeBuf.EndWrite<LiquidNodeUpdate>(bufferCount);
 
     // Update the node data...
     liquidComputeShader.SetBuffer(updateNodesKernelId, "updates", updateNodeComputeBuf);
     liquidComputeShader.SetTexture(updateNodesKernelId, "nodeData", nodeDataRT);
     liquidComputeShader.Dispatch(updateNodesKernelId, numThreadGroups, numThreadGroups, numThreadGroups);
+  }
+ 
+  public void writeUpdateDebrisDiffToLiquid(
+    in IEnumerable<TerrainGridNode> prevDebrisNodes, in IEnumerable<TerrainGridNode> currDebrisNodes, 
+    in IEnumerable<TerrainGridNode> liquidChangeNodes
+  ) {
+    if (updateNodeComputeBuf == null) { return; }
+
+    var borderFront = volComponent.getBorderFront();
+    var fullResSize = volComponent.getFullResSize();
+    var bufferCount = fullResSize*fullResSize*fullResSize;
+
+    var nodeCBArr = updateNodeComputeBuf.BeginWrite<LiquidNodeUpdate>(0, bufferCount);
+    foreach (var debrisNode in prevDebrisNodes) {
+      var idx = LiquidNodeUpdate.flattenedNodeIdx(debrisNode.gridIndex, borderFront, fullResSize);
+      LiquidNodeUpdate nodeUpdate;
+      nodeUpdate.terrainIsoVal = debrisNode.isoVal;
+      nodeUpdate.liquidVolume = debrisNode.liquidVol;
+      nodeCBArr[idx] = nodeUpdate;
+    }
+    foreach (var debrisNode in currDebrisNodes) {
+      var idx = LiquidNodeUpdate.flattenedNodeIdx(debrisNode.gridIndex, borderFront, fullResSize);
+      LiquidNodeUpdate nodeUpdate;
+      nodeUpdate.terrainIsoVal = 1;
+      nodeUpdate.liquidVolume  = 0;
+      nodeCBArr[idx] = nodeUpdate;
+    }
+    foreach (var liquidNode in liquidChangeNodes) {
+      var idx = LiquidNodeUpdate.flattenedNodeIdx(liquidNode.gridIndex, borderFront, fullResSize);
+      LiquidNodeUpdate nodeUpdate;
+      nodeUpdate.terrainIsoVal = 0;
+      nodeUpdate.liquidVolume = liquidNode.liquidVol;
+      nodeCBArr[idx] = nodeUpdate;
+    }
+    updateNodeComputeBuf.EndWrite<LiquidNodeUpdate>(bufferCount);
+
+    // Update the node data...
+    liquidComputeShader.SetBuffer(updateNodeTypeDiffKernelId, "updates", updateNodeComputeBuf);
+    liquidComputeShader.SetTexture(updateNodeTypeDiffKernelId, "nodeData", nodeDataRT);
+    liquidComputeShader.Dispatch(updateNodeTypeDiffKernelId, numThreadGroups, numThreadGroups, numThreadGroups);
   }
 
   // TODO: Optimize so that we only read the interior of the 3D buffer?

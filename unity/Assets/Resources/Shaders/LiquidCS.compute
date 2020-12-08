@@ -12,6 +12,7 @@
 // Update stuff
 #pragma kernel CSClearNodeData
 #pragma kernel CSUpdateNodeData
+#pragma kernel CSUpdateNodeTypeDiff
 #pragma kernel CSReadNodeData
 
 // Debug stuff
@@ -396,7 +397,7 @@ void CSCalculateFlowsKernel(uint3 id : SV_DispatchThreadID) {
 
   // Downward flow
   if (remainingVolume > LIQUID_EPSILON && typeB == EMPTY_NODE_TYPE && liquidVolB < maxVolume) {
-    float calcLiquidB = dt*max(0, 0.5*(remainingVolume - liquidVolB));
+    float calcLiquidB = dt*max(0, 0.5*(liquidVol - liquidVolB));
     flowToLBD.y = max(calcLiquidB, flowToLBD.y);
     flowToLBD.y = min(flowToLBD.y, min(maxVolume-liquidVolB, remainingVolume));
     remainingVolume -= flowToLBD.y;
@@ -405,7 +406,7 @@ void CSCalculateFlowsKernel(uint3 id : SV_DispatchThreadID) {
 
   // Leftward flow
   if (remainingVolume > LIQUID_EPSILON && typeL == EMPTY_NODE_TYPE) {
-    flowToLBD.x = max(max((remainingVolume-liquidVolL)/6.0, 0.0), flowToLBD.x);
+    flowToLBD.x = max(max((liquidVol-liquidVolL)/6.0, 0.0), flowToLBD.x);
     flowToLBD.x = min(flowToLBD.x, min(max(maxVolume-liquidVolL,0), remainingVolume));
     remainingVolume -= flowToLBD.x;
     result.flowL = flowToLBD.x;
@@ -413,7 +414,7 @@ void CSCalculateFlowsKernel(uint3 id : SV_DispatchThreadID) {
 
   // Rightward flow
   if (remainingVolume > LIQUID_EPSILON && typeR == EMPTY_NODE_TYPE) {
-    flowToRTU.x = max(max((remainingVolume-liquidVolR)/5.0, 0.0), flowToRTU.x);
+    flowToRTU.x = max(max((liquidVol-liquidVolR)/5.0, 0.0), flowToRTU.x);
     flowToRTU.x = min(flowToRTU.x, min(max(maxVolume-liquidVolR,0), remainingVolume));
     remainingVolume -= flowToRTU.x;
     result.flowR = flowToRTU.x;
@@ -421,7 +422,7 @@ void CSCalculateFlowsKernel(uint3 id : SV_DispatchThreadID) {
 
   // Backward flow
   if (remainingVolume > LIQUID_EPSILON && typeD == EMPTY_NODE_TYPE) {
-    flowToLBD.z = max(max((remainingVolume-liquidVolD)/4.0, 0.0), flowToLBD.z);
+    flowToLBD.z = max(max((liquidVol-liquidVolD)/4.0, 0.0), flowToLBD.z);
     flowToLBD.z = min(flowToLBD.z, min(max(maxVolume-liquidVolD,0), remainingVolume));
     remainingVolume -= flowToLBD.z;
     result.flowD = flowToLBD.z;
@@ -429,7 +430,7 @@ void CSCalculateFlowsKernel(uint3 id : SV_DispatchThreadID) {
 
   // Forward flow
   if (remainingVolume > LIQUID_EPSILON && typeU == EMPTY_NODE_TYPE) {
-    flowToRTU.z = max(max((remainingVolume-liquidVolU)/3.0, 0.0), flowToRTU.z);
+    flowToRTU.z = max(max((liquidVol-liquidVolU)/3.0, 0.0), flowToRTU.z);
     flowToRTU.z = min(flowToRTU.z, min(max(maxVolume-liquidVolU,0), remainingVolume));
     remainingVolume -= flowToRTU.z;
     result.flowU = flowToRTU.z;
@@ -440,7 +441,7 @@ void CSCalculateFlowsKernel(uint3 id : SV_DispatchThreadID) {
     if (remainingVolume > maxVolume) {
       flowToRTU.y = 0.5*(remainingVolume-maxVolume);
     }
-    else if (liquidVolT < maxVolume) { 
+    else if (liquidVolT < liquidVol) { 
       flowToRTU.y = min(flowToRTU.y, min(maxVolume-liquidVolT, remainingVolume));
     }
     remainingVolume -= flowToRTU.y;
@@ -530,6 +531,24 @@ void CSUpdateNodeData(uint3 id : SV_DispatchThreadID) {
   if (!isOutOfBounds(id)) {
     LiquidNodeUpdate update = updates[idToIndex(id)];
     nodeData[id.xyz] = buildNode(update.terrainIsoVal < ISOVAL_CUTOFF ? EMPTY_NODE_TYPE : SOLID_NODE_TYPE, update.liquidVolume, UNSETTLED_NODE);
+  }
+}
+//RWStructuredBuffer<LiquidNodeUpdate> updates; 
+//RWTexture3D<float4> nodeData; // Output of CSUpdateNodeData
+[numthreads(8,8,8)]
+void CSUpdateNodeTypeDiff(uint3 id : SV_DispatchThreadID) {
+  if (!isOutOfBounds(id)) {
+    LiquidNodeUpdate update = updates[idToIndex(id)];
+    float4 currNode = nodeData[id.xyz];
+    float newNodeType = update.terrainIsoVal < ISOVAL_CUTOFF ? EMPTY_NODE_TYPE : SOLID_NODE_TYPE;
+    float newNodeVol  = update.liquidVolume;
+    if (newNodeType != nodeType(currNode)) {
+      currNode[NODE_TYPE_IDX] = newNodeType;
+    }
+    if (newNodeVol != nodeLiquidVolume(currNode)) {
+      currNode[NODE_VOL_IDX] = newNodeVol;
+    }
+    nodeData[id.xyz] = currNode;
   }
 }
 

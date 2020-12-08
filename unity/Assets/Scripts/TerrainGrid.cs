@@ -18,7 +18,8 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
   // Live data used in the editor and in-game, note that we serialize these fields so that we can undo/redo edit operations
   private TerrainGridNode[,,] nodes; // Does not include the outer "ghost" nodes with zeroed isovalues
   private Dictionary<Vector3Int, TerrainColumn> terrainColumns;
-  private Dictionary<GameObject, HashSet<TerrainGridNode>> debrisNodeDict;
+  private Dictionary<GameObject, TerrainDebrisDiff> debrisNodeDict;
+  private bool debrisToLiquidNeedsUpdate = false;
 
   private Bedrock bedrock;
 
@@ -43,7 +44,7 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
       Mathf.Clamp(unitsToNodeIndex(x), 0, nodes.GetLength(0)-1), 
       Mathf.Clamp(unitsToNodeIndex(y), 0, nodes.GetLength(1)-1), 
       Mathf.Clamp(unitsToNodeIndex(z), 0, nodes.GetLength(2)-1));
-    }
+  }
   public Vector3Int unitsToNodeIndexVec3(in Vector3 unitPos) { return unitsToNodeIndexVec3(unitPos.x, unitPos.y, unitPos.z);}
   public static float nodeIndexToUnits(int idx) { return idx*unitsPerNode(); }
   public Vector3 nodeIndexToUnitsVec3(int x, int y, int z) { return nodeIndexToUnitsVec3(new Vector3Int(x,y,z)); }
@@ -376,7 +377,7 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
         waterCompute.initAll();
         waterCompute.writeUpdateNodesToLiquid(nodes);
       }
-      debrisNodeDict = new Dictionary<GameObject, HashSet<TerrainGridNode>>();
+      debrisNodeDict = new Dictionary<GameObject, TerrainDebrisDiff>();
       // Build all the assets for the game that aren't stored in the level data
       buildBedrock();
       buildTerrainColumns();
@@ -395,24 +396,24 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
   }
 
   void FixedUpdate() {
-    if (debrisNodeDict.Count > 0) {
+    if (debrisNodeDict.Count > 0 && debrisToLiquidNeedsUpdate) {
       waterCompute.readUpdateNodesFromLiquid(nodes);
 
       // Go through all the nodes that might be inside the debris, if any have liquid in them then we check to make sure
       // it's actually inside the debris and displace it to the closest empty non-terrain node if it is
-      var allAffectedNodes = new HashSet<TerrainGridNode>();
+      var allCurrAffectedNodes = new HashSet<TerrainGridNode>();
+      var allPrevAffectedNodes = new HashSet<TerrainGridNode>();
       var affectedLiquidNodes = new HashSet<TerrainGridNode>();
-      foreach (var debrisNodes in debrisNodeDict.Values) {
-        allAffectedNodes.UnionWith(debrisNodes);
-        foreach (var debrisNode in debrisNodes) {
+      foreach (var debrisDiffs in debrisNodeDict.Values) {
+        allCurrAffectedNodes.UnionWith(debrisDiffs.currDebrisNodes);
+        allPrevAffectedNodes.UnionWith(debrisDiffs.prevDebrisNodes);
+        foreach (var debrisNode in debrisDiffs.currDebrisNodes) {
           if (debrisNode.liquidVol > 0) { affectedLiquidNodes.Add(debrisNode); }
         }
       }
-      if (affectedLiquidNodes.Count > 0) {
-        displaceNodeLiquid(affectedLiquidNodes, allAffectedNodes);
-      }
-
-      waterCompute.writeUpdateNodesAndDebrisToLiquid(nodes, debrisNodeDict);
+      var changedLiquidNodes = displaceNodeLiquid(affectedLiquidNodes, allCurrAffectedNodes);
+      waterCompute.writeUpdateDebrisDiffToLiquid(allPrevAffectedNodes, allCurrAffectedNodes, changedLiquidNodes);
+      debrisToLiquidNeedsUpdate = false;
     }
   }
 
@@ -625,46 +626,38 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     return result;
   }
 
-
-  private void displaceNodeLiquid(IEnumerable<TerrainGridNode> affectedLiquidNodes, HashSet<TerrainGridNode> restrictedNodes) {
-    foreach (var liquidNode in affectedLiquidNodes) {
-      var nodeIdx = liquidNode.gridIndex;
-
-      // Find, roughly, the shortest path out of the debris to the nearest non-terrain node(s)
-      var searchedNodes = new HashSet<TerrainGridNode>();
-      var bfsQueue = new Queue<TerrainGridNode>();
-      bfsQueue.Enqueue(liquidNode);
-      searchedNodes.Add(liquidNode);
-
-      var closestEmptyNodes = new List<TerrainGridNode>();
-      while (bfsQueue.Count > 0) {
-        var currNode = bfsQueue.Dequeue();
-        if (!currNode.isTerrain() && !restrictedNodes.Contains(currNode)) { 
-          closestEmptyNodes.Add(currNode);
-          foreach (var otherNode in bfsQueue) { if (!otherNode.isTerrain() && !restrictedNodes.Contains(otherNode)) { closestEmptyNodes.Add(otherNode); } }
-          closestEmptyNodes.Add(currNode); 
-          break;
-        }
-        var neighbours = getNeighboursForNode(currNode);
-        foreach (var neighbour in neighbours) {
-          if (searchedNodes.Contains(neighbour)) { continue; }
-          searchedNodes.Add(neighbour);
-          bfsQueue.Enqueue(neighbour);
-        }
+  public HashSet<TerrainGridNode> findPeripheryNodes(in HashSet<TerrainGridNode> internalNodes) {
+    var peripheryNodes = new HashSet<TerrainGridNode>();
+    foreach (var node in internalNodes) {
+      var neighbours = getNeighboursForNode(node);
+      foreach (var neighbour in neighbours) {
+        if (!internalNodes.Contains(neighbour)) { peripheryNodes.Add(neighbour); }
       }
-
-      // Distribute liquid evenly across all the closest empty nodes
-      if (closestEmptyNodes.Count == 0) { continue; }
-      var liquidPerNode = liquidNode.liquidVol / (float)closestEmptyNodes.Count;
-      foreach (var ceNode in closestEmptyNodes) {
-        ceNode.liquidVol += liquidPerNode;
-      }
-      liquidNode.liquidVol = 0;
     }
+    return peripheryNodes;
+  }
+
+  private List<TerrainGridNode> displaceNodeLiquid(IEnumerable<TerrainGridNode> affectedLiquidNodes, HashSet<TerrainGridNode> displacedNodes) {
+    var peripheryNodes = findPeripheryNodes(displacedNodes);
+    var fillableNodes = new List<TerrainGridNode>();
+    foreach (var peripheryNode in peripheryNodes) {
+      if (!peripheryNode.isTerrain()) { fillableNodes.Add(peripheryNode); }
+    }
+    // Distribute liquid evenly across all the non-terrain periphery nodes
+    if (fillableNodes.Count > 0) {
+      foreach (var liquidNode in affectedLiquidNodes) {
+        var liquidPerNode = liquidNode.liquidVol / (float)fillableNodes.Count;
+        foreach (var fillableNode in fillableNodes) {
+          fillableNode.liquidVol += liquidPerNode;
+        }
+        liquidNode.liquidVol = 0;
+      }
+    }
+    return fillableNodes;
   } 
   
-  // TODO: Make this function update a dictionary of <GameObject, HashSet<TerrainGridNode>> then
-  // in the FixedUpdate method go through that dictionary and perform the proper read/write updates from/to the liquid simulation
+  // This function updates a dictionary of debris nodes then in the FixedUpdate method 
+  // we go through that dictionary and perform the proper read/write updates from/to the liquid simulation
   // and the liquid quantities in nodes - The debris needs to be treated as solid nodes while it moves without being a part of the nodes array
   public void updateMovingDebris(GameObject debrisGO) {
     var debrisCollider = debrisGO.GetComponent<Collider>();
@@ -676,17 +669,28 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
 
     // Keep the nodes associated with the debris up-to-date in the debrisNodeDict
     var affectedNodes = new HashSet<TerrainGridNode>();
+    var closenessEpsilon = 0.5f*halfUnitsPerNode();
     for (int x = nodeIdxRange.xStartIdx; x <= nodeIdxRange.xEndIdx; x++) {
       for (int y = nodeIdxRange.yStartIdx; y <= nodeIdxRange.yEndIdx; y++) {
         for (int z = nodeIdxRange.zStartIdx; z <= nodeIdxRange.zEndIdx; z++) {
           var node = nodes[x,y,z];
           var nodeWSPos = node.position + transform.position;
-          if (Vector3.SqrMagnitude(debrisCollider.ClosestPoint(nodeWSPos)-nodeWSPos) < 1e-6f) { affectedNodes.Add(node); }
+          if (debrisCollider.IsPointInside(nodeWSPos, closenessEpsilon)) { affectedNodes.Add(node); }
         }
       }
     }
-
-    debrisNodeDict[debrisGO] = affectedNodes;
+    TerrainDebrisDiff prevDiff;
+    if (debrisNodeDict.TryGetValue(debrisGO, out prevDiff)) {
+      if (!affectedNodes.SetEquals(prevDiff.currDebrisNodes)) {
+        prevDiff.prevDebrisNodes = prevDiff.currDebrisNodes;
+        prevDiff.currDebrisNodes = affectedNodes;
+        debrisToLiquidNeedsUpdate = true;
+      }
+    }
+    else {
+      debrisNodeDict.Add(debrisGO, new TerrainDebrisDiff(new HashSet<TerrainGridNode>(), affectedNodes));
+      debrisToLiquidNeedsUpdate = true;
+    }
   }
 
   public void mergeDebrisIntoTerrain(GameObject debrisGO) {
@@ -757,7 +761,7 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
       // Build debris for each island
       var debris = buildTerrainDebris(islandNodeSet);
       // Add the nodes occupied by the debris to the debris dictionary
-      debrisNodeDict.Add(debris.gameObj, islandNodeSet);
+      debrisNodeDict.Add(debris.gameObj, new TerrainDebrisDiff(new HashSet<TerrainGridNode>(), islandNodeSet));
       // And clear the isovalues for all the nodes that make up the debris (which is now a separate mesh)
       foreach (var node in islandNodeSet) {
         foreach (var tcIndex in node.columnIndices) { resultTCs.Add(terrainColumns[tcIndex]); }
