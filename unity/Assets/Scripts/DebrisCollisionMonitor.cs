@@ -8,10 +8,11 @@ public class DebrisCollisionMonitor : MonoBehaviour {
   public static readonly float ySqrDistToFalloff = 25.0f; // Squared distance below the y-axis before the mesh has "fallen off" the map
   public static readonly float minVelForSleep    = 1e-4f; // Minimum velocity on each axis of a rigidbody, below this assumes it's no longer active
   public static readonly float minAngVelForSleep = 1e-3f; // Min angular vel on each axis (see above)
-  public static readonly float moveEventUpdateTime = 1f/15f;
+  public static readonly float moveEventUpdateTime = 1f/30f;
 
   public GameEvent onSleepEvent;    // Called when debris slows/stops and comes to rest within the terrain
   public GameEvent onFellOffEvent;  // Called when the debris falls off and goes below the terrain
+  public GameEvent onMoveEvent;     // Called as the debris falls/moves
   
   public float sleepTime = 2.0f;    // Time in seconds where 'IsSleeping' is true until the debris is considered fully asleep
   private float sleepTimeCount = 0;
@@ -24,6 +25,7 @@ public class DebrisCollisionMonitor : MonoBehaviour {
   private void Start() {
     onSleepEvent   = Resources.Load<GameEvent>(GameEvent.DEBRIS_SLEEP_EVENT);
     onFellOffEvent = Resources.Load<GameEvent>(GameEvent.DEBRIS_FELL_OFF_EVENT);
+    onMoveEvent    = Resources.Load<GameEvent>(GameEvent.DEBRIS_MOVE_UPDATE_EVENT);
   }
 
   private void FixedUpdate() {
@@ -57,14 +59,11 @@ public class DebrisCollisionMonitor : MonoBehaviour {
     else {
       sleepTimeCount = 0;
 
-      // As the debris falls it may displace liquid, we need to figure out where to displace the liquid
-      // and update the liquid simulation so that it knows about this and the velocity of the debris
-      // Since this is an expensive operation (and accuracy is not super important) we only do it once every 15 frames
-
-      // TODO: Have an event for falling debris
+      // Debris is moving, fire update events -
+      // Since this is an expensive operation (and accuracy is not super important) we don't do it on every update
       moveTimeCount += Time.fixedDeltaTime;
       if (moveTimeCount >= moveEventUpdateTime) {
-        //onDebrisMoveTickEvent?.FireEvent(gameObject);
+        onMoveEvent?.FireEvent(gameObject);
         moveTimeCount -= moveEventUpdateTime;
       }
     }

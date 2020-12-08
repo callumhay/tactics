@@ -14,14 +14,14 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   editorType: 0
   paintType: 0
-  paintMode: 1
+  paintMode: 0
   brushType: 1
-  brushSize: 3
+  brushSize: 1
   matPaintIntensity: 0.25
   gridSnaping: 0
   showGridOverlay: 0
   groundUpOnly: 0
-  setLevelValue: 10
+  setLevelValue: 1
   paintMaterial: {fileID: 0}
   columnInsetXAmount: 0
   columnInsetNegXAmount: 0
@@ -29,5 +29,5 @@ MonoBehaviour:
   columnInsetNegZAmount: 0
   showTerrainNodes: 1
   showEmptyNodes: 1
-  showSurfaceNodes: 0
+  showSurfaceNodes: 1
   showAboveSurfaceNodes: 1

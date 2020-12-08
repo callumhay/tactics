@@ -1,4 +1,4 @@
-﻿
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 #pragma warning disable 649
@@ -326,6 +326,10 @@ public class WaterCompute : MonoBehaviour {
   /// </summary>
   /// <param name="nodes">The current state of the nodes to be written for simulation.</param>
   public void writeUpdateNodesToLiquid(in TerrainGridNode[,,] nodes) {
+    this.writeUpdateNodesAndDebrisToLiquid(nodes, new Dictionary<GameObject, HashSet<TerrainGridNode>>());
+  }
+
+  public void writeUpdateNodesAndDebrisToLiquid(in TerrainGridNode[,,] nodes, in Dictionary<GameObject, HashSet<TerrainGridNode>> debrisNodeDict) {
     if (updateNodeComputeBuf == null) { return; }
 
     var borderFront = volComponent.getBorderFront();
@@ -340,6 +344,17 @@ public class WaterCompute : MonoBehaviour {
       nodeUpdate.liquidVolume = node.liquidVol;
       nodeCBArr[idx] = nodeUpdate;
     }
+    /*
+    foreach (var debrisNodes in debrisNodeDict.Values) {
+      foreach (var debrisNode in debrisNodes) {
+        var idx = LiquidNodeUpdate.flattenedNodeIdx(debrisNode.gridIndex, borderFront, fullResSize);
+        LiquidNodeUpdate nodeUpdate;
+        nodeUpdate.terrainIsoVal = 1;
+        nodeUpdate.liquidVolume = 0;
+        nodeCBArr[idx] = nodeUpdate;
+      }
+    }
+    */
     updateNodeComputeBuf.EndWrite<LiquidNodeUpdate>(bufferCount);
 
     // Update the node data...
@@ -349,7 +364,7 @@ public class WaterCompute : MonoBehaviour {
   }
 
   // TODO: Optimize so that we only read the interior of the 3D buffer?
-  public void readUpdateNodesFromLiquid(ref TerrainGridNode[,,] nodes) {
+  public void readUpdateNodesFromLiquid(TerrainGridNode[,,] nodes) {
     if (nodeDataRT == null || readNodeComputeBuf == null) { return; }
     //RenderTexture.active = nodeDataRT;
     //nodeDataReadTex.Read
