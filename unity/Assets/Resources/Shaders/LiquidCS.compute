@@ -247,6 +247,7 @@ void CSVorticityConfinementKernel(uint3 id : SV_DispatchThreadID) {
 //uint3 internalSize;
 //RWTexture3D<float4> vel;
 //RWTexture3D<float4> nodeData;
+RWTexture3D<float4> obsticleVel;
 RWTexture3D<float> pressure; // Output: We clear the initial pressure buffer while we calculate the divergence
 RWTexture3D<float> divergence; // Output of CSDivergenceKernel
 
@@ -260,12 +261,12 @@ void CSDivergenceKernel(uint3 id : SV_DispatchThreadID) {
   float4 nD = nodeData[idxD]; float4 nU = nodeData[idxU];
 
   float3 noVel = float3(0,0,0);
-  float3 fieldL = (nodeType(nL) == SOLID_NODE_TYPE) ? noVel : vel[idxL].xyz;
-  float3 fieldR = (nodeType(nR) == SOLID_NODE_TYPE) ? noVel : vel[idxR].xyz;
-  float3 fieldB = (nodeType(nB) == SOLID_NODE_TYPE) ? noVel : vel[idxB].xyz;
-  float3 fieldT = (nodeType(nT) == SOLID_NODE_TYPE) ? noVel : vel[idxT].xyz;
-  float3 fieldD = (nodeType(nD) == SOLID_NODE_TYPE) ? noVel : vel[idxD].xyz;
-  float3 fieldU = (nodeType(nU) == SOLID_NODE_TYPE) ? noVel : vel[idxU].xyz;
+  float3 fieldL = (nodeType(nL) == SOLID_NODE_TYPE) ? obsticleVel[idxL].xyz : vel[idxL].xyz;
+  float3 fieldR = (nodeType(nR) == SOLID_NODE_TYPE) ? obsticleVel[idxR].xyz : vel[idxR].xyz;
+  float3 fieldB = (nodeType(nB) == SOLID_NODE_TYPE) ? obsticleVel[idxB].xyz : vel[idxB].xyz;
+  float3 fieldT = (nodeType(nT) == SOLID_NODE_TYPE) ? obsticleVel[idxT].xyz : vel[idxT].xyz;
+  float3 fieldD = (nodeType(nD) == SOLID_NODE_TYPE) ? obsticleVel[idxD].xyz : vel[idxD].xyz;
+  float3 fieldU = (nodeType(nU) == SOLID_NODE_TYPE) ? obsticleVel[idxU].xyz : vel[idxU].xyz;
 
   divergence[id.xyz] = ((fieldR[0]-fieldL[0]) + (fieldT[1]-fieldB[1]) + (fieldU[2]-fieldD[2])) / (float)(internalSize.x+internalSize.y+internalSize.z);
   pressure[id.xyz] = 0.0;
@@ -306,6 +307,7 @@ void CSPressureKernel(uint3 id : SV_DispatchThreadID) {
 // Project Velocity *****************
 //uint3 internalSize;
 //RWTexture3D<float4> vel;
+//RWTexture3D<float4> obsticleVel;
 //RWTexture3D<float4> nodeData;
 //RWTexture3D<float> pressure;
 RWTexture3D<float4> projectedVel; // Output of CSProjectKernel
@@ -313,7 +315,7 @@ RWTexture3D<float4> projectedVel; // Output of CSProjectKernel
 [numthreads(8,8,8)]
 void CSProjectKernel(uint3 id : SV_DispatchThreadID) {
   float4 node = nodeData[id.xyz];
-  if (isOutOfBounds(id) || nodeType(node) == SOLID_NODE_TYPE) { projectedVel[id.xyz] = float4(0,0,0,0); return; }
+  if (isOutOfBounds(id) || nodeType(node) == SOLID_NODE_TYPE) { projectedVel[id.xyz] = obsticleVel[id.xyz]; return; }
 
   uint3 idxL, idxR, idxB, idxT, idxD, idxU;
   neighbourIndices(id, idxL, idxR, idxB, idxT, idxD, idxU);
@@ -328,22 +330,22 @@ void CSProjectKernel(uint3 id : SV_DispatchThreadID) {
   float pB = pressure[idxB]; float pT = pressure[idxT];
   float pD = pressure[idxD]; float pU = pressure[idxU];
 
-  // NOTE: This requires augmentation if the boundaries have velocity!
+  float3 obstVel  = float3(0,0,0);
   float3 vMaskPos = float3(1,1,1);
   float3 vMaskNeg = float3(1,1,1);
-  if (nodeType(nL) == SOLID_NODE_TYPE /*|| nodeSettled(nL) == SETTLED_NODE*/) { pL = pC; vMaskNeg[0] = 0; }
-  if (nodeType(nR) == SOLID_NODE_TYPE /*|| nodeSettled(nR) == SETTLED_NODE*/) { pR = pC; vMaskPos[0] = 0; }
-  if (nodeType(nB) == SOLID_NODE_TYPE /*|| nodeSettled(nB) == SETTLED_NODE*/) { pB = pC; vMaskNeg[1] = 0; }
-  if (nodeType(nT) == SOLID_NODE_TYPE /*|| nodeSettled(nT) == SETTLED_NODE*/) { pT = pC; vMaskPos[1] = 0; }
-  if (nodeType(nD) == SOLID_NODE_TYPE /*|| nodeSettled(nD) == SETTLED_NODE*/) { pD = pC; vMaskNeg[2] = 0; }
-  if (nodeType(nU) == SOLID_NODE_TYPE /*|| nodeSettled(nU) == SETTLED_NODE*/) { pU = pC; vMaskPos[2] = 0; }
+  if (nodeType(nL) == SOLID_NODE_TYPE /*|| nodeSettled(nL) == SETTLED_NODE*/) { pL = pC; obstVel[0] = obsticleVel[idxL].x; vMaskNeg[0] = 0; }
+  if (nodeType(nR) == SOLID_NODE_TYPE /*|| nodeSettled(nR) == SETTLED_NODE*/) { pR = pC; obstVel[0] = obsticleVel[idxR].x; vMaskPos[0] = 0; }
+  if (nodeType(nB) == SOLID_NODE_TYPE /*|| nodeSettled(nB) == SETTLED_NODE*/) { pB = pC; obstVel[1] = obsticleVel[idxB].y; vMaskNeg[1] = 0; }
+  if (nodeType(nT) == SOLID_NODE_TYPE /*|| nodeSettled(nT) == SETTLED_NODE*/) { pT = pC; obstVel[1] = obsticleVel[idxT].y; vMaskPos[1] = 0; }
+  if (nodeType(nD) == SOLID_NODE_TYPE /*|| nodeSettled(nD) == SETTLED_NODE*/) { pD = pC; obstVel[2] = obsticleVel[idxD].z; vMaskNeg[2] = 0; }
+  if (nodeType(nU) == SOLID_NODE_TYPE /*|| nodeSettled(nU) == SETTLED_NODE*/) { pU = pC; obstVel[2] = obsticleVel[idxU].z; vMaskPos[2] = 0; }
 
   float sizeSum = internalSize.x+internalSize.y+internalSize.z;
   float4 result = float4(u[0] - (pR-pL) / sizeSum, u[1] - (pT-pB) / sizeSum, u[2] - (pU-pD) / sizeSum, 0);
   result[0] = min(result[0]*vMaskPos[0], max(result[0]*vMaskNeg[0], result[0]));
   result[1] = min(result[1]*vMaskPos[1], max(result[1]*vMaskNeg[1], result[1]));
   result[2] = min(result[2]*vMaskPos[2], max(result[2]*vMaskNeg[2], result[2]));
-  projectedVel[id.xyz] = result;
+  projectedVel[id.xyz] = result + float4(obstVel, 0);
 }
 
 // Calculating flows in/out of nodes *****************
@@ -405,7 +407,7 @@ void CSCalculateFlowsKernel(uint3 id : SV_DispatchThreadID) {
   }
 
   // Leftward flow
-  if (remainingVolume > LIQUID_EPSILON && typeL == EMPTY_NODE_TYPE && liquidVolL < maxVolume) {
+  if (remainingVolume > LIQUID_EPSILON && typeL == EMPTY_NODE_TYPE && liquidVolL < liquidVol) {
     flowToLBD.x = max(max((remainingVolume-liquidVolL)/6.0, 0.0), flowToLBD.x);
     flowToLBD.x = min(flowToLBD.x, min(max(maxVolume-liquidVolL,0), remainingVolume));
     remainingVolume -= flowToLBD.x;
@@ -413,7 +415,7 @@ void CSCalculateFlowsKernel(uint3 id : SV_DispatchThreadID) {
   }
 
   // Rightward flow
-  if (remainingVolume > LIQUID_EPSILON && typeR == EMPTY_NODE_TYPE && liquidVolR < maxVolume) {
+  if (remainingVolume > LIQUID_EPSILON && typeR == EMPTY_NODE_TYPE && liquidVolR < liquidVol) {
     flowToRTU.x = max(max((remainingVolume-liquidVolR)/5.0, 0.0), flowToRTU.x);
     flowToRTU.x = min(flowToRTU.x, min(max(maxVolume-liquidVolR,0), remainingVolume));
     remainingVolume -= flowToRTU.x;
@@ -421,7 +423,7 @@ void CSCalculateFlowsKernel(uint3 id : SV_DispatchThreadID) {
   }
 
   // Backward flow
-  if (remainingVolume > LIQUID_EPSILON && typeD == EMPTY_NODE_TYPE && liquidVolD < maxVolume) {
+  if (remainingVolume > LIQUID_EPSILON && typeD == EMPTY_NODE_TYPE && liquidVolD < liquidVol) {
     flowToLBD.z = max(max((remainingVolume-liquidVolD)/4.0, 0.0), flowToLBD.z);
     flowToLBD.z = min(flowToLBD.z, min(max(maxVolume-liquidVolD,0), remainingVolume));
     remainingVolume -= flowToLBD.z;

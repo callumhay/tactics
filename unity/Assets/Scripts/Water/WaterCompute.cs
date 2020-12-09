@@ -72,6 +72,7 @@ public class WaterCompute : MonoBehaviour {
 
   private RenderTexture nodeDataRT;
   private RenderTexture velRT;
+  private RenderTexture obsticleVelRT;
   private RenderTexture temp3DFloat4RT1;
   private RenderTexture temp3DFloat4RT2;
   private RenderTexture temp3DFloatRT;
@@ -137,6 +138,7 @@ public class WaterCompute : MonoBehaviour {
     //nodeDataReadTex = new Texture3D(fullResSize, fullResSize, fullResSize, TextureFormat.ARGB32, false);
     nodeDataRT = init3DRenderTexture(fullResSize, RenderTextureFormat.ARGBFloat);
     velRT = init3DRenderTexture(fullResSize, RenderTextureFormat.ARGBFloat);
+    obsticleVelRT = init3DRenderTexture(fullResSize, RenderTextureFormat.ARGBFloat);
     temp3DFloat4RT1 = init3DRenderTexture(fullResSize, RenderTextureFormat.ARGBFloat);
     temp3DFloat4RT2 = init3DRenderTexture(fullResSize, RenderTextureFormat.ARGBFloat);
     temp3DFloatRT = init3DRenderTexture(fullResSize, RenderTextureFormat.RFloat);
@@ -172,6 +174,7 @@ public class WaterCompute : MonoBehaviour {
   private void OnDestroy() {
     nodeDataRT?.Release();
     velRT?.Release();
+    obsticleVelRT?.Release();
     temp3DFloat4RT1?.Release();
     temp3DFloat4RT2?.Release();
     temp3DFloatRT?.Release();
@@ -188,6 +191,7 @@ public class WaterCompute : MonoBehaviour {
     result.volumeDepth = resSize;
     result.enableRandomWrite = true;
     result.Create();
+    clearRT(result, new Color(0,0,0,0));
     return result;
   }
 
@@ -239,6 +243,7 @@ public class WaterCompute : MonoBehaviour {
 
   private void computeDivergence() {
     liquidComputeShader.SetTexture(divergenceKernelId, "vel", velRT);
+    liquidComputeShader.SetTexture(divergenceKernelId, "obsticleVel", obsticleVelRT);
     liquidComputeShader.SetTexture(divergenceKernelId, "nodeData", nodeDataRT);
     liquidComputeShader.SetTexture(divergenceKernelId, "divergence", temp3DFloatRT);
     liquidComputeShader.SetTexture(divergenceKernelId, "pressure", tempPressurePing);
@@ -263,6 +268,7 @@ public class WaterCompute : MonoBehaviour {
 
   private void projectVelocity() {
     liquidComputeShader.SetTexture(projectKernelId, "vel", velRT);
+    liquidComputeShader.SetTexture(projectKernelId, "obsticleVel", obsticleVelRT);
     liquidComputeShader.SetTexture(projectKernelId, "nodeData", nodeDataRT);
     liquidComputeShader.SetTexture(projectKernelId, "pressure", tempPressurePing);
     liquidComputeShader.SetTexture(projectKernelId, "projectedVel", temp3DFloat4RT1);
@@ -426,7 +432,8 @@ public class WaterCompute : MonoBehaviour {
       // Make sure we are only reading the interior (non-border) portion of the array
       if (nodeIdx.x < 0 || nodeIdx.y < 0 || nodeIdx.z < 0 || nodeIdx.x >= nodes.GetLength(0) ||
           nodeIdx.y >= nodes.GetLength(1) || nodeIdx.z >= nodes.GetLength(2)) { continue; }
-
+          
+      // We only read the liquid values
       nodes[nodeIdx.x, nodeIdx.y, nodeIdx.z].liquidVol = readNodeCPUArr[i];
     }
   }
