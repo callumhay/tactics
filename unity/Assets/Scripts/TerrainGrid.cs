@@ -429,8 +429,8 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
         }
       }
       var changedLiquidNodes = displaceNodeLiquid(affectedLiquidNodes, allCurrAffectedNodes);
-      //waterCompute.writeUpdateDebrisDiffToLiquid(allPrevAffectedNodes, allCurrAffectedNodes, changedLiquidNodes);
-      waterCompute.writeUpdateNodesAndDebrisToLiquid(nodes, debrisNodeDict);
+      waterCompute.writeUpdateDebrisDiffToLiquid(allPrevAffectedNodes, allCurrAffectedNodes, changedLiquidNodes);
+      //waterCompute.writeUpdateNodesAndDebrisToLiquid(nodes, debrisNodeDict);
     }
   }
 

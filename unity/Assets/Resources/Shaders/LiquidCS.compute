@@ -407,7 +407,7 @@ void CSCalculateFlowsKernel(uint3 id : SV_DispatchThreadID) {
   }
 
   // Leftward flow
-  if (remainingVolume > LIQUID_EPSILON && typeL == EMPTY_NODE_TYPE && liquidVolL < liquidVol) {
+  if (remainingVolume > LIQUID_EPSILON && typeL == EMPTY_NODE_TYPE && liquidVolL < maxVolume) {
     flowToLBD.x = max(max((remainingVolume-liquidVolL)/6.0, 0.0), flowToLBD.x);
     flowToLBD.x = min(flowToLBD.x, min(max(maxVolume-liquidVolL,0), remainingVolume));
     remainingVolume -= flowToLBD.x;
@@ -415,7 +415,7 @@ void CSCalculateFlowsKernel(uint3 id : SV_DispatchThreadID) {
   }
 
   // Rightward flow
-  if (remainingVolume > LIQUID_EPSILON && typeR == EMPTY_NODE_TYPE && liquidVolR < liquidVol) {
+  if (remainingVolume > LIQUID_EPSILON && typeR == EMPTY_NODE_TYPE && liquidVolR < maxVolume) {
     flowToRTU.x = max(max((remainingVolume-liquidVolR)/5.0, 0.0), flowToRTU.x);
     flowToRTU.x = min(flowToRTU.x, min(max(maxVolume-liquidVolR,0), remainingVolume));
     remainingVolume -= flowToRTU.x;
@@ -423,7 +423,7 @@ void CSCalculateFlowsKernel(uint3 id : SV_DispatchThreadID) {
   }
 
   // Backward flow
-  if (remainingVolume > LIQUID_EPSILON && typeD == EMPTY_NODE_TYPE && liquidVolD < liquidVol) {
+  if (remainingVolume > LIQUID_EPSILON && typeD == EMPTY_NODE_TYPE && liquidVolD < maxVolume) {
     flowToLBD.z = max(max((remainingVolume-liquidVolD)/4.0, 0.0), flowToLBD.z);
     flowToLBD.z = min(flowToLBD.z, min(max(maxVolume-liquidVolD,0), remainingVolume));
     remainingVolume -= flowToLBD.z;
