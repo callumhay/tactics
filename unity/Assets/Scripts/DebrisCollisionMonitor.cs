@@ -58,7 +58,7 @@ public class DebrisCollisionMonitor : MonoBehaviour {
     }
     else {
       sleepTimeCount = 0;
-
+     
       // Debris is moving, fire update events -
       // Since this is an expensive operation (and accuracy is not super important) we don't do it on every update
       moveTimeCount += Time.fixedDeltaTime;
@@ -66,6 +66,7 @@ public class DebrisCollisionMonitor : MonoBehaviour {
         onMoveEvent?.FireEvent(gameObject);
         moveTimeCount -= moveEventUpdateTime;
       }
+      
     }
   }
 

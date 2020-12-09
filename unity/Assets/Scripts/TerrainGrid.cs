@@ -398,6 +398,7 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
   void FixedUpdate() {
     
     if (debrisNodeDict.Count > 0 && debrisToLiquidNeedsUpdate) {
+      debrisToLiquidNeedsUpdate = false;
       waterCompute.readUpdateNodesFromLiquid(nodes);
 
       // Go through all the nodes that might be inside the debris, if any have liquid in them then we check to make sure
@@ -430,7 +431,7 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
       }
       var changedLiquidNodes = displaceNodeLiquid(affectedLiquidNodes, allCurrAffectedNodes);
       waterCompute.writeUpdateDebrisDiffToLiquid(allPrevAffectedNodes, allCurrAffectedNodes, changedLiquidNodes);
-      debrisToLiquidNeedsUpdate = false;
+      //waterCompute.writeUpdateNodesAndDebrisToLiquid(nodes, debrisNodeDict);
     }
     
   }
@@ -699,6 +700,8 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     }
     TerrainDebrisDiff prevDiff;
     if (debrisNodeDict.TryGetValue(debrisGO, out prevDiff)) {
+      // Only indicate that there's an update if the debris has changed position/orientation such that 
+      // the set of nodes that fill it has also changed
       if (!affectedNodes.SetEquals(prevDiff.currDebrisNodes)) {
         prevDiff.prevDebrisNodes = prevDiff.currDebrisNodes;
         prevDiff.currDebrisNodes = affectedNodes;
