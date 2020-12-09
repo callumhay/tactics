@@ -38,7 +38,7 @@ public class WaterCompute : MonoBehaviour {
   [Range(0,101325)]
   public float atmosphericPressure = 100.0f;
   [Range(0,1000)]
-  public float maxGravityVelocity = 12.0f;    // m/s
+  public float maxGravityVelocity = 20.0f;    // m/s
   [Range(0,1000)]
   public float maxPressureVelocity = 11.0f;     // m/s
   [Range(0,100)]
@@ -69,7 +69,7 @@ public class WaterCompute : MonoBehaviour {
   private int readNodesKernelId;
 
   private bool isInit = false;
-  //private Texture3D nodeDataReadTex;
+
   private RenderTexture nodeDataRT;
   private RenderTexture velRT;
   private RenderTexture temp3DFloat4RT1;

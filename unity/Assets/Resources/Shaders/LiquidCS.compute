@@ -397,7 +397,7 @@ void CSCalculateFlowsKernel(uint3 id : SV_DispatchThreadID) {
 
   // Downward flow
   if (remainingVolume > LIQUID_EPSILON && typeB == EMPTY_NODE_TYPE && liquidVolB < maxVolume) {
-    float calcLiquidB = dt*max(0, 0.5*(liquidVol - liquidVolB));
+    float calcLiquidB = dt*max(0, 0.5*(remainingVolume - liquidVolB));
     flowToLBD.y = max(calcLiquidB, flowToLBD.y);
     flowToLBD.y = min(flowToLBD.y, min(maxVolume-liquidVolB, remainingVolume));
     remainingVolume -= flowToLBD.y;
@@ -405,32 +405,32 @@ void CSCalculateFlowsKernel(uint3 id : SV_DispatchThreadID) {
   }
 
   // Leftward flow
-  if (remainingVolume > LIQUID_EPSILON && typeL == EMPTY_NODE_TYPE) {
-    flowToLBD.x = max(max((liquidVol-liquidVolL)/6.0, 0.0), flowToLBD.x);
+  if (remainingVolume > LIQUID_EPSILON && typeL == EMPTY_NODE_TYPE && liquidVolL < maxVolume) {
+    flowToLBD.x = max(max((remainingVolume-liquidVolL)/6.0, 0.0), flowToLBD.x);
     flowToLBD.x = min(flowToLBD.x, min(max(maxVolume-liquidVolL,0), remainingVolume));
     remainingVolume -= flowToLBD.x;
     result.flowL = flowToLBD.x;
   }
 
   // Rightward flow
-  if (remainingVolume > LIQUID_EPSILON && typeR == EMPTY_NODE_TYPE) {
-    flowToRTU.x = max(max((liquidVol-liquidVolR)/5.0, 0.0), flowToRTU.x);
+  if (remainingVolume > LIQUID_EPSILON && typeR == EMPTY_NODE_TYPE && liquidVolR < maxVolume) {
+    flowToRTU.x = max(max((remainingVolume-liquidVolR)/5.0, 0.0), flowToRTU.x);
     flowToRTU.x = min(flowToRTU.x, min(max(maxVolume-liquidVolR,0), remainingVolume));
     remainingVolume -= flowToRTU.x;
     result.flowR = flowToRTU.x;
   }
 
   // Backward flow
-  if (remainingVolume > LIQUID_EPSILON && typeD == EMPTY_NODE_TYPE) {
-    flowToLBD.z = max(max((liquidVol-liquidVolD)/4.0, 0.0), flowToLBD.z);
+  if (remainingVolume > LIQUID_EPSILON && typeD == EMPTY_NODE_TYPE && liquidVolD < maxVolume) {
+    flowToLBD.z = max(max((remainingVolume-liquidVolD)/4.0, 0.0), flowToLBD.z);
     flowToLBD.z = min(flowToLBD.z, min(max(maxVolume-liquidVolD,0), remainingVolume));
     remainingVolume -= flowToLBD.z;
     result.flowD = flowToLBD.z;
   }
 
   // Forward flow
-  if (remainingVolume > LIQUID_EPSILON && typeU == EMPTY_NODE_TYPE) {
-    flowToRTU.z = max(max((liquidVol-liquidVolU)/3.0, 0.0), flowToRTU.z);
+  if (remainingVolume > LIQUID_EPSILON && typeU == EMPTY_NODE_TYPE && liquidVolU < liquidVol) {
+    flowToRTU.z = max(max((remainingVolume-liquidVolU)/3.0, 0.0), flowToRTU.z);
     flowToRTU.z = min(flowToRTU.z, min(max(maxVolume-liquidVolU,0), remainingVolume));
     remainingVolume -= flowToRTU.z;
     result.flowU = flowToRTU.z;

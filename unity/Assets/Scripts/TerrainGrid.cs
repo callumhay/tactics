@@ -404,11 +404,27 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
       var allCurrAffectedNodes = new HashSet<TerrainGridNode>();
       var allPrevAffectedNodes = new HashSet<TerrainGridNode>();
       var affectedLiquidNodes = new HashSet<TerrainGridNode>();
-      foreach (var debrisDiffs in debrisNodeDict.Values) {
+      foreach (var debrisDictPair in debrisNodeDict) {
+        var debrisDiffs = debrisDictPair.Value;
         allCurrAffectedNodes.UnionWith(debrisDiffs.currDebrisNodes);
         allPrevAffectedNodes.UnionWith(debrisDiffs.prevDebrisNodes);
+        float liquidAmt = 0f;
         foreach (var debrisNode in debrisDiffs.currDebrisNodes) {
-          if (debrisNode.liquidVol > 0) { affectedLiquidNodes.Add(debrisNode); }
+          if (debrisNode.liquidVol > 0) {
+            affectedLiquidNodes.Add(debrisNode);
+            liquidAmt += debrisNode.liquidVol;
+          }
+        }
+        // If there's liquid in the way of the debris then we set the drag (due to bouyancy) on its rigidbody
+        // based on the fraction of its weight that's in the liquid
+        var debrisGO = debrisDictPair.Key;
+        var debrisRB = debrisGO.GetComponent<Rigidbody>();
+        if (liquidAmt > 0) {
+          debrisRB.drag = 15*liquidAmt*waterCompute.liquidDensity / debrisRB.mass;
+        }
+        else {
+          var debrisCollider = debrisGO.GetComponent<Collider>();
+          debrisRB.drag = TerrainDebris.getDrag(debrisCollider.bounds);
         }
       }
       var changedLiquidNodes = displaceNodeLiquid(affectedLiquidNodes, allCurrAffectedNodes);
