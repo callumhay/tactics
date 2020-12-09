@@ -396,6 +396,7 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
   }
 
   void FixedUpdate() {
+    
     if (debrisNodeDict.Count > 0 && debrisToLiquidNeedsUpdate) {
       waterCompute.readUpdateNodesFromLiquid(nodes);
 
@@ -431,6 +432,7 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
       waterCompute.writeUpdateDebrisDiffToLiquid(allPrevAffectedNodes, allCurrAffectedNodes, changedLiquidNodes);
       debrisToLiquidNeedsUpdate = false;
     }
+    
   }
 
   /// <summary>

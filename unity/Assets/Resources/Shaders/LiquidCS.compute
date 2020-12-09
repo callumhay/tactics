@@ -11,8 +11,8 @@
 
 // Update stuff
 #pragma kernel CSClearNodeData
+#pragma kernel CSClearUpdateBuffer
 #pragma kernel CSUpdateNodeData
-#pragma kernel CSUpdateNodeTypeDiff
 #pragma kernel CSReadNodeData
 
 // Debug stuff
@@ -524,31 +524,30 @@ void CSClearNodeData(uint3 id : SV_DispatchThreadID) {
   else { nodeData[id.xyz] = buildNode(EMPTY_NODE_TYPE, 0.0, UNSETTLED_NODE); }
 }
 
-RWStructuredBuffer<LiquidNodeUpdate> updates; 
+RWStructuredBuffer<LiquidNodeUpdate> updates; // Output of CSClearUpdateBuffer
+[numthreads(8,8,8)]
+void CSClearUpdateBuffer(uint3 id : SV_DispatchThreadID) {
+  LiquidNodeUpdate clearUpdate;
+  clearUpdate.terrainIsoVal = 0;
+  clearUpdate.liquidVolume = 0;
+  clearUpdate.isDiff = 0;
+  updates[idToIndex(id)] = clearUpdate;
+}
+
+//RWStructuredBuffer<LiquidNodeUpdate> updates; // Input and output of CSUpdateNodeData
 //RWTexture3D<float4> nodeData; // Output of CSUpdateNodeData
 [numthreads(8,8,8)]
 void CSUpdateNodeData(uint3 id : SV_DispatchThreadID) {
-  if (!isOutOfBounds(id)) {
-    LiquidNodeUpdate update = updates[idToIndex(id)];
+  LiquidNodeUpdate update = updates[idToIndex(id)];
+  if (update.isDiff > 0) {
     nodeData[id.xyz] = buildNode(update.terrainIsoVal < ISOVAL_CUTOFF ? EMPTY_NODE_TYPE : SOLID_NODE_TYPE, update.liquidVolume, UNSETTLED_NODE);
-  }
-}
-//RWStructuredBuffer<LiquidNodeUpdate> updates; 
-//RWTexture3D<float4> nodeData; // Output of CSUpdateNodeData
-[numthreads(8,8,8)]
-void CSUpdateNodeTypeDiff(uint3 id : SV_DispatchThreadID) {
-  if (!isOutOfBounds(id)) {
-    LiquidNodeUpdate update = updates[idToIndex(id)];
-    float4 currNode = nodeData[id.xyz];
-    float newNodeType = update.terrainIsoVal < ISOVAL_CUTOFF ? EMPTY_NODE_TYPE : SOLID_NODE_TYPE;
-    float newNodeVol  = update.liquidVolume;
-    if (newNodeType != nodeType(currNode)) {
-      currNode[NODE_TYPE_IDX] = newNodeType;
-    }
-    if (newNodeVol != nodeLiquidVolume(currNode)) {
-      currNode[NODE_VOL_IDX] = newNodeVol;
-    }
-    nodeData[id.xyz] = currNode;
+    
+    // Clear the update now that we've used it to update the node data
+    LiquidNodeUpdate clearUpdate;
+    clearUpdate.terrainIsoVal = 0;
+    clearUpdate.liquidVolume = 0;
+    clearUpdate.isDiff = 0;
+    updates[idToIndex(id)] = clearUpdate;
   }
 }
 

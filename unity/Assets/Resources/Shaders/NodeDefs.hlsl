@@ -22,6 +22,7 @@ struct NodeFlowInfo {
 struct LiquidNodeUpdate {
   float terrainIsoVal;
   float liquidVolume;
+  float isDiff;
 };
 
 float4 buildNode(int type, float liquidVol, int settled) {

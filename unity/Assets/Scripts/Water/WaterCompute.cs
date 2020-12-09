@@ -9,6 +9,7 @@ using UnityEngine;
 struct LiquidNodeUpdate {
   public float terrainIsoVal;
   public float liquidVolume;
+  public float isDiff;
 
   public static int flattenedNodeIdx(in Vector3Int nodeIdx, in Vector3Int borderFront, int size) {
     return LevelData.node3DIndexToFlatIndex(borderFront.x+nodeIdx.x, borderFront.y+nodeIdx.y, borderFront.z+nodeIdx.z, size, size);
@@ -65,7 +66,6 @@ public class WaterCompute : MonoBehaviour {
   private int sumFlowsKernelId;
   private int adjustVolFromFlowsKernelId;
   private int updateNodesKernelId;
-  private int updateNodeTypeDiffKernelId;
   private int readNodesKernelId;
 
   private bool isInit = false;
@@ -99,7 +99,6 @@ public class WaterCompute : MonoBehaviour {
     sumFlowsKernelId = liquidComputeShader.FindKernel("CSSumFlowsKernel");
     adjustVolFromFlowsKernelId = liquidComputeShader.FindKernel("CSAdjustNodeFlowsKernel");
     updateNodesKernelId = liquidComputeShader.FindKernel("CSUpdateNodeData");
-    updateNodeTypeDiffKernelId = liquidComputeShader.FindKernel("CSUpdateNodeTypeDiff");
     readNodesKernelId = liquidComputeShader.FindKernel("CSReadNodeData");
 
     initUniforms();
@@ -145,7 +144,7 @@ public class WaterCompute : MonoBehaviour {
 
     int flattenedBufSize = fullResSize*fullResSize*fullResSize;
     flowsBuffer = new ComputeBuffer(flattenedBufSize, 6*sizeof(float)); // Uses the NodeFlowInfo struct
-    updateNodeComputeBuf = new ComputeBuffer(flattenedBufSize, 2*sizeof(float), ComputeBufferType.Default, ComputeBufferMode.SubUpdates); // Uses the LiquidNodeUpdate struct
+    updateNodeComputeBuf = new ComputeBuffer(flattenedBufSize, 3*sizeof(float), ComputeBufferType.Default, ComputeBufferMode.SubUpdates); // Uses the LiquidNodeUpdate struct
     readNodeComputeBuf = new ComputeBuffer(flattenedBufSize, sizeof(float), ComputeBufferType.Default, ComputeBufferMode.Dynamic);
     readNodeCPUArr = new float[flattenedBufSize];
   }
@@ -320,6 +319,11 @@ public class WaterCompute : MonoBehaviour {
     int clearKernelId = liquidComputeShader.FindKernel("CSClearNodeData");
     liquidComputeShader.SetTexture(clearKernelId, "nodeData", nodeDataRT);
     liquidComputeShader.Dispatch(clearKernelId, numThreadGroups, numThreadGroups, numThreadGroups);
+
+    // Clear the update node buffer - THIS DOESNT WORK... CAUSES ALL LIQUID TO DISAPPEAR - NO IDEA WHY.
+    //var clearUpdatesKernelId = liquidComputeShader.FindKernel("CSClearUpdateBuffer");
+    //liquidComputeShader.SetBuffer(clearUpdatesKernelId, "updates", updateNodeComputeBuf);
+    //liquidComputeShader.Dispatch(clearUpdatesKernelId, numThreadGroups, numThreadGroups, numThreadGroups);
   }
 
   /// <summary>
@@ -344,6 +348,7 @@ public class WaterCompute : MonoBehaviour {
       LiquidNodeUpdate nodeUpdate;
       nodeUpdate.terrainIsoVal = node.isoVal;
       nodeUpdate.liquidVolume = node.liquidVol;
+      nodeUpdate.isDiff = 1;
       nodeCBArr[idx] = nodeUpdate;
     }
     foreach (var debrisDiffs in debrisNodeDict.Values) {
@@ -352,6 +357,7 @@ public class WaterCompute : MonoBehaviour {
         LiquidNodeUpdate nodeUpdate;
         nodeUpdate.terrainIsoVal = 1;
         nodeUpdate.liquidVolume = 0;
+        nodeUpdate.isDiff = 1;
         nodeCBArr[idx] = nodeUpdate;
       }
     }
@@ -379,6 +385,7 @@ public class WaterCompute : MonoBehaviour {
       LiquidNodeUpdate nodeUpdate;
       nodeUpdate.terrainIsoVal = debrisNode.isoVal;
       nodeUpdate.liquidVolume = debrisNode.liquidVol;
+      nodeUpdate.isDiff = 1;
       nodeCBArr[idx] = nodeUpdate;
     }
     foreach (var debrisNode in currDebrisNodes) {
@@ -386,6 +393,7 @@ public class WaterCompute : MonoBehaviour {
       LiquidNodeUpdate nodeUpdate;
       nodeUpdate.terrainIsoVal = 1;
       nodeUpdate.liquidVolume  = 0;
+      nodeUpdate.isDiff = 1;
       nodeCBArr[idx] = nodeUpdate;
     }
     foreach (var liquidNode in liquidChangeNodes) {
@@ -393,14 +401,15 @@ public class WaterCompute : MonoBehaviour {
       LiquidNodeUpdate nodeUpdate;
       nodeUpdate.terrainIsoVal = 0;
       nodeUpdate.liquidVolume = liquidNode.liquidVol;
+      nodeUpdate.isDiff = 1;
       nodeCBArr[idx] = nodeUpdate;
     }
     updateNodeComputeBuf.EndWrite<LiquidNodeUpdate>(bufferCount);
 
     // Update the node data...
-    liquidComputeShader.SetBuffer(updateNodeTypeDiffKernelId, "updates", updateNodeComputeBuf);
-    liquidComputeShader.SetTexture(updateNodeTypeDiffKernelId, "nodeData", nodeDataRT);
-    liquidComputeShader.Dispatch(updateNodeTypeDiffKernelId, numThreadGroups, numThreadGroups, numThreadGroups);
+    liquidComputeShader.SetBuffer(updateNodesKernelId, "updates", updateNodeComputeBuf);
+    liquidComputeShader.SetTexture(updateNodesKernelId, "nodeData", nodeDataRT);
+    liquidComputeShader.Dispatch(updateNodesKernelId, numThreadGroups, numThreadGroups, numThreadGroups);
   }
 
   // TODO: Optimize so that we only read the interior of the 3D buffer?
