@@ -60,7 +60,6 @@ public class TerrainColumn {
         bool isInsetMinX = xMinInsetNodes > 0; bool isInsetMinZ = zMinInsetNodes > 0;
         bool isInsetMaxX = xMaxInsetNodes > 0; bool isInsetMaxZ = zMaxInsetNodes > 0;
 
-        
         var minPt = new Vector3(
           isTCXMinEdge ? -isoInc : isInsetMinX ? xMinInsetNodes*unitsPerNode-isoInc : 0, 0, 
           isTCZMinEdge ? -isoInc : isInsetMinZ ? zMinInsetNodes*unitsPerNode-isoInc : 0);
@@ -107,9 +106,9 @@ public class TerrainColumn {
         mesh.SetIndices(triangles, MeshTopology.Triangles, 0);
         
         Vector3 minPt, maxPt;
-        terrainColumn.getMeshMinMax(out minPt, out maxPt);
-        minPt.x -= isoInc; maxPt.x += isoInc;
-        minPt.z -= isoInc; maxPt.z += isoInc;
+        terrainColumn.getMeshMinMax(out minPt, out maxPt, false);
+        //minPt.x -= (isoInc + TerrainColumn.BOUNDS_EPSILON); maxPt.x += isoInc + TerrainColumn.BOUNDS_EPSILON;
+        //minPt.z -= (isoInc + TerrainColumn.BOUNDS_EPSILON); maxPt.z += isoInc + TerrainColumn.BOUNDS_EPSILON;
         minPt.y = minIdx.y*TerrainGrid.unitsPerNode() - TerrainColumn.BOUNDS_EPSILON;
         maxPt.y = maxIdx.y*TerrainGrid.unitsPerNode() + isoInc + TerrainColumn.BOUNDS_EPSILON;
         
@@ -131,6 +130,7 @@ public class TerrainColumn {
   public static readonly float MIN_LANDING_OVERHANG_UNITS = SIZE*2-2*TerrainGrid.unitsPerNode();
   public static readonly int MIN_LANDING_OVERHANG_NODES = (int)(TerrainGrid.nodesPerUnit*MIN_LANDING_OVERHANG_UNITS);
   public static readonly int NUM_ADJACENT_LANDING_NODES = (TerrainGrid.nodesPerUnit*SIZE)-1;
+  public static readonly int NUM_ADJACENT_LANDING_NODES_CHECK = NUM_ADJACENT_LANDING_NODES*NUM_ADJACENT_LANDING_NODES-NUM_ADJACENT_LANDING_NODES;
   public static readonly int MAX_LANDING_HEIGHT_DEVIATION_NODES = 1;
   public static readonly float BOUNDS_EPSILON = 1e-4f;
 
@@ -183,16 +183,18 @@ public class TerrainColumn {
     GameObject.DestroyImmediate(gameObj);
   }
 
-  private void getMeshMinMax(out Vector3 minPt, out Vector3 maxPt) {
+  private void getMeshMinMax(out Vector3 minPt, out Vector3 maxPt, bool includeLevelBounds=true) {
     // When building the mesh for a TerrainColumn: 
     // If we're at the near or far extents of the grid then we include one layer of the outside coordinates.
     // We do this to avoid culling the triangles that make up the outer walls of the terrain.
     var outerLayerAmt = TerrainGrid.unitsPerNode();
-    minPt = new Vector3(Mathf.Min(index.x-outerLayerAmt,0), float.MinValue, Mathf.Min(index.z-outerLayerAmt,0));
+    minPt = new Vector3(includeLevelBounds ? Mathf.Min(index.x-outerLayerAmt,0) : 0, float.MinValue, includeLevelBounds ? Mathf.Min(index.z-outerLayerAmt,0) : 0);
     maxPt = new Vector3(TerrainColumn.SIZE, float.MaxValue, TerrainColumn.SIZE);
-    var extentNodeIdx = terrain.terrainColumnNodeIndex(this, new Vector3Int(numNodesX(), numNodesY(), numNodesZ()));
-    maxPt.x += extentNodeIdx.x >= terrain.numNodesX() ? outerLayerAmt : 0;
-    maxPt.z += extentNodeIdx.z >= terrain.numNodesZ() ? outerLayerAmt : 0;
+    if (includeLevelBounds) {
+      var extentNodeIdx = terrain.terrainColumnNodeIndex(this, new Vector3Int(numNodesX(), numNodesY(), numNodesZ()));
+      maxPt.x += extentNodeIdx.x >= terrain.numNodesX() ? outerLayerAmt : 0;
+      maxPt.z += extentNodeIdx.z >= terrain.numNodesZ() ? outerLayerAmt : 0;
+    }
 
     // Subtract/Add an epsilon to avoid removing vertices at the edges
     minPt.x -= BOUNDS_EPSILON; minPt.z -= BOUNDS_EPSILON;
@@ -286,6 +288,14 @@ public class TerrainColumn {
     var numXNodes = numNodesX();
     var numZNodes = numNodesZ();
 
+    // if (index.x == 5 && index.z == 8) {
+    //   for (int x = 0; x < availNodeArr.GetLength(0); x++) {
+    //     for (int z = 0; z < availNodeArr.GetLength(1); z++) {
+    //       Debug.Log(string.Join(",",availNodeArr[x,z]));
+    //     }
+    //   }
+    // }
+
     // Go through the available nodes and check to see if there are enough nodes clustered
     // together in adjacent colunns with approximately the same y level to make up landings
     for (int x = 0; x <= availNodeArr.GetLength(0)-NUM_ADJACENT_LANDING_NODES; x++) {
@@ -321,7 +331,7 @@ public class TerrainColumn {
           i--;
 
           // Did we find a landing (i.e., a square of a reasonable size of level nodes)?
-          if (landingNodeCount >= NUM_ADJACENT_LANDING_NODES*NUM_ADJACENT_LANDING_NODES) {
+          if (landingNodeCount >= NUM_ADJACENT_LANDING_NODES_CHECK) {
             // Map the x and z into the node index space (from terrain column local space)
             landingMin.x += idxRange.xStartIdx;
             landingMin.z += idxRange.zStartIdx;
