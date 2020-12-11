@@ -197,24 +197,24 @@ public class TerrainGridTool : EditorTool {
     var insetHandleSnap = TerrainGrid.unitsPerNode()*1.5f;
 
     for (int x = 0; x < terrainGrid.xSize; x++) {
-      float insetXPos = x*TerrainColumn.size;
-      var xPos = x*TerrainColumn.size + 0.5f*TerrainColumn.size;
+      float insetXPos = x*TerrainColumn.SIZE;
+      var xPos = x*TerrainColumn.SIZE + 0.5f*TerrainColumn.SIZE;
       for (int z = 0; z < terrainGrid.zSize; z++) {
 
-        var zPos = z*TerrainColumn.size + 0.5f*TerrainColumn.size;
+        var zPos = z*TerrainColumn.SIZE + 0.5f*TerrainColumn.SIZE;
         var yPos = terrainGrid.fastSampleHeight(x,z) + halfUnitsPerNode;
         var baseHandlePos = new Vector3(xPos, yPos+TerrainGrid.unitsPerNode(), zPos) + translation;
         var name = "TCHeightHandle(" + xPos + "," + zPos + ")";
         var controlId = EditorGUIUtility.GetControlID(name.GetHashCode(), FocusType.Keyboard);
 
         // Draw the inset as a rectangle on the column
-        float insetZPos = z*TerrainColumn.size;
+        float insetZPos = z*TerrainColumn.SIZE;
         float insetYPos = yPos + halfUnitsPerNode*0.5f;
         var quadVerts = new Vector3[4];
         quadVerts[0] = new Vector3(insetXPos+insetXUnits, insetYPos, insetZPos+insetZUnits) + translation;
-        quadVerts[1] = new Vector3(insetXPos+TerrainColumn.size-insetNegXUnits, insetYPos, insetZPos+insetZUnits) + translation;
-        quadVerts[2] = new Vector3(insetXPos+TerrainColumn.size-insetNegXUnits, insetYPos, insetZPos+TerrainColumn.size-insetNegZUnits) + translation;
-        quadVerts[3] = new Vector3(insetXPos+insetXUnits, insetYPos, insetZPos+TerrainColumn.size-insetNegZUnits) + translation;
+        quadVerts[1] = new Vector3(insetXPos+TerrainColumn.SIZE-insetNegXUnits, insetYPos, insetZPos+insetZUnits) + translation;
+        quadVerts[2] = new Vector3(insetXPos+TerrainColumn.SIZE-insetNegXUnits, insetYPos, insetZPos+TerrainColumn.SIZE-insetNegZUnits) + translation;
+        quadVerts[3] = new Vector3(insetXPos+insetXUnits, insetYPos, insetZPos+TerrainColumn.SIZE-insetNegZUnits) + translation;
         Handles.color = insetFaceColour;
         Handles.DrawSolidRectangleWithOutline(quadVerts, insetFaceColour, insetOutlineColour);
 
@@ -278,12 +278,12 @@ public class TerrainGridTool : EditorTool {
     var halfUnitsPerNode = TerrainGrid.halfUnitsPerNode();
 
     for (int x = 0; x < terrainGrid.xSize; x++) {
-      var xPos = x*TerrainColumn.size + 0.5f*TerrainColumn.size;
+      var xPos = x*TerrainColumn.SIZE + 0.5f*TerrainColumn.SIZE;
       for (int z = 0; z < terrainGrid.zSize; z++) {
         var currIdx = new Vector2Int(x,z);
         if (nodeEditSelectedColumns.Contains(currIdx)) { continue; }
 
-        var zPos = z*TerrainColumn.size + 0.5f*TerrainColumn.size;
+        var zPos = z*TerrainColumn.SIZE + 0.5f*TerrainColumn.SIZE;
         var yPos = terrainGrid.fastSampleHeight(x,z) + halfUnitsPerNode;
         var pos = new Vector3(xPos, yPos, zPos) + translation;
 
@@ -348,16 +348,16 @@ public class TerrainGridTool : EditorTool {
 
     var translation = terrainGrid.transform.position;
     for (int x = 0; x < terrainGrid.xSize; x++) {
-      var xPos = x*TerrainColumn.size;
+      var xPos = x*TerrainColumn.SIZE;
       for (int z = 0; z < terrainGrid.zSize; z++) {
         if ((x+z) % 2 == 0) {
-          var zPos = z*TerrainColumn.size;
+          var zPos = z*TerrainColumn.SIZE;
           var yPos = terrainGrid.fastSampleHeight(x,z) + halfUnitsPerNode + 1e-4f;
           var quadVerts = new Vector3[4];
           quadVerts[0] = new Vector3(xPos, yPos, zPos) + translation;
-          quadVerts[1] = new Vector3(xPos+TerrainColumn.size, yPos, zPos) + translation;
-          quadVerts[2] = new Vector3(xPos+TerrainColumn.size, yPos, zPos+TerrainColumn.size) + translation;
-          quadVerts[3] = new Vector3(xPos, yPos, zPos+TerrainColumn.size) + translation;
+          quadVerts[1] = new Vector3(xPos+TerrainColumn.SIZE, yPos, zPos) + translation;
+          quadVerts[2] = new Vector3(xPos+TerrainColumn.SIZE, yPos, zPos+TerrainColumn.SIZE) + translation;
+          quadVerts[3] = new Vector3(xPos, yPos, zPos+TerrainColumn.SIZE) + translation;
           Handles.DrawSolidRectangleWithOutline(quadVerts, faceColour, outlineColour);
         }
       }

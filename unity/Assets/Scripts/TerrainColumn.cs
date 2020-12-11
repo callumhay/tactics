@@ -3,10 +3,140 @@ using System.Collections.Generic;
 using UnityEngine;
 
 public class TerrainColumn {
-  public static int size = 1;
+
+  public class Landing {
+    public Vector3Int minIdx;
+    public Vector3Int maxIdx;
+
+    public GameObject gameObj;
+    private MeshFilter meshFilter;
+    private MeshRenderer meshRenderer;
+
+    public Landing(in TerrainColumn terrainColumn, Vector3Int min, Vector3Int max) {
+      Debug.Assert(min.x <= max.x && min.y <= max.y && min.z <= max.z);
+      minIdx = min;
+      maxIdx = max;
+
+      var name = string.Format("Landing [{0} - {1}]", min, max);
+      var existingGO = terrainColumn.gameObj.transform.Find(name)?.gameObject;
+      if (existingGO != null) {
+        gameObj = existingGO;
+        meshFilter = gameObj.GetComponent<MeshFilter>();
+        meshRenderer = gameObj.GetComponent<MeshRenderer>();
+      }
+      else {
+        gameObj = new GameObject();
+        gameObj.name = name;
+        //gameObj.tag = "Highlightable";
+        meshFilter   = gameObj.AddComponent<MeshFilter>();
+        meshRenderer = gameObj.AddComponent<MeshRenderer>();
+      }
+      gameObj.transform.SetParent(terrainColumn.gameObj.transform);
+      gameObj.transform.localPosition = Vector3.zero;
+
+      var terrain = terrainColumn.terrain;
+      var unitsPerNode = TerrainGrid.unitsPerNode();
+      var isoInc = unitsPerNode*MarchingCubes.ISOVAL_CUTOFF;
+
+      // Generate the landing mesh
+      var vertices = new List<Vector3>();
+      var triangles = new List<int>();
+      var mesh = new Mesh();
+
+      if (minIdx.y == 0 && maxIdx.y == 0) {
+        // Handle the special case where the ground is bedrock - just draw a plane at y==0
+        var minTCIdx = terrain.terrainColumnNodeIndex(terrainColumn, new Vector3Int(0,0,0)); // "global" index within the whole terrain
+
+        bool isTCXMinEdge = terrainColumn.index.x == 0;
+        bool isTCXMaxEdge = terrainColumn.index.x == terrain.xSize-1;
+        bool isTCZMinEdge = terrainColumn.index.z == 0;
+        bool isTCZMaxEdge = terrainColumn.index.z == terrain.zSize-1;
+
+        var xMinInsetNodes = minIdx.x-minTCIdx.x;
+        var zMinInsetNodes = minIdx.z-minTCIdx.z;
+        var xMaxInsetNodes = (minTCIdx.x + TerrainGrid.nodesPerUnit*TerrainColumn.SIZE-1) - maxIdx.x;
+        var zMaxInsetNodes = (minTCIdx.z + TerrainGrid.nodesPerUnit*TerrainColumn.SIZE-1) - maxIdx.z;
+
+        bool isInsetMinX = xMinInsetNodes > 0; bool isInsetMinZ = zMinInsetNodes > 0;
+        bool isInsetMaxX = xMaxInsetNodes > 0; bool isInsetMaxZ = zMaxInsetNodes > 0;
+
+        
+        var minPt = new Vector3(
+          isTCXMinEdge ? -isoInc : isInsetMinX ? xMinInsetNodes*unitsPerNode-isoInc : 0, 0, 
+          isTCZMinEdge ? -isoInc : isInsetMinZ ? zMinInsetNodes*unitsPerNode-isoInc : 0);
+        var maxPt = new Vector3(
+          TerrainColumn.SIZE + (isTCXMaxEdge ? isoInc : isInsetMaxX ? -xMaxInsetNodes*unitsPerNode+isoInc : 0), 0, 
+          TerrainColumn.SIZE + (isTCZMaxEdge ? isoInc : isInsetMaxZ ? -zMaxInsetNodes*unitsPerNode+isoInc : 0));
+
+        vertices.Add(minPt);
+        vertices.Add(new Vector3(minPt.x, minPt.y, maxPt.z));
+        vertices.Add(new Vector3(maxPt.x, minPt.y, maxPt.z));
+        vertices.Add(new Vector3(maxPt.x, minPt.y, minPt.z));
+        triangles.Add(0); triangles.Add(1); triangles.Add(2);
+        triangles.Add(0); triangles.Add(2); triangles.Add(3);
+        mesh.SetVertices(vertices);
+        mesh.SetIndices(triangles, MeshTopology.Triangles, 0);
+        mesh.RecalculateNormals(); 
+      }
+      else {
+        // We need the specialized mesh from marching cubes: This is a duplicate of the one used in the TerrainColumn, 
+        // but it's isolated and allows us to highlight and apply effects to the landing specifically
+        var corners = CubeCorner.buildEmptyCorners();
+        var numNodesX = terrainColumn.numNodesX();
+        var numNodesZ = terrainColumn.numNodesZ();
+        var localIdx = new Vector3Int();
+        for (int y = min.y-1; y <= max.y+1; y++) {
+          localIdx.y = y;
+          for (int x = -1; x <= numNodesX; x++) {
+            localIdx.x = x;
+            for (int z = -1; z <= numNodesZ; z++) {
+              localIdx.z = z;
+
+              var terrainIdx = terrain.terrainColumnNodeIndex(terrainColumn, localIdx); // "global" index within the whole terrain
+              for (int i = 0; i < CubeCorner.NUM_CORNERS; i++) {
+                // Get the node at the current index in the grid (also gets empty "ghost" nodes at the edges)
+                var cornerNode = terrain.getNode(terrainIdx + MarchingCubes.corners[i]);
+                corners[i].setFromNode(cornerNode, -terrainColumn.gameObj.transform.position);
+              }
+              MarchingCubes.polygonizeMeshOnly(corners, triangles, vertices);
+            }
+          }
+        }
+
+        mesh.SetVertices(vertices);
+        mesh.SetIndices(triangles, MeshTopology.Triangles, 0);
+        
+        Vector3 minPt, maxPt;
+        terrainColumn.getMeshMinMax(out minPt, out maxPt);
+        minPt.x -= isoInc; maxPt.x += isoInc;
+        minPt.z -= isoInc; maxPt.z += isoInc;
+        minPt.y = minIdx.y*TerrainGrid.unitsPerNode() - TerrainColumn.BOUNDS_EPSILON;
+        maxPt.y = maxIdx.y*TerrainGrid.unitsPerNode() + isoInc + TerrainColumn.BOUNDS_EPSILON;
+        
+        mesh.RecalculateNormals(MeshHelper.defaultSmoothingAngle, MeshHelper.defaultTolerance, minPt, maxPt);
+        mesh.RecalculateBounds();
+      }
+
+      meshFilter.sharedMesh = mesh;
+      meshRenderer.material = Resources.Load<Material>("Materials/TerrainHighlightMat");
+      
+    }
+
+    public void clear() {
+      GameObject.DestroyImmediate(gameObj);
+    }
+  }
+
+  public static readonly int SIZE = 1;
+  public static readonly float MIN_LANDING_OVERHANG_UNITS = SIZE*2-2*TerrainGrid.unitsPerNode();
+  public static readonly int MIN_LANDING_OVERHANG_NODES = (int)(TerrainGrid.nodesPerUnit*MIN_LANDING_OVERHANG_UNITS);
+  public static readonly int NUM_ADJACENT_LANDING_NODES = (TerrainGrid.nodesPerUnit*SIZE)-1;
+  public static readonly int MAX_LANDING_HEIGHT_DEVIATION_NODES = 1;
+  public static readonly float BOUNDS_EPSILON = 1e-4f;
 
   public TerrainGrid terrain;
   public Vector3Int index { get; private set; } // Index within the TerrainGrid
+  public List<Landing> landings { get; private set; }
 
   // GameObject and Mesh data
   public GameObject gameObj;
@@ -24,6 +154,7 @@ public class TerrainColumn {
       meshFilter = gameObj.GetComponent<MeshFilter>();
       meshCollider = gameObj.GetComponent<MeshCollider>();
       meshRenderer = gameObj.GetComponent<MeshRenderer>();
+
     }
     else {
       gameObj = new GameObject();
@@ -33,15 +164,39 @@ public class TerrainColumn {
       meshCollider = gameObj.AddComponent<MeshCollider>();
       meshRenderer = gameObj.AddComponent<MeshRenderer>();
     }
-    gameObj.transform.position = TerrainColumn.size * (Vector3)_index;
+    gameObj.transform.position = TerrainColumn.SIZE * (Vector3)_index;
   }
 
-  private int numNodesX() { return TerrainColumn.size * TerrainGrid.nodesPerUnit; }
+  private int numNodesX() { return TerrainColumn.SIZE * TerrainGrid.nodesPerUnit; }
   private int numNodesY() { return terrain.ySize  * TerrainGrid.nodesPerUnit; }
-  private int numNodesZ() { return TerrainColumn.size * TerrainGrid.nodesPerUnit; }
+  private int numNodesZ() { return TerrainColumn.SIZE * TerrainGrid.nodesPerUnit; }
 
+  private void clearLandingRanges() {
+    if (landings != null) {
+      foreach (var landing in landings) {
+        landing.clear();
+      }
+    }
+  }
   public void clear() {
+    clearLandingRanges();
     GameObject.DestroyImmediate(gameObj);
+  }
+
+  private void getMeshMinMax(out Vector3 minPt, out Vector3 maxPt) {
+    // When building the mesh for a TerrainColumn: 
+    // If we're at the near or far extents of the grid then we include one layer of the outside coordinates.
+    // We do this to avoid culling the triangles that make up the outer walls of the terrain.
+    var outerLayerAmt = TerrainGrid.unitsPerNode();
+    minPt = new Vector3(Mathf.Min(index.x-outerLayerAmt,0), float.MinValue, Mathf.Min(index.z-outerLayerAmt,0));
+    maxPt = new Vector3(TerrainColumn.SIZE, float.MaxValue, TerrainColumn.SIZE);
+    var extentNodeIdx = terrain.terrainColumnNodeIndex(this, new Vector3Int(numNodesX(), numNodesY(), numNodesZ()));
+    maxPt.x += extentNodeIdx.x >= terrain.numNodesX() ? outerLayerAmt : 0;
+    maxPt.z += extentNodeIdx.z >= terrain.numNodesZ() ? outerLayerAmt : 0;
+
+    // Subtract/Add an epsilon to avoid removing vertices at the edges
+    minPt.x -= BOUNDS_EPSILON; minPt.z -= BOUNDS_EPSILON;
+    maxPt.x += BOUNDS_EPSILON; maxPt.z += BOUNDS_EPSILON;
   }
 
   public void regenerateMesh() {
@@ -53,9 +208,7 @@ public class TerrainColumn {
     var _numNodesY = numNodesY();
     var _numNodesZ = numNodesZ();
 
-    var corners = new CubeCorner[CubeCorner.numCorners];
-    for (int i = 0; i < CubeCorner.numCorners; i++) { corners[i] = new CubeCorner(); }
-
+    var corners = CubeCorner.buildEmptyCorners();
     var localIdx = new Vector3Int();
     for (int x = -1; x <= _numNodesX; x++) {
       localIdx.x = x;
@@ -65,30 +218,15 @@ public class TerrainColumn {
           localIdx.z = z;
           
           var terrainIdx = terrain.terrainColumnNodeIndex(this, localIdx); // "global" index within the whole terrain
-          for (int i = 0; i < CubeCorner.numCorners; i++) {
-            // Get the node at the current index in the grid 
-            // (also gets empty "ghost" nodes at the edges)
+          for (int i = 0; i < CubeCorner.NUM_CORNERS; i++) {
+            // Get the node at the current index in the grid (also gets empty "ghost" nodes at the edges)
             var cornerNode = terrain.getNode(terrainIdx + MarchingCubes.corners[i]);
             corners[i].setFromNode(cornerNode, -gameObj.transform.position);
           }
-          MarchingCubes.polygonize(corners, ref materials, ref triangles, ref vertices);
+          MarchingCubes.polygonize(corners, materials, triangles, vertices);
         }
       }
     }
-
-    // If we're at the near or far extents of the grid then we include one layer of the outside coordinates.
-    // We do this to avoid culling the triangles that make up the outer walls of the terrain.
-    var outerLayerAmt = TerrainGrid.unitsPerNode();
-    var minXZPt = new Vector2(Mathf.Min(index.x-outerLayerAmt,0), Mathf.Min(index.z-outerLayerAmt,0));
-    var maxXZPt = Vector2.zero + (new Vector2(TerrainColumn.size,TerrainColumn.size));
-    var extentNodeIdx = terrain.terrainColumnNodeIndex(this, new Vector3Int(_numNodesX, _numNodesY, _numNodesZ));
-    maxXZPt.x += extentNodeIdx.x >= terrain.numNodesX() ? outerLayerAmt : 0;
-    maxXZPt.y += extentNodeIdx.z >= terrain.numNodesZ() ? outerLayerAmt : 0;
-
-    // Subtract/Add an epsilon to avoid removing vertices at the edges
-    var boundEpsilon = 1e-4f;
-    minXZPt.x -= boundEpsilon; minXZPt.y -= boundEpsilon;
-    maxXZPt.x += boundEpsilon; maxXZPt.y += boundEpsilon;
 
     var mesh = new Mesh();
     mesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
@@ -97,10 +235,106 @@ public class TerrainColumn {
     // Split the mesh triangles up into their respective material groups (i.e., submeshes)
     MeshHelper.Submeshify(ref mesh, ref meshRenderer, ref materials, triangles, MaterialHelper.defaultMaterial);
 
-    mesh.RecalculateNormals(MeshHelper.defaultSmoothingAngle, MeshHelper.defaultTolerance, minXZPt, maxXZPt);
+    Vector3 minPt, maxPt;
+    getMeshMinMax(out minPt, out maxPt);
+
+    mesh.RecalculateNormals(MeshHelper.defaultSmoothingAngle, MeshHelper.defaultTolerance, minPt, maxPt);
     mesh.RecalculateBounds();
     meshFilter.sharedMesh = mesh;
     meshCollider.sharedMesh = mesh;
+
+    regenerateLandings();
+  }
+
+  private void regenerateLandings() {
+    clearLandingRanges();
+    landings = new List<Landing>();
+
+    var idxRange = terrain.getIndexRangeForTerrainColumn(this);
+    idxRange.yEndIdx -= (MIN_LANDING_OVERHANG_NODES-1);
+
+    // Build an array of all empty nodes (with enough overhang) in each node column within this TerrainColumn
+    var tempIdx = new Vector3Int();
+    var availNodeArr = new List<int>[idxRange.xEndIdx-idxRange.xStartIdx+1,idxRange.zEndIdx-idxRange.zStartIdx+1];
+    for (int x = idxRange.xStartIdx; x <= idxRange.xEndIdx; x++) {
+      for (int z = idxRange.zStartIdx; z <= idxRange.zEndIdx; z++) {
+        var availNodeList = availNodeArr[x-idxRange.xStartIdx,z-idxRange.zStartIdx] = new List<int>();
+        for (int y = idxRange.yStartIdx; y <= idxRange.yEndIdx; y++) {
+          tempIdx.Set(x,y,z);
+          var node = terrain.getNode(tempIdx);
+          var nodeIsTerrain = node.isTerrain();
+          tempIdx.Set(x,y+1,z);
+          var aboveNode = terrain.getNode(tempIdx);
+          var aboveNodeIsTerrain = aboveNode.isTerrain();
+          if ((y == 0 && !nodeIsTerrain && !aboveNodeIsTerrain) || (nodeIsTerrain && !aboveNodeIsTerrain)) {
+            // Check whether there's an overhang for a landing
+            bool isOverhang = true;
+            for (int i = 2; i < MIN_LANDING_OVERHANG_NODES; i++) {
+              tempIdx.Set(x,y+i,z);
+              var overhangNode = terrain.getNode(tempIdx);
+              if (overhangNode.isTerrain()) { isOverhang = false; break; }
+            }
+            if (isOverhang) {
+              availNodeList.Add(y);
+              y += MIN_LANDING_OVERHANG_NODES;
+            }
+          }
+        }
+      }
+    }
+
+    var numXNodes = numNodesX();
+    var numZNodes = numNodesZ();
+
+    // Go through the available nodes and check to see if there are enough nodes clustered
+    // together in adjacent colunns with approximately the same y level to make up landings
+    for (int x = 0; x <= availNodeArr.GetLength(0)-NUM_ADJACENT_LANDING_NODES; x++) {
+      for (int z = 0; z <= availNodeArr.GetLength(1)-NUM_ADJACENT_LANDING_NODES; z++) {
+        var availNodeList = availNodeArr[x,z];
+        for (int i = 0; i < availNodeList.Count; i++) {
+          int y = availNodeList[i];
+
+          int landingNodeCount = 1;
+          Vector3Int landingMin = new Vector3Int(x, y, z);
+          Vector3Int landingMax = new Vector3Int(0, y, 0);
+          for (int ax = x; ax < numXNodes; ax++) {
+            for (int az = z; az < numZNodes; az++) {
+              if (ax == x && az == z) { continue; }
+              var adjAvailNodeList = availNodeArr[ax,az];
+              for (int j = 0; j < adjAvailNodeList.Count; j++) {
+                var adjY = adjAvailNodeList[j];
+                if (Math.Abs(y-adjY) <= MAX_LANDING_HEIGHT_DEVIATION_NODES) {
+                  landingNodeCount++;
+                  
+                  landingMin.y = Math.Min(landingMin.y, adjY);
+                  landingMax = Vector3Int.Max(landingMax, new Vector3Int(ax, adjY, az));
+                  
+                  adjAvailNodeList.RemoveAt(j);
+                  break;
+                }
+                else if (adjY > y) { break; }
+              }
+            }
+          }
+
+          availNodeList.RemoveAt(i);
+          i--;
+
+          // Did we find a landing (i.e., a square of a reasonable size of level nodes)?
+          if (landingNodeCount >= NUM_ADJACENT_LANDING_NODES*NUM_ADJACENT_LANDING_NODES) {
+            // Map the x and z into the node index space (from terrain column local space)
+            landingMin.x += idxRange.xStartIdx;
+            landingMin.z += idxRange.zStartIdx;
+            landingMax.x += idxRange.xStartIdx;
+            landingMax.z += idxRange.zStartIdx;
+            // Generate the landing and its geometry, materials, etc.
+            var landing = new Landing(this, landingMin, landingMax);
+            landings.Add(landing);
+            //Debug.Log("Found a landing for TC " + index + " at " + landingMinY + "-" + landingMaxY);
+          }
+        }
+      }
+    }
   }
 
 }

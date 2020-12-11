@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using UnityEngine;
 
 public class CubeCorner {
-  public static int numCorners = 8;
+  public static readonly int NUM_CORNERS = 8;
   public Vector3 position;
   public float isoVal;
   public List<NodeMaterialContrib> materials = new List<NodeMaterialContrib>();
@@ -13,6 +13,12 @@ public class CubeCorner {
     position = node.position + translation;
     isoVal = node.isoVal;
     materials = new List<NodeMaterialContrib>(node.materials);
+  }
+
+  public static CubeCorner[] buildEmptyCorners() {
+    var corners = new CubeCorner[NUM_CORNERS];
+    for (int i = 0; i < CubeCorner.NUM_CORNERS; i++) { corners[i] = new CubeCorner(); }
+    return corners;
   }
 }
 
@@ -25,6 +31,10 @@ public class MarchingCubes {
     new Vector3Int(1, 1, 1), new Vector3Int(0, 1, 1)
   };
 
+  public static void polygonizeMeshOnly(in CubeCorner[] corners, List<int> triangles, List<Vector3> vertices, bool removeNegYTris = true) {
+    polygonize(corners, null, triangles, vertices, removeNegYTris);
+  }
+
   /// <summary>
   /// Given an array of corners this will perform the Marching Cubes algorithm and turn those corners into
   /// geometry/mesh data that will be appended to the given referenced lists.
@@ -35,8 +45,8 @@ public class MarchingCubes {
   /// <param name="vertices">The vertices appended to, represents the generated vertexes of the mesh.</param>
   /// <param name="removeNegYTris">If true any triangles with y-coordinate vertices < 0 will be removed. </param>
   public static void polygonize(
-    in CubeCorner[] corners, ref List<Tuple<Material[],float[]>> materials, 
-    ref List<int> triangles, ref List<Vector3> vertices, bool removeNegYTris = true
+    in CubeCorner[] corners, List<Tuple<Material[],float[]>> materials, 
+    List<int> triangles, List<Vector3> vertices, bool removeNegYTris = true
   ) {
 
     // Determine the index into the edge table which tells us which vertices are inside of the surface
@@ -65,9 +75,9 @@ public class MarchingCubes {
       var currLen = vertices.Count();
       triangles.Add(currLen); triangles.Add(currLen+1); triangles.Add(currLen+2);
       vertices.Add(vertA); vertices.Add(vertB); vertices.Add(vertC);
-      materials.Add(new Tuple<Material[],float[]>(matsA, contribsA)); 
-      materials.Add(new Tuple<Material[],float[]>(matsB, contribsB)); 
-      materials.Add(new Tuple<Material[],float[]>(matsC, contribsC));
+      materials?.Add(new Tuple<Material[],float[]>(matsA, contribsA)); 
+      materials?.Add(new Tuple<Material[],float[]>(matsB, contribsB)); 
+      materials?.Add(new Tuple<Material[],float[]>(matsC, contribsC));
     }
   }
 

@@ -70,21 +70,21 @@ public class TerrainDebris {
     var triangles = new List<int>();
     var materials = new List<Tuple<Material[],float[]>>();
 
-    var corners = new CubeCorner[CubeCorner.numCorners];
-    for (int i = 0; i < CubeCorner.numCorners; i++) { corners[i] = new CubeCorner(); }
+    var corners = new CubeCorner[CubeCorner.NUM_CORNERS];
+    for (int i = 0; i < CubeCorner.NUM_CORNERS; i++) { corners[i] = new CubeCorner(); }
 
     for (int x = 0; x < lsNodes.GetLength(0)-1; x++) {
       for (int y = 0; y < lsNodes.GetLength(1)-1; y++) {
         for (int z = 0; z < lsNodes.GetLength(2)-1; z++) {
           ref readonly var node = ref lsNodes[x,y,z];
-          for (int i = 0; i < CubeCorner.numCorners; i++) {
+          for (int i = 0; i < CubeCorner.NUM_CORNERS; i++) {
             ref readonly var cornerInc = ref MarchingCubes.corners[i];
             var cornerNode = lsNodes[x+cornerInc.x, y+cornerInc.y, z+cornerInc.z];
             corners[i].position = cornerNode.position;
             corners[i].isoVal = cornerNode.isoVal;
             corners[i].materials = cornerNode.materials;
           }
-          MarchingCubes.polygonize(corners, ref materials, ref triangles, ref vertices, false);
+          MarchingCubes.polygonize(corners, materials, triangles, vertices, false);
         }
       }
     }

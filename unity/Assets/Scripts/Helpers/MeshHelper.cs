@@ -58,7 +58,7 @@ public static class MeshHelper {
   }
 
     /*
-  private void appendQuad(float zPos, float xSize, float ySize, ref List<Vector3> vertices, ref List<int> triangles) {
+  public void appendQuad(float zPos, float xSize, float ySize, ref List<Vector3> vertices, ref List<int> triangles) {
     var size = new Vector3(xSize, ySize, 0);
     var halfSize = 0.5f * size;
 
@@ -106,13 +106,13 @@ public static class MeshHelper {
 
   public static void RecalculateNormals(this Mesh mesh, float smoothingAngle, float tolerance) {
     MeshHelper.RecalculateNormals(mesh, smoothingAngle, tolerance, 
-      new Vector2(float.MinValue, float.MinValue),
-      new Vector2(float.MaxValue, float.MaxValue)
+      new Vector3(float.MinValue, float.MinValue, float.MinValue),
+      new Vector3(float.MaxValue, float.MaxValue, float.MaxValue)
     );
   }
 
   public static void RecalculateNormals(
-    this Mesh mesh, float smoothingAngle, float tolerance, in Vector2 minXZ, in Vector2 maxXZ
+    this Mesh mesh, float smoothingAngle, float tolerance, in Vector3 min, in Vector3 max
   ) {
 
     var decimalShift = Mathf.Log10(1.0f / tolerance);
@@ -170,7 +170,9 @@ public static class MeshHelper {
         var vertex = vertexEntry.vertex;
 
         // Clean up all vertices outside of the min/max
-        if ((vertex.x < minXZ.x || vertex.x > maxXZ.x) || (vertex.z < minXZ.y || vertex.z > maxXZ.y)) {
+        if ((vertex.x < min.x || vertex.x > max.x) || 
+            (vertex.y < min.y || vertex.y > max.y) ||
+            (vertex.z < min.z || vertex.z > max.z)) {
           vertexEntry.isRemoved = true;
           foreach (var faceEntry in vertexEntry.faces) { faceEntry.face.isRemoved = true; }
           continue;

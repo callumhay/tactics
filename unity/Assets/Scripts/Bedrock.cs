@@ -29,7 +29,7 @@ public class Bedrock {
   public void regenerateMesh() {
     var unitsPerNode = TerrainGrid.unitsPerNode();
     var unitAdjust = unitsPerNode*2f*(1f-MarchingCubes.ISOVAL_CUTOFF);
-    var scale = new Vector3(terrain.xSize*TerrainColumn.size + unitAdjust, height, terrain.zSize*TerrainColumn.size + unitAdjust);
+    var scale = new Vector3(terrain.xSize*TerrainColumn.SIZE + unitAdjust, height, terrain.zSize*TerrainColumn.SIZE + unitAdjust);
     gameObj.transform.localScale = scale;
     gameObj.transform.localPosition = 0.5f * (new Vector3(terrain.xSize, -height, terrain.zSize));
     var renderer = gameObj.GetComponent<Renderer>();

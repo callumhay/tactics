@@ -345,7 +345,7 @@ void CSProjectKernel(uint3 id : SV_DispatchThreadID) {
   result[0] = min(result[0]*vMaskPos[0], max(result[0]*vMaskNeg[0], result[0]));
   result[1] = min(result[1]*vMaskPos[1], max(result[1]*vMaskNeg[1], result[1]));
   result[2] = min(result[2]*vMaskPos[2], max(result[2]*vMaskNeg[2], result[2]));
-  projectedVel[id.xyz] = result + float4(obstVel, 0);
+  projectedVel[id.xyz] = result + float4(obstVel/internalSize, 0);
 }
 
 // Calculating flows in/out of nodes *****************
@@ -496,11 +496,14 @@ void CSAdjustNodeFlowsKernel(uint3 id : SV_DispatchThreadID) {
   //NodeFlowInfo fL = flows[idToIndex(idxL)]; NodeFlowInfo fR = flows[idToIndex(idxR)];
   //NodeFlowInfo fB = flows[idToIndex(idxB)]; NodeFlowInfo fT = flows[idToIndex(idxT)];
   //NodeFlowInfo fD = flows[idToIndex(idxD)]; NodeFlowInfo fU = flows[idToIndex(idxU)];
-  
+
+  float unitVolume = unitsPerNode * unitsPerNode * unitsPerNode;
+
   float sC = summedFlows[id.xyz];
   float liquidVol = nodeLiquidVolume(node);
   float finalVol = liquidVol + sC;
-  node[NODE_VOL_IDX] = abs(finalVol) < LIQUID_EPSILON ? 0 : finalVol;
+  // Clean up the volume amount if it's within and epsilon of an empty or full node
+  node[NODE_VOL_IDX] = abs(finalVol) < LIQUID_EPSILON ? 0 : abs(finalVol-unitVolume) < LIQUID_EPSILON ? unitVolume : finalVol;
   /*
   if (abs(finalVol) < LIQUID_EPSILON) {
     node[NODE_VOL_IDX] = 0;
@@ -532,22 +535,26 @@ void CSClearUpdateBuffer(uint3 id : SV_DispatchThreadID) {
   LiquidNodeUpdate clearUpdate;
   clearUpdate.terrainIsoVal = 0;
   clearUpdate.liquidVolume = 0;
+  clearUpdate.velocity = float3(0,0,0);
   clearUpdate.isDiff = 0;
   updates[idToIndex(id)] = clearUpdate;
 }
 
 //RWStructuredBuffer<LiquidNodeUpdate> updates; // Input and output of CSUpdateNodeData
 //RWTexture3D<float4> nodeData; // Output of CSUpdateNodeData
+//RWTexture3D<float4> obsticleVel; // Output of CSUpdateNodeData
 [numthreads(8,8,8)]
 void CSUpdateNodeData(uint3 id : SV_DispatchThreadID) {
   LiquidNodeUpdate update = updates[idToIndex(id)];
   if (update.isDiff > 0) {
     nodeData[id.xyz] = buildNode(update.terrainIsoVal < ISOVAL_CUTOFF ? EMPTY_NODE_TYPE : SOLID_NODE_TYPE, update.liquidVolume, UNSETTLED_NODE);
+    obsticleVel[id.xyz] = float4(update.velocity, 0);
     
     // Clear the update now that we've used it to update the node data
     LiquidNodeUpdate clearUpdate;
     clearUpdate.terrainIsoVal = 0;
     clearUpdate.liquidVolume = 0;
+    clearUpdate.velocity = float3(0,0,0);
     clearUpdate.isDiff = 0;
     updates[idToIndex(id)] = clearUpdate;
   }

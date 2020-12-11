@@ -4,7 +4,7 @@ using UnityEngine;
 [PreferBinarySerialization]
 [CreateAssetMenu(fileName="New Level", menuName="Tactics/Level")]
 public class LevelData : ScriptableObject {
-  public static string emptyLevelAssetPath = "Assets/Resources/Levels/Empty Level.asset";
+  public static readonly string emptyLevelAssetPath = "Assets/Resources/Levels/Empty Level.asset";
 
   public string levelName;
   [Range(1,32)]
@@ -28,7 +28,7 @@ public class LevelData : ScriptableObject {
     return new Vector3Int(x,y,z);
   }
   public static int numNodesToSize(int numNodes) {
-    return (numNodes - 1)/(TerrainGrid.nodesPerUnit*TerrainColumn.size - 1);
+    return (numNodes - 1)/(TerrainGrid.nodesPerUnit*TerrainColumn.SIZE - 1);
   }
   
   /// <summary>
@@ -37,7 +37,7 @@ public class LevelData : ScriptableObject {
   /// <param name="size">Number of terrain columns.</param>
   /// <returns>Number of nodes spanning the given number of terrain columns.</returns>
   public static int sizeToNumNodes(int size) {
-    return (size*TerrainGrid.nodesPerUnit*TerrainColumn.size) + 1 - size;
+    return (size*TerrainGrid.nodesPerUnit*TerrainColumn.SIZE) + 1 - size;
   }
 
   public void updateFromNodes(in TerrainGridNode[,,] allNodes, in IEnumerable<TerrainGridNode> nodeUpdates) {

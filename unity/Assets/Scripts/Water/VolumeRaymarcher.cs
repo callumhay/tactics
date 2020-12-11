@@ -20,7 +20,7 @@ public class VolumeRaymarcher : MonoBehaviour {
 
   private Vector3 getVolumeUnitSize() {
     Debug.Assert(terrainGrid != null);
-    return new Vector3(terrainGrid.xSize, terrainGrid.ySize, terrainGrid.zSize)*TerrainColumn.size;
+    return new Vector3(terrainGrid.xSize, terrainGrid.ySize, terrainGrid.zSize)*TerrainColumn.SIZE;
   }
 
   public void initResolutionInfo() {

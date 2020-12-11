@@ -31,7 +31,7 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
   public int numNodesZ() { return LevelData.sizeToNumNodes(zSize); }
   public int numNodes()  { return numNodesX()*numNodesY()*numNodesZ(); }
 
-  public static float unitsPerNode() { return (((float)TerrainColumn.size) / ((float)TerrainGrid.nodesPerUnit-1)); }
+  public static float unitsPerNode() { return (((float)TerrainColumn.SIZE) / ((float)TerrainGrid.nodesPerUnit-1)); }
   public static float halfUnitsPerNode() { return (0.5f * unitsPerNode()); }
   public Vector3 unitsPerNodeVec3() { var u = unitsPerNode(); return new Vector3(u,u,u); }
   public Vector3 halfUnitsPerNodeVec3() { var v = unitsPerNodeVec3(); return 0.5f*v; }
@@ -56,7 +56,7 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     // Find the closest column center to the given point and snap to it
     var lsPt = wsPt - transform.position; // local space
 
-    var unitsPerTC = (unitsPerNode()*TerrainColumn.size*(nodesPerUnit-1));
+    var unitsPerTC = (unitsPerNode()*TerrainColumn.SIZE*(nodesPerUnit-1));
     var oneOverUnitsPerTC = 1.0f / unitsPerTC;
     var halfUnitsPerTC = unitsPerTC / 2.0f;
 
@@ -78,7 +78,7 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     return b;
   }
 
-  private sealed class IndexRange {
+  public sealed class IndexRange {
     public int xStartIdx;
     public int xEndIdx;
     public int yStartIdx;
@@ -101,11 +101,11 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     };
   }
 
-  private IndexRange getIndexRangeForTerrainColumn(in TerrainColumn terrainCol) {
+  public IndexRange getIndexRangeForTerrainColumn(in TerrainColumn terrainCol) {
     return getIndexRangeForTerrainColumn(terrainCol.index);
   }
-  private IndexRange getIndexRangeForTerrainColumn(in Vector3Int terrainColIdx) {
-    var numNodesPerTCMinus1 = TerrainColumn.size*TerrainGrid.nodesPerUnit-1;
+  public IndexRange getIndexRangeForTerrainColumn(in Vector3Int terrainColIdx) {
+    var numNodesPerTCMinus1 = TerrainColumn.SIZE*TerrainGrid.nodesPerUnit-1;
     var nodeXIdxStart = terrainColIdx.x * numNodesPerTCMinus1;
     var nodeZIdxStart = terrainColIdx.z * numNodesPerTCMinus1;
     return new IndexRange {
@@ -299,8 +299,8 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
 
   public Vector3Int terrainColumnNodeIndex(in TerrainColumn terrainCol, in Vector3Int localIdx) {
     return new Vector3Int(
-      terrainCol.index.x * (TerrainGrid.nodesPerUnit * TerrainColumn.size - 1), 0, 
-      terrainCol.index.z * (TerrainGrid.nodesPerUnit * TerrainColumn.size - 1)
+      terrainCol.index.x * (TerrainGrid.nodesPerUnit * TerrainColumn.SIZE - 1), 0, 
+      terrainCol.index.z * (TerrainGrid.nodesPerUnit * TerrainColumn.SIZE - 1)
     ) + localIdx;
   }
 
@@ -396,20 +396,17 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
   }
 
   void FixedUpdate() {
-    
-    if (debrisNodeDict.Count > 0 && debrisToLiquidNeedsUpdate) {
+    if (debrisNodeDict != null && debrisNodeDict.Count > 0 && debrisToLiquidNeedsUpdate) {
       debrisToLiquidNeedsUpdate = false;
       waterCompute.readUpdateNodesFromLiquid(nodes);
 
       // Go through all the nodes that might be inside the debris, if any have liquid in them then we check to make sure
       // it's actually inside the debris and displace it to the closest empty non-terrain node if it is
       var allCurrAffectedNodes = new HashSet<TerrainGridNode>();
-      var allPrevAffectedNodes = new HashSet<TerrainGridNode>();
       var affectedLiquidNodes = new HashSet<TerrainGridNode>();
       foreach (var debrisDictPair in debrisNodeDict) {
         var debrisDiffs = debrisDictPair.Value;
         allCurrAffectedNodes.UnionWith(debrisDiffs.currDebrisNodes);
-        allPrevAffectedNodes.UnionWith(debrisDiffs.prevDebrisNodes);
         float liquidAmt = 0f;
         foreach (var debrisNode in debrisDiffs.currDebrisNodes) {
           if (debrisNode.liquidVol > 0) {
@@ -430,8 +427,9 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
         }
       }
       var changedLiquidNodes = displaceNodeLiquid(affectedLiquidNodes, allCurrAffectedNodes);
-      waterCompute.writeUpdateDebrisDiffToLiquid(allPrevAffectedNodes, allCurrAffectedNodes, changedLiquidNodes);
-      //waterCompute.writeUpdateNodesAndDebrisToLiquid(nodes, debrisNodeDict);
+      if (changedLiquidNodes.Count > 0) {
+        waterCompute.writeUpdateDebrisDiffToLiquid(debrisNodeDict, changedLiquidNodes);
+      }
     }
     
   }
@@ -451,7 +449,7 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     var tcXIndices = new List<int>();
     var tcZIndices = new List<int>();
     var tcIndices = new List<Vector3Int>();
-    var nodesPerTCMinus1 = TerrainColumn.size*TerrainGrid.nodesPerUnit - 1;
+    var nodesPerTCMinus1 = TerrainColumn.SIZE*TerrainGrid.nodesPerUnit - 1;
     for (int x = 0; x < numNodesX; x++) {
       var xPos = nodeIndexToUnits(x);
 
@@ -966,8 +964,8 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
 
   public float fastSampleHeight(int terrainColX, int terrainColZ) {
     if (nodes == null) { return 0f; }
-    int nodeIdxX = terrainColX*TerrainColumn.size*(nodesPerUnit-1) + (nodesPerUnit/2)*TerrainColumn.size;
-    int nodeIdxZ = terrainColZ*TerrainColumn.size*(nodesPerUnit-1) + (nodesPerUnit/2)*TerrainColumn.size;
+    int nodeIdxX = terrainColX*TerrainColumn.SIZE*(nodesPerUnit-1) + (nodesPerUnit/2)*TerrainColumn.SIZE;
+    int nodeIdxZ = terrainColZ*TerrainColumn.SIZE*(nodesPerUnit-1) + (nodesPerUnit/2)*TerrainColumn.SIZE;
     //Debug.Log("X: " + nodeIdxX + ", Z: " + nodeIdxZ + " Grid size: " + nodes.GetLength(0) + ", " + nodes.GetLength(1) + ", " + nodes.GetLength(2));
     int numYNodes = numNodesY();
     int finalYNodeIdx = 0;
@@ -1037,7 +1035,7 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     //Debug.Log("Prev scale: " + currScale + ", New scale: " + newScale);
     if (Mathf.Abs(heightChange) >= halfUnitsPerNode()) {
       // Adjust the height of the terrain column based on the given change
-      float newHeight = Mathf.Clamp(currHeight + heightChange, 0, Mathf.Min(maxHeight, TerrainColumn.size*ySize));
+      float newHeight = Mathf.Clamp(currHeight + heightChange, 0, Mathf.Min(maxHeight, TerrainColumn.SIZE*ySize));
       //Debug.Log("Prev Height: " + currHeight + ", New Height: " + newHeight);
 
       var yStartNodeIdx = unitsToNodeIndex(currHeight);

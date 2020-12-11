@@ -22,6 +22,7 @@ struct NodeFlowInfo {
 struct LiquidNodeUpdate {
   float terrainIsoVal;
   float liquidVolume;
+  float3 velocity;
   float isDiff;
 };
 
