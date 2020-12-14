@@ -92,6 +92,6 @@ public class VolumeRaymarcher : MonoBehaviour {
   //}
 
   public void updateVolumeData(RenderTexture rt) {
-    meshRenderer.material.SetTexture("nodeTex", rt);
+    meshRenderer?.material.SetTexture("nodeTex", rt);
   }
 }

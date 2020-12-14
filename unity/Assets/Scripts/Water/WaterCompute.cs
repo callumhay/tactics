@@ -35,6 +35,7 @@ public class WaterCompute : MonoBehaviour {
 
   public static readonly int NUM_THREADS_PER_BLOCK = 8;
 
+  public bool enableSimulation = true;
   [Range(1,10000)]
   public float liquidDensity = 1000.0f;   // kg/m^3
   [Range(0,101325)]
@@ -83,7 +84,7 @@ public class WaterCompute : MonoBehaviour {
 
   ComputeBuffer updateNodeComputeBuf; // CPU -> GPU buffer - allows us to tell the water simulation about the terrain
   ComputeBuffer readNodeComputeBuf;   // GPU -> CPU buffer - allows us to tell the terrain about the water simulation
-  float[] readNodeCPUArr;
+  float[] readNodeCPUArr; // Temp buffer for reading nodes from GPU to CPU
 
   private VolumeRaymarcher volComponent;
 
@@ -196,6 +197,8 @@ public class WaterCompute : MonoBehaviour {
   }
 
   private void FixedUpdate() {
+    if (!enableSimulation) { return; }
+    
     liquidComputeShader.SetFloat("dt", Time.fixedDeltaTime);
     advectVelocity();
     applyExternalForces();
@@ -386,6 +389,8 @@ public class WaterCompute : MonoBehaviour {
     liquidComputeShader.SetTexture(updateNodesKernelId, "nodeData", nodeDataRT);
     liquidComputeShader.SetTexture(updateNodesKernelId, "obsticleVel", obsticleVelRT);
     liquidComputeShader.Dispatch(updateNodesKernelId, numThreadGroups, numThreadGroups, numThreadGroups);
+
+    volComponent.updateVolumeData(nodeDataRT);
   }
  
   public void writeUpdateDebrisDiffToLiquid(
@@ -441,6 +446,8 @@ public class WaterCompute : MonoBehaviour {
     liquidComputeShader.SetTexture(updateNodesKernelId, "nodeData", nodeDataRT);
     liquidComputeShader.SetTexture(updateNodesKernelId, "obsticleVel", obsticleVelRT);
     liquidComputeShader.Dispatch(updateNodesKernelId, numThreadGroups, numThreadGroups, numThreadGroups);
+
+    volComponent.updateVolumeData(nodeDataRT);
   }
 
   // TODO: Optimize so that we only read the interior of the 3D buffer?

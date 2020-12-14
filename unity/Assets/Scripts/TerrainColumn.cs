@@ -27,7 +27,7 @@ public class TerrainColumn {
       else {
         gameObj = new GameObject();
         gameObj.name = name;
-        //gameObj.tag = "Highlightable";
+        gameObj.tag = "Highlightable";
         meshFilter   = gameObj.AddComponent<MeshFilter>();
         meshRenderer = gameObj.AddComponent<MeshRenderer>();
       }
@@ -118,7 +118,7 @@ public class TerrainColumn {
 
       meshFilter.sharedMesh = mesh;
       meshRenderer.material = Resources.Load<Material>("Materials/TerrainHighlightMat");
-      
+      gameObj.SetActive(false);
     }
 
     public void clear() {
@@ -154,7 +154,6 @@ public class TerrainColumn {
       meshFilter = gameObj.GetComponent<MeshFilter>();
       meshCollider = gameObj.GetComponent<MeshCollider>();
       meshRenderer = gameObj.GetComponent<MeshRenderer>();
-
     }
     else {
       gameObj = new GameObject();
@@ -288,14 +287,6 @@ public class TerrainColumn {
     var numXNodes = numNodesX();
     var numZNodes = numNodesZ();
 
-    // if (index.x == 5 && index.z == 8) {
-    //   for (int x = 0; x < availNodeArr.GetLength(0); x++) {
-    //     for (int z = 0; z < availNodeArr.GetLength(1); z++) {
-    //       Debug.Log(string.Join(",",availNodeArr[x,z]));
-    //     }
-    //   }
-    // }
-
     // Go through the available nodes and check to see if there are enough nodes clustered
     // together in adjacent colunns with approximately the same y level to make up landings
     for (int x = 0; x <= availNodeArr.GetLength(0)-NUM_ADJACENT_LANDING_NODES; x++) {
@@ -332,15 +323,14 @@ public class TerrainColumn {
 
           // Did we find a landing (i.e., a square of a reasonable size of level nodes)?
           if (landingNodeCount >= NUM_ADJACENT_LANDING_NODES_CHECK) {
-            // Map the x and z into the node index space (from terrain column local space)
+            // Map the x and z into the node index space (from TerrainColumn local space)
             landingMin.x += idxRange.xStartIdx;
             landingMin.z += idxRange.zStartIdx;
             landingMax.x += idxRange.xStartIdx;
             landingMax.z += idxRange.zStartIdx;
-            // Generate the landing and its geometry, materials, etc.
+            // Generate and add the landing with its geometry, materials, etc.
             var landing = new Landing(this, landingMin, landingMax);
             landings.Add(landing);
-            //Debug.Log("Found a landing for TC " + index + " at " + landingMinY + "-" + landingMaxY);
           }
         }
       }

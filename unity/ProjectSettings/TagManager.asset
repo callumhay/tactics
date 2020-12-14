@@ -6,6 +6,7 @@ TagManager:
   tags:
   - Terrain
   - FSPostprocess
+  - Highlightable
   layers:
   - Default
   - TransparentFX
