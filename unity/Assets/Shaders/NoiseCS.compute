@@ -1,5 +1,6 @@
-﻿#pragma kernel CSNoise
-#include "SimplexNoise.compute"
+﻿/*
+#pragma kernel CSNoise
+#include "SimplexNoise.hlsl"
 
 RWTexture3D<float4> isoValues;
 uint3 borderBack;
@@ -17,3 +18,4 @@ void CSNoise(uint3 id : SV_DispatchThreadID) {
   float noiseVal = snoise(float4(5*id.x/(float)resolution, 5*id.y/(float)resolution, 5*id.z/(float)resolution, time));
   isoValues[id.xyz] = float4(noiseVal,noiseVal,noiseVal,noiseVal);
 }
+*/
