@@ -1,5 +1,6 @@
 ﻿#ifndef NOISE_SIMPLEX_FUNC
 #define NOISE_SIMPLEX_FUNC
+
 /*
 
 Description:
@@ -409,7 +410,26 @@ float snoise(float4 v)
 	);
 }
 
+#define MAX_OCTAVES 8
 
+// The following is a composite sum of various octaves of the snoise functions with
+// tweakable lacunarity and gain.
+// Based on https://developer.amd.com/wordpress/media/2012/10/Tatarchuk-Noise(GDC07-D3D_Day).pdf
+float sumSNoise(float4 vInputCoords, float nNumOctaves, float fFrequency, float fLacunarity, float fGain) {
+  float fNoiseSum = 0;
+  float fAmplitude = 1;
+  float fAmplitudeSum = 0;
+  float4 vSampleCoords = vInputCoords;
+  [unroll(MAX_OCTAVES)]
+  for (int i = 0; i < nNumOctaves; i++) {
+    fNoiseSum += fAmplitude * snoise(float4(vSampleCoords.xyz*fFrequency, vSampleCoords.w));
+    fAmplitudeSum += fAmplitude;
+    fAmplitude *= fGain;
+    vSampleCoords.xyz *= fLacunarity;
+  }
+  fNoiseSum /= fAmplitudeSum;
+  return fNoiseSum;
+} 
 
 //                 Credits from source glsl file:
 //

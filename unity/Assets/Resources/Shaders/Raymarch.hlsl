@@ -13,7 +13,7 @@ void DoSample(Texture3D volumeTex, SamplerState volumeSampler, float3 uvw, float
   float nodeVolume, float transmittance, inout float4 colour) {
   float4 node = SAMPLE_TEXTURE3D(volumeTex, volumeSampler, uvw);
 
-  float nodeVolPercentage = transmittance*smoothstep(0, nodeVolume, nodeLiquidVolume(node));
+  float nodeVolPercentage = transmittance*smoothstep(0, nodeVolume, 100*nodeLiquidVolume(node));
   //float nodeVolPercentage = saturate(smoothstep(0, nodeVolume, 10*nodeLiquidVolume(node)));
   //float4 sampleColour = nodeLiquidVolume(node) > nodeVolume ? float4(1,0,0,nodeVolPercentage) : (nodeSettled(node) ==  SETTLED_NODE) ? float4(0,1,0,nodeVolPercentage) : float4(1, 1, 1, nodeVolPercentage);//((nodeType(node) == SOLID_NODE_TYPE) ? float4(1,0,0,1) : float4(1, 1, 1, nodeVolPercentage));
   float4 sampleColour = weight * float4(1,1,1,nodeVolPercentage);
@@ -67,7 +67,7 @@ void Raymarch_float(
   float3 resNoBorderVecDivRes = resNoBorderVec / (float)resolution;
 
   // Perform a jitter along the ray, the jitter must not exceed half the voxel unit distance along the ray
-  //float jitterOffset = SAMPLE_TEXTURE2D(jitterTex, jitterSampler, pos.xy).r; // Random values in [0,1)
+  float jitterOffset = SAMPLE_TEXTURE2D(jitterTex, jitterSampler, pos.xy).r; // Random values in [0,1)
 
   // Calculate the intersection points of the eye ray to the box
   float3 pNear = rayOrigin + rayDir*tNear;
@@ -79,7 +79,7 @@ void Raymarch_float(
   float fSamples = clamp(bestSamples, MIN_ITERATIONS, MAX_ITERATIONS);
   int nSamples = floor(fSamples);
   float3 stepVec = nearToFarVec / (nSamples-1.0);
-  float3 currPos = pNear;// - stepVec*jitterOffset;
+  float3 currPos = pNear + stepVec*jitterOffset;
 
   colour = float4(0,0,0,0);
   float3 uvw = float3(0,0,0);
@@ -94,8 +94,8 @@ void Raymarch_float(
   
   clip(colour.a - 1e-4); // Discard the fragment if there's no alpha
 
-  float noiseVal = snoise(float4(currPos-stepVec, 0.2*time));
-  nNormal = calcIsoNormal(volumeTex, volumeSampler, uvw, resolution) + 0.001*float3(noiseVal,noiseVal,noiseVal);
+  float noiseVal = sumSNoise(float4(currPos-stepVec, 0.2*time), 2, 0.5, 1.5, 0.75); //snoise(float4(currPos-stepVec, 0.2*time));
+  nNormal = calcIsoNormal(volumeTex, volumeSampler, uvw, resolution) + 0.0025*float3(noiseVal,noiseVal,noiseVal);
   
   depthOffset = length(currPos-pNear)-tFar;
 
