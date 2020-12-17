@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 #pragma warning disable 649
@@ -31,11 +32,12 @@ struct NodeFlowInfo {
   public float flowD; public float flowU;
 };
 
+[ExecuteAlways]
 public class WaterCompute : MonoBehaviour {
 
   public static readonly int NUM_THREADS_PER_BLOCK = 8;
 
-  public bool enableSimulation = true;
+  public bool enableSimulation = false;
   [Range(1,10000)]
   public float liquidDensity = 1000.0f;   // kg/m^3
   [Range(0,101325)]
@@ -70,8 +72,6 @@ public class WaterCompute : MonoBehaviour {
   private int updateNodesKernelId;
   private int readNodesKernelId;
 
-  private bool isInit = false;
-
   private RenderTexture nodeDataRT;
   private RenderTexture velRT;
   private RenderTexture obsticleVelRT;
@@ -88,9 +88,17 @@ public class WaterCompute : MonoBehaviour {
 
   private VolumeRaymarcher volComponent;
 
-  public void initAll() {
-    if (isInit) { return; }
-    liquidComputeShader = Resources.Load<ComputeShader>("Shaders/LiquidCS");
+  private Vector3Int currBorderBack;
+  private Vector3Int currBorderFront;
+  private int currFullResSize;
+
+
+  public void initAll(VolumeRaymarcher _volComponent) {
+    volComponent = _volComponent;
+    if (liquidComputeShader == null) {
+      liquidComputeShader = Resources.Load<ComputeShader>("Shaders/LiquidCS");
+    }
+
     advectKernelId = liquidComputeShader.FindKernel("CSAdvect");
     applyExtForcesKernelId = liquidComputeShader.FindKernel("CSApplyExternalForces");
     curlKernelId = liquidComputeShader.FindKernel("CSCurl");
@@ -106,37 +114,38 @@ public class WaterCompute : MonoBehaviour {
 
     initUniforms();
 
-    volComponent = GetComponent<VolumeRaymarcher>();
-    if (!volComponent) {
-      Debug.LogError("Could not find VolumeRaymarcher component in GameObject.");
-      return;
-    }
-
-    volComponent.initResolutionInfo();
     var borderBack = volComponent.getBorderBack();
     var borderFront = volComponent.getBorderFront();
     var fullResSize = volComponent.getFullResSize();
-    var internalResSize = new Vector3Int(fullResSize, fullResSize, fullResSize) - (borderBack+borderFront);
-    Debug.Log("Internal resolution size: " + internalResSize);
-    Debug.Log("Border Front: " +  new Vector3(borderFront.x, borderFront.y, borderFront.z));
-    Debug.Log("Border Back: " + new Vector3(borderBack.x, borderBack.y,borderBack.z));
 
-    liquidComputeShader.SetInts("borderBack", new int[]{borderBack.x, borderBack.y,borderBack.z});
-    liquidComputeShader.SetInts("borderFront", new int[]{borderFront.x, borderFront.y, borderFront.z});
-    liquidComputeShader.SetInts("internalSize", new int[]{internalResSize.x, internalResSize.y, internalResSize.z});
-    liquidComputeShader.SetInt("fullSize", fullResSize);
+    // Don't reinitialize all the buffers unless we changed the dimensions
+    if (borderBack != currBorderBack || borderFront != currBorderFront || currFullResSize != fullResSize) {
+      currBorderBack = borderBack;
+      currBorderFront = borderFront;
+      currFullResSize = fullResSize;
 
-    numThreadGroups = fullResSize / NUM_THREADS_PER_BLOCK;
-    Debug.Log("Number of thread groups: " + numThreadGroups); 
+      var internalResSize = new Vector3Int(fullResSize, fullResSize, fullResSize) - (borderBack+borderFront);
+      //Debug.Log("Internal resolution size: " + internalResSize);
+      //Debug.Log("Border Front: " +  new Vector3(borderFront.x, borderFront.y, borderFront.z));
+      //Debug.Log("Border Back: " + new Vector3(borderBack.x, borderBack.y,borderBack.z));
 
-    initBuffersAndRTs(fullResSize);
-    //initDebugNodes();
-    clearNodes();
-    isInit = true;
+      liquidComputeShader.SetInts("borderBack", new int[]{borderBack.x, borderBack.y,borderBack.z});
+      liquidComputeShader.SetInts("borderFront", new int[]{borderFront.x, borderFront.y, borderFront.z});
+      liquidComputeShader.SetInts("internalSize", new int[]{internalResSize.x, internalResSize.y, internalResSize.z});
+      liquidComputeShader.SetInt("fullSize", fullResSize);
+
+      numThreadGroups = fullResSize / NUM_THREADS_PER_BLOCK;
+      //Debug.Log("Number of thread groups: " + numThreadGroups); 
+
+      initBuffersAndRTs(fullResSize);
+      //initDebugNodes();
+      clearNodes();
+    }
   }
 
   private void initBuffersAndRTs(int fullResSize) {
-    //nodeDataReadTex = new Texture3D(fullResSize, fullResSize, fullResSize, TextureFormat.ARGB32, false);
+    clearBuffersAndRTs();
+
     nodeDataRT = init3DRenderTexture(fullResSize, RenderTextureFormat.ARGBFloat);
     velRT = init3DRenderTexture(fullResSize, RenderTextureFormat.ARGBFloat);
     obsticleVelRT = init3DRenderTexture(fullResSize, RenderTextureFormat.ARGBFloat);
@@ -147,9 +156,14 @@ public class WaterCompute : MonoBehaviour {
     tempPressurePong = init3DRenderTexture(fullResSize, RenderTextureFormat.RFloat);
 
     int flattenedBufSize = fullResSize*fullResSize*fullResSize;
+
     flowsBuffer = new ComputeBuffer(flattenedBufSize, 6*sizeof(float)); // Uses the NodeFlowInfo struct
+    GC.SuppressFinalize(flowsBuffer);
     updateNodeComputeBuf = new ComputeBuffer(flattenedBufSize, 6*sizeof(float), ComputeBufferType.Default, ComputeBufferMode.SubUpdates); // Uses the LiquidNodeUpdate struct
+    GC.SuppressFinalize(updateNodeComputeBuf);
     readNodeComputeBuf = new ComputeBuffer(flattenedBufSize, sizeof(float), ComputeBufferType.Default, ComputeBufferMode.Dynamic);
+    GC.SuppressFinalize(readNodeComputeBuf);
+
     readNodeCPUArr = new float[flattenedBufSize];
   }
   private void initUniforms() {
@@ -165,25 +179,27 @@ public class WaterCompute : MonoBehaviour {
     liquidComputeShader.SetFloat("flowMultiplier", flowMultiplier);
   }
 
+  private void clearBuffersAndRTs() {
+    nodeDataRT?.Release(); nodeDataRT = null;
+    velRT?.Release(); velRT = null;
+    obsticleVelRT?.Release(); obsticleVelRT = null;
+    temp3DFloat4RT1?.Release(); temp3DFloat4RT1 = null;
+    temp3DFloat4RT2?.Release(); temp3DFloat4RT2 = null;
+    temp3DFloatRT?.Release(); temp3DFloatRT = null;
+    tempPressurePing?.Release(); tempPressurePing = null;
+    tempPressurePong?.Release(); tempPressurePong = null;
+    flowsBuffer?.Release(); flowsBuffer?.Dispose(); flowsBuffer = null;
+    updateNodeComputeBuf?.Release(); updateNodeComputeBuf?.Dispose(); updateNodeComputeBuf = null;
+    readNodeComputeBuf?.Release(); readNodeComputeBuf?.Dispose(); readNodeComputeBuf = null;
+  }
+
   private void Start() {
-    initAll();
   }
   private void OnValidate() {
     initUniforms();
   }
-
   private void OnDestroy() {
-    nodeDataRT?.Release();
-    velRT?.Release();
-    obsticleVelRT?.Release();
-    temp3DFloat4RT1?.Release();
-    temp3DFloat4RT2?.Release();
-    temp3DFloatRT?.Release();
-    tempPressurePing?.Release();
-    tempPressurePong?.Release();
-    flowsBuffer?.Release();
-    updateNodeComputeBuf?.Release();
-    readNodeComputeBuf?.Release();
+    clearBuffersAndRTs();
   }
   
   private RenderTexture init3DRenderTexture(int resSize, RenderTextureFormat format) {
@@ -197,9 +213,9 @@ public class WaterCompute : MonoBehaviour {
   }
 
   private void FixedUpdate() {
-    if (!enableSimulation) { return; }
+    if (!enableSimulation || liquidComputeShader == null || volComponent == null) { return; }
     
-    liquidComputeShader.SetFloat("dt", Time.fixedDeltaTime);
+    liquidComputeShader.SetFloat("dt", applyCFL(Time.fixedDeltaTime));
     advectVelocity();
     applyExternalForces();
     applyVorticityConfinement();
@@ -320,12 +336,13 @@ public class WaterCompute : MonoBehaviour {
     RenderTexture.active = tempRT;
   }
 
-  private void initDebugNodes() {
-    int debugKernelId = liquidComputeShader.FindKernel("CSFillDebugNodeData");
-    liquidComputeShader.SetTexture(debugKernelId, "nodeData", nodeDataRT);
-    liquidComputeShader.Dispatch(debugKernelId, numThreadGroups, numThreadGroups, numThreadGroups);
-  }
-  private void clearNodes() {
+  //private void initDebugNodes() {
+  //  int debugKernelId = liquidComputeShader.FindKernel("CSFillDebugNodeData");
+  //  liquidComputeShader.SetTexture(debugKernelId, "nodeData", nodeDataRT);
+  //  liquidComputeShader.Dispatch(debugKernelId, numThreadGroups, numThreadGroups, numThreadGroups);
+  //}
+
+  public void clearNodes() {
     int clearKernelId = liquidComputeShader.FindKernel("CSClearNodeData");
     liquidComputeShader.SetTexture(clearKernelId, "nodeData", nodeDataRT);
     liquidComputeShader.Dispatch(clearKernelId, numThreadGroups, numThreadGroups, numThreadGroups);
@@ -343,6 +360,7 @@ public class WaterCompute : MonoBehaviour {
       nodeCBArr[i] = initUpdate;
     }
     updateNodeComputeBuf.EndWrite<LiquidNodeUpdate>(bufferCount);
+    volComponent.updateVolumeData(nodeDataRT);
   }
 
   /// <summary>

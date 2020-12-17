@@ -248,12 +248,14 @@ Material:
     - emissionMultiplier: 0.8
     - fresnelPower: 1.3
     - indexOfRefraction: 1.333
+    - liquidThickness: 10
+    - liquidVolumeMultiplier: 1
     - metallic: 0
-    - nodeVolume: 0.2
+    - nodeVolume: 0.015625
     - opacityMultiplier: 1
-    - resolution: 64
+    - resolution: 48
     - smoothness: 0.8
-    - transmittance: 1
+    - transmittance: 10
     m_Colors:
     - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
     - _BaseColorMap_MipInfo: {r: 0, g: 0, b: 0, a: 0}
@@ -271,11 +273,11 @@ Material:
     - _UVDetailsMappingMask: {r: 1, g: 0, b: 0, a: 0}
     - _UVMappingMask: {r: 1, g: 0, b: 0, a: 0}
     - _UVMappingMaskEmissive: {r: 1, g: 0, b: 0, a: 0}
-    - baseColour: {r: 0, g: 0.023529412, b: 0.08627451, a: 0}
-    - borderBack: {r: 1, g: 1, b: 1, a: 0}
-    - borderFront: {r: 1, g: 1, b: 1, a: 0}
-    - boundsMax: {r: 10, g: 10, b: 10, a: 0}
-    - boundsMin: {r: -10, g: -10, b: -10, a: 0}
+    - baseColour: {r: 0, g: 0.09411765, b: 0.34509805, a: 0}
+    - borderBack: {r: 18, g: 4, b: 18, a: 0}
+    - borderFront: {r: 17, g: 3, b: 17, a: 0}
+    - boundsMax: {r: 3, g: 10, b: 3, a: 0}
+    - boundsMin: {r: 0, g: 0, b: 0, a: 0}
   m_BuildTextureStacks: []
 --- !u!114 &4388669169913572155
 MonoBehaviour:

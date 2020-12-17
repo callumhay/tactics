@@ -159,11 +159,13 @@ public class TerrainColumn {
       gameObj = new GameObject();
       gameObj.name = name;
       gameObj.tag = "Terrain";
+      gameObj.layer = LayerMask.NameToLayer(LayerHelper.TERRAIN_LAYER_NAME);
       meshFilter   = gameObj.AddComponent<MeshFilter>();
       meshCollider = gameObj.AddComponent<MeshCollider>();
       meshRenderer = gameObj.AddComponent<MeshRenderer>();
     }
     gameObj.transform.position = TerrainColumn.SIZE * (Vector3)_index;
+    
   }
 
   private int numNodesX() { return TerrainColumn.SIZE * TerrainGrid.nodesPerUnit; }

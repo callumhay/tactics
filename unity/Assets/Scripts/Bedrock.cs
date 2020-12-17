@@ -18,6 +18,7 @@ public class Bedrock {
       gameObj = GameObject.CreatePrimitive(PrimitiveType.Cube);
       gameObj.transform.position = new Vector3(0,0,0);
       gameObj.name = Bedrock.GAME_OBJ_NAME;
+      gameObj.layer = LayerMask.NameToLayer(LayerHelper.TERRAIN_LAYER_NAME);
       var renderer = gameObj.GetComponent<Renderer>();
       renderer.sharedMaterial = Resources.Load<Material>("Materials/BedrockMat");
     }
