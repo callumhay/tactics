@@ -412,9 +412,10 @@ float snoise(float4 v)
 
 #define MAX_OCTAVES 8
 
-// The following is a composite sum of various octaves of the snoise functions with
-// tweakable lacunarity and gain.
+// The following is a composite sum of multiple octaves of the snoise functions with
+// tweakable frequency, lacunarity, and gain.
 // Based on https://developer.amd.com/wordpress/media/2012/10/Tatarchuk-Noise(GDC07-D3D_Day).pdf
+// See also: https://catlikecoding.com/unity/tutorials/noise/
 float sumSNoise(float4 vInputCoords, float nNumOctaves, float fFrequency, float fLacunarity, float fGain) {
   float fNoiseSum = 0;
   float fAmplitude = 1;

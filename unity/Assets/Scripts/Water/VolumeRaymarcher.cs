@@ -28,7 +28,7 @@ public class VolumeRaymarcher : MonoBehaviour {
     // Find the terrain grid component, this must exist and be initialized before this function is called!
     terrainGrid = GetComponent<TerrainGrid>();
     if (!terrainGrid) {
-      Debug.LogError("Could not find TerrainGrid component on GameObject!");
+      Debug.LogError("Could not find TerrainGrid component!");
       return;
     }
 

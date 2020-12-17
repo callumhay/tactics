@@ -7,19 +7,18 @@
 #include "SimplexNoise.hlsl"
 
 #define MIN_ITERATIONS 3
-#define MAX_ITERATIONS 32
+#define MAX_ITERATIONS 64
 
 void DoSample(Texture3D volumeTex, SamplerState volumeSampler, float3 uvw, float weight,
-  float nodeVolume, float transmittance, inout float4 colour) {
+  float nodeVolume, float thicknessMultiplier, inout float4 colour) {
   float4 node = SAMPLE_TEXTURE3D(volumeTex, volumeSampler, uvw);
 
-  float nodeVolPercentage = transmittance*smoothstep(0, nodeVolume, 100*nodeLiquidVolume(node));
+  float nodeVolPercentage = clamp(thicknessMultiplier*nodeLiquidVolume(node) / nodeVolume, 0, 1); //thicknessMultiplier*smoothstep(0, nodeVolume, 5*nodeLiquidVolume(node));
   //float nodeVolPercentage = saturate(smoothstep(0, nodeVolume, 10*nodeLiquidVolume(node)));
   //float4 sampleColour = nodeLiquidVolume(node) > nodeVolume ? float4(1,0,0,nodeVolPercentage) : (nodeSettled(node) ==  SETTLED_NODE) ? float4(0,1,0,nodeVolPercentage) : float4(1, 1, 1, nodeVolPercentage);//((nodeType(node) == SOLID_NODE_TYPE) ? float4(1,0,0,1) : float4(1, 1, 1, nodeVolPercentage));
   float4 sampleColour = weight * float4(1,1,1,nodeVolPercentage);
   colour.rgb = (1-sampleColour.a)*colour.rgb + sampleColour.a * sampleColour.rgb;
   colour.a = (1-sampleColour.a)*colour.a + sampleColour.a;
-  
 }
 
 float3 calcUVW(float3 borderFront, float resNoBorderLen, float3 currPos, float3 boxMin, float boxMinMaxLen) {
@@ -43,7 +42,7 @@ void Raymarch_float(
   Texture3D volumeTex, SamplerState volumeSampler, 
   Texture2D jitterTex, SamplerState jitterSampler,
   float eyeDepthAlongRay, float cameraFarPlane, float2 pos, float3 rayOrigin, float3 rayDir, float3 boxMin, float3 boxMax, 
-  int3 borderFront, int3 borderBack, float resolution, float transmittance, float nodeVolume,
+  int3 borderFront, int3 borderBack, float resolution, float thicknessMultiplier, float nodeVolume,
   float time, out float4 colour, out float depthOffset, out float3 nNormal) {
   
   depthOffset = 0;
@@ -66,9 +65,6 @@ void Raymarch_float(
   float resNoBorderLen = length(resNoBorderVec);
   float3 resNoBorderVecDivRes = resNoBorderVec / (float)resolution;
 
-  // Perform a jitter along the ray, the jitter must not exceed half the voxel unit distance along the ray
-  float jitterOffset = SAMPLE_TEXTURE2D(jitterTex, jitterSampler, pos.xy).r; // Random values in [0,1)
-
   // Calculate the intersection points of the eye ray to the box
   float3 pNear = rayOrigin + rayDir*tNear;
   float3 pFar  = rayOrigin + rayDir*tFar;
@@ -79,40 +75,29 @@ void Raymarch_float(
   float fSamples = clamp(bestSamples, MIN_ITERATIONS, MAX_ITERATIONS);
   int nSamples = floor(fSamples);
   float3 stepVec = nearToFarVec / (nSamples-1.0);
+
+  // Perform a jitter along the ray
+  float jitterOffset = SAMPLE_TEXTURE2D(jitterTex, jitterSampler, pos.xy).r; // Random values in [0,1)
   float3 currPos = pNear + stepVec*jitterOffset;
 
+  // Raymarch to find the accumulation of liquid (up to saturation or until we hit the end of the ray)
   colour = float4(0,0,0,0);
   float3 uvw = float3(0,0,0);
   int i = 0;
   [unroll(MAX_ITERATIONS)]
   for (; i < nSamples; i++) {
     uvw = calcUVW(borderFront, resNoBorderLen, currPos, boxMin, boxMinMaxLen);
-    DoSample(volumeTex, volumeSampler, uvw, 1, nodeVolume, transmittance, colour);
+    DoSample(volumeTex, volumeSampler, uvw, 1, nodeVolume, thicknessMultiplier, colour);
     currPos += stepVec;
     if (colour.a > 0.99) { break; }
   }
   
   clip(colour.a - 1e-4); // Discard the fragment if there's no alpha
 
+  depthOffset = length(currPos-pNear)-tFar;
+  
   float noiseVal = sumSNoise(float4(currPos-stepVec, 0.2*time), 2, 0.5, 1.5, 0.75); //snoise(float4(currPos-stepVec, 0.2*time));
   nNormal = calcIsoNormal(volumeTex, volumeSampler, uvw, resolution) + 0.0025*float3(noiseVal,noiseVal,noiseVal);
-  
-  depthOffset = length(currPos-pNear)-tFar;
-
-/*
-  float remainingSample = frac(fSamples); 
-  if (i == nSamples && remainingSample > 0) {
-    //uvw = calcUVW(borderFront, resNoBorderLen, currPos, boxMin, boxMinMaxLen);
-    //DoSample(volumeTex, volumeSampler, uvw, remainingSample, nodeVolume, transmittance, colour);
-    //float3 partNormal = calcIsoNormal(volumeTex, volumeSampler, uvw, resolution);
-    //nNormal += remainingSample*partNormal;
-    depthOffset = tNear-tFar;
-  }
-  else {
-    depthOffset = length(currPos-pNear)-tFar;
-  }
-  */
-
   float normalLen = length(nNormal);
   nNormal = normalLen < 1e-12 ? normalize(-stepVec) : nNormal/normalLen;
 
