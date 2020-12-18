@@ -12,8 +12,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 98d9b1dd3dee9476ba6c0f6586489315, type: 3}
   m_Name: TGTWSettings
   m_EditorClassIdentifier: 
-  editorType: 0
-  paintType: 2
+  editorType: 1
+  paintType: 0
   paintMode: 0
   brushType: 1
   brushSize: 1.5
@@ -21,7 +21,7 @@ MonoBehaviour:
   gridSnaping: 1
   showGridOverlay: 0
   groundUpOnly: 1
-  setLevelValue: 10
+  setLevelValue: 1
   paintMaterial: {fileID: 0}
   columnInsetXAmount: 0
   columnInsetNegXAmount: 0

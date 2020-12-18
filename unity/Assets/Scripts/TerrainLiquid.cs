@@ -23,7 +23,7 @@ public class TerrainLiquid {
   }
 
   public void initAll(in TerrainGridNode[,,] nodes) {
-    volRaymarcher.initAll();
+    //volRaymarcher.initAll();
     waterCompute.initAll(volRaymarcher);
     waterCompute.writeUpdateNodesToLiquid(nodes);
   }

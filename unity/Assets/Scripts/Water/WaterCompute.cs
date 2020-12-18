@@ -180,6 +180,7 @@ public class WaterCompute : MonoBehaviour {
   }
 
   private void clearBuffersAndRTs() {
+    if (!nodeDataRT) { return; }
     nodeDataRT?.Release(); nodeDataRT = null;
     velRT?.Release(); velRT = null;
     obsticleVelRT?.Release(); obsticleVelRT = null;
@@ -225,7 +226,7 @@ public class WaterCompute : MonoBehaviour {
     calculateAndSumFlows();
     adjustNodesFromFlows();
 
-    volComponent.updateVolumeData(nodeDataRT);
+    volComponent.updateNodeTexture(nodeDataRT);
   }
 
   private void advectVelocity() {
@@ -354,13 +355,13 @@ public class WaterCompute : MonoBehaviour {
     initUpdate.terrainIsoVal = 0;
     initUpdate.liquidVolume = 0;
     initUpdate.velocity = Vector3.zero;
-    initUpdate.isDiff = 0;
+    initUpdate.isDiff = 1;
     var nodeCBArr = updateNodeComputeBuf.BeginWrite<LiquidNodeUpdate>(0, bufferCount);
     for (int i = 0; i < bufferCount; i++) {
       nodeCBArr[i] = initUpdate;
     }
     updateNodeComputeBuf.EndWrite<LiquidNodeUpdate>(bufferCount);
-    volComponent.updateVolumeData(nodeDataRT);
+    volComponent.updateNodeTexture(nodeDataRT);
   }
 
   /// <summary>
@@ -408,7 +409,7 @@ public class WaterCompute : MonoBehaviour {
     liquidComputeShader.SetTexture(updateNodesKernelId, "obsticleVel", obsticleVelRT);
     liquidComputeShader.Dispatch(updateNodesKernelId, numThreadGroups, numThreadGroups, numThreadGroups);
 
-    volComponent.updateVolumeData(nodeDataRT);
+    volComponent.updateNodeTexture(nodeDataRT);
   }
  
   public void writeUpdateDebrisDiffToLiquid(
@@ -465,7 +466,7 @@ public class WaterCompute : MonoBehaviour {
     liquidComputeShader.SetTexture(updateNodesKernelId, "obsticleVel", obsticleVelRT);
     liquidComputeShader.Dispatch(updateNodesKernelId, numThreadGroups, numThreadGroups, numThreadGroups);
 
-    volComponent.updateVolumeData(nodeDataRT);
+    volComponent.updateNodeTexture(nodeDataRT);
   }
 
   // TODO: Optimize so that we only read the interior of the 3D buffer?

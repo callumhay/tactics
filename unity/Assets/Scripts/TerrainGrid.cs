@@ -330,9 +330,6 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     }
   }
   public void OnBeforeSerialize() {
-    //if (levelData != null) {
-    //  levelData.setNodesFrom3DArray(nodes);
-    //}
   }
   public void OnAfterDeserialize() {
     loadLevelDataNodes();
@@ -385,8 +382,13 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     #endif
   }
 
+  public static readonly float debrisUpdateTime = DebrisCollisionMonitor.moveEventUpdateTime*2;
+  private float debrisTimeCounter = 0;
   void FixedUpdate() {
-    if (debrisNodeDict != null && debrisNodeDict.Count > 0 && debrisToLiquidNeedsUpdate) {
+
+    debrisTimeCounter += Time.fixedDeltaTime;
+    if (debrisToLiquidNeedsUpdate && debrisNodeDict != null && debrisNodeDict.Count > 0 && debrisTimeCounter >= debrisUpdateTime) {
+      debrisTimeCounter = 0;
       debrisToLiquidNeedsUpdate = false;
       terrainLiquid.waterCompute.readUpdateNodesFromLiquid(nodes);
 

@@ -4,7 +4,9 @@ using UnityEngine;
 [ExecuteAlways]
 public class VolumeRaymarcher : MonoBehaviour {
   private static readonly int JITTER_TEX_SIZE = 256;
+  
   public Texture2D jitterTexture;
+  public RenderTexture nodeTexture;
 
   // Assigned in Awake/Start
   private int volResolution;
@@ -20,6 +22,8 @@ public class VolumeRaymarcher : MonoBehaviour {
   public int getFullResSize() { return volResolution; }
 
   public void initAll() {
+    Debug.Assert(terrainGrid != null);
+
     // Calculate the resolution of the 3D texture for rendering into the slices
     var numNodesVec = new Vector3(terrainGrid.numNodesX(), terrainGrid.numNodesY(), terrainGrid.numNodesZ());
 
@@ -41,7 +45,9 @@ public class VolumeRaymarcher : MonoBehaviour {
 
     var volumeUnitSize = new Vector3(terrainGrid.xSize, terrainGrid.ySize, terrainGrid.zSize)*TerrainColumn.SIZE;
     // Set the raycasting material
-    meshRenderer.sharedMaterial = new Material(Resources.Load<Material>("Materials/VolumeRaymarchMat")); // "Materials/DebugDiffuseMat"
+    if (!meshRenderer.sharedMaterial) {
+      meshRenderer.sharedMaterial = new Material(Resources.Load<Material>("Materials/VolumeRaymarchMat")); // "Materials/DebugDiffuseMat"
+    }
     meshRenderer.sharedMaterial.SetVector("boundsMax", transform.localToWorldMatrix * volumeUnitSize);
     meshRenderer.sharedMaterial.SetVector("boundsMin", transform.localToWorldMatrix * new Vector3(0,0,0));
     meshRenderer.sharedMaterial.SetVector("borderFront", new Vector3(resBorderFrontInt.x, resBorderFrontInt.y, resBorderFrontInt.z));
@@ -49,6 +55,9 @@ public class VolumeRaymarcher : MonoBehaviour {
     meshRenderer.sharedMaterial.SetFloat("resolution", volResolution);
     meshRenderer.sharedMaterial.SetFloat("nodeVolume", Mathf.Pow(TerrainGrid.unitsPerNode(),3));
     meshRenderer.sharedMaterial.SetTexture("jitterTex", jitterTexture);
+    if (nodeTexture) {
+      meshRenderer.sharedMaterial.SetTexture("nodeTex", nodeTexture);
+    }
 
     // Build the bounding box used to render the volume via raymarching between its faces
     var mesh = new Mesh();
@@ -57,12 +66,10 @@ public class VolumeRaymarcher : MonoBehaviour {
     MeshHelper.BuildCubeData(volumeUnitSize, out triangles, out vertices);
     mesh.SetVertices(vertices);
     mesh.SetTriangles(triangles, 0);
-    if (meshFilter.sharedMesh) { meshFilter.sharedMesh.Clear(); }
     meshFilter.sharedMesh = mesh;
   }
 
-  private void Awake() {
-    // Find the terrain grid component, this must exist and be initialized before this function is called!
+  private void Start() {
     var terrainGO = GameObject.Find(TerrainGrid.GAME_OBJ_NAME);
     if (!terrainGO) {
       Debug.LogError("Could not find '" + TerrainGrid.GAME_OBJ_NAME + "' GameObject!");
@@ -82,11 +89,13 @@ public class VolumeRaymarcher : MonoBehaviour {
     meshRenderer.allowOcclusionWhenDynamic = false;
     meshRenderer.motionVectorGenerationMode = MotionVectorGenerationMode.ForceNoMotion;
     if (!jitterTexture) { jitterTexture = TextureHelper.buildJitterTexture2D(JITTER_TEX_SIZE, true); }
+    initAll();
   }
 
-  private void Start() {}
-
-  public void updateVolumeData(RenderTexture rt) {
-    meshRenderer?.sharedMaterial.SetTexture("nodeTex", rt);
+  public void updateNodeTexture(RenderTexture nodeTex) {
+    if (nodeTex != null) {
+      meshRenderer.sharedMaterial.SetTexture("nodeTex", nodeTex);
+      nodeTexture = nodeTex;
+    }
   }
 }

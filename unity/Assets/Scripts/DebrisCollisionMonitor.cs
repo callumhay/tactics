@@ -8,7 +8,7 @@ public class DebrisCollisionMonitor : MonoBehaviour {
   public static readonly float ySqrDistToFalloff = 25.0f; // Squared distance below the y-axis before the mesh has "fallen off" the map
   public static readonly float minVelForSleep    = 1e-4f; // Minimum velocity on each axis of a rigidbody, below this assumes it's no longer active
   public static readonly float minAngVelForSleep = 1e-3f; // Min angular vel on each axis (see above)
-  public static readonly float moveEventUpdateTime = 1f/15f;
+  public static readonly float moveEventUpdateTime = 1f/30f;
 
   public GameEvent onSleepEvent;    // Called when debris slows/stops and comes to rest within the terrain
   public GameEvent onFellOffEvent;  // Called when the debris falls off and goes below the terrain
