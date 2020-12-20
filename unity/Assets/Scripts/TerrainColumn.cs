@@ -137,8 +137,8 @@ public class TerrainColumn {
   public static readonly float HALF_SIZE = SIZE * 0.5f;
   public static readonly float MIN_LANDING_OVERHANG_UNITS = SIZE*2;
   public static readonly int MIN_LANDING_OVERHANG_NODES = (int)(TerrainGrid.nodesPerUnit*MIN_LANDING_OVERHANG_UNITS);
+  public static readonly int MIN_ADJACENT_LANDING_NODES_ON_AXIS = (TerrainGrid.nodesPerUnit*SIZE)-2;
   public static readonly int NUM_ADJACENT_LANDING_NODES = (TerrainGrid.nodesPerUnit*SIZE)-1;
-  public static readonly int NUM_ADJACENT_LANDING_NODES_CHECK = NUM_ADJACENT_LANDING_NODES*NUM_ADJACENT_LANDING_NODES-NUM_ADJACENT_LANDING_NODES;
   public static readonly int MAX_LANDING_HEIGHT_DEVIATION_NODES = 1;
   public static readonly float BOUNDS_EPSILON = 1e-4f;
 
@@ -310,25 +310,45 @@ public class TerrainColumn {
           int y = availNodeList[i];
 
           int landingNodeCount = 1;
+
+          int numConsecutiveX = 0;
+          int numConsecutiveZ = 0;
+
           Vector3Int landingMin = new Vector3Int(x, y, z);
           Vector3Int landingMax = new Vector3Int(0, y, 0);
+
           for (int ax = x; ax < numXNodes; ax++) {
+            numConsecutiveZ = 0;
             for (int az = z; az < numZNodes; az++) {
-              if (ax == x && az == z) { continue; }
+
+              if (ax == x && az == z) {
+                numConsecutiveX = 1;
+                numConsecutiveZ = 1;
+                continue;
+              }
+
               var adjAvailNodeList = availNodeArr[ax,az];
+              bool foundNode = false;
               for (int j = 0; j < adjAvailNodeList.Count; j++) {
                 var adjY = adjAvailNodeList[j];
-                if (Math.Abs(y-adjY) <= MAX_LANDING_HEIGHT_DEVIATION_NODES) {
+                if (Math.Abs(y-adjY) < MAX_LANDING_HEIGHT_DEVIATION_NODES) {
                   landingNodeCount++;
                   
                   landingMin.y = Math.Min(landingMin.y, adjY);
                   landingMax = Vector3Int.Max(landingMax, new Vector3Int(ax, adjY, az));
                   
                   adjAvailNodeList.RemoveAt(j);
+                  foundNode = true;
                   break;
                 }
                 else if (adjY > y) { break; }
               }
+              if (foundNode) {
+                numConsecutiveZ++;
+              }
+            }
+            if (numConsecutiveZ >= MIN_ADJACENT_LANDING_NODES_ON_AXIS) {
+              numConsecutiveX++;
             }
           }
 
@@ -336,7 +356,7 @@ public class TerrainColumn {
           i--;
 
           // Did we find a landing (i.e., a square of a reasonable size of level nodes)?
-          if (landingNodeCount >= NUM_ADJACENT_LANDING_NODES_CHECK) {
+          if (numConsecutiveX >= MIN_ADJACENT_LANDING_NODES_ON_AXIS) {
             // Map the x and z into the node index space (from TerrainColumn local space)
             landingMin.x += idxRange.xStartIdx;
             landingMin.z += idxRange.zStartIdx;
