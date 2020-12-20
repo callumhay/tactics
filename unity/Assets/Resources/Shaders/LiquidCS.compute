@@ -1,4 +1,5 @@
-﻿#pragma kernel CSAdvect
+﻿// Water simulation kernels
+#pragma kernel CSAdvect
 #pragma kernel CSApplyExternalForces
 #pragma kernel CSCurl
 #pragma kernel CSVorticityConfinementKernel
@@ -9,14 +10,11 @@
 #pragma kernel CSSumFlowsKernel
 #pragma kernel CSAdjustNodeFlowsKernel
 
-// Update stuff
+// Update kernels
 #pragma kernel CSClearNodeData
 #pragma kernel CSClearUpdateBuffer
 #pragma kernel CSUpdateNodeData
 #pragma kernel CSReadNodeData
-
-// Debug stuff
-#pragma kernel CSFillDebugNodeData
 
 #include "CommonCS.hlsl"
 #include "NodeDefs.hlsl"
@@ -565,25 +563,4 @@ RWStructuredBuffer<float> liquidReadValues; // Output of CSReadNodeData
 [numthreads(8,8,8)]
 void CSReadNodeData(uint3 id : SV_DispatchThreadID) {
   liquidReadValues[idToIndex(id)] = nodeLiquidVolume(nodeData[id.xyz]);
-}
-
-// DEBUG STUFF *******************
-//RWTexture3D<float4> nodeData; // Output of CSFillDebugNodeData
-[numthreads(8,8,8)]
-void CSFillDebugNodeData(uint3 id : SV_DispatchThreadID) {
-
-  if (isOutOfBounds(id)) {
-    nodeData[id.xyz] = buildNode(SOLID_NODE_TYPE, 0.0, UNSETTLED_NODE);
-  }
-  else {
-    /*
-    if (id.x == borderFront.x || id.y == borderFront.y || id.z == borderFront.z || id.x == borderFront.x+internalSize.x-1 ||
-        id.y == borderFront.y+internalSize.y-1 || id.z == borderFront.z+internalSize.z-1) {
-      nodeData[id.xyz] = buildNode(EMPTY_NODE_TYPE, 1, UNSETTLED_NODE);
-      return;
-    }
-    */
-    float maxVol = unitsPerNode*unitsPerNode*unitsPerNode;
-    nodeData[id.xyz] = buildNode(EMPTY_NODE_TYPE, (float)id.y > fullSize/1.75 ? maxVol : 0.0, UNSETTLED_NODE);
-  }
 }

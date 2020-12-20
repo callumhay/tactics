@@ -51,6 +51,9 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     var nodeUnitsVec = unitsPerNodeVec3(); return Vector3.Scale(nodeIdx, nodeUnitsVec); 
   }
 
+  public TerrainColumn terrainColumn(in Vector2Int tcIdx) { return terrainColumn(new Vector3Int(tcIdx.x, 0, tcIdx.y)); }
+  public TerrainColumn terrainColumn(in Vector3Int tcIdx) { return terrainColumns[tcIdx]; }
+
   public void getGridSnappedPoint(ref Vector3 wsPt) {
     // Find the closest column center to the given point and snap to it
     var lsPt = wsPt - transform.position; // local space
@@ -366,8 +369,11 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
       // Build all the assets for the game that aren't stored in the level data
       buildTerrainLiquid();
       buildBedrock();
-      buildTerrainColumns();
+      regenerateMeshes(buildTerrainColumns());
       terrainPhysicsCleanup();
+
+      var caret = GameObject.Find("Square Selection Caret").GetComponent<SquareSelectionCaret>();
+      caret.placeCaret(terrainColumn(new Vector2Int(0,0)));
     }
     #if UNITY_EDITOR
     else {
@@ -376,6 +382,7 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
         buildTerrainLiquid();
         buildBedrock();
         buildTerrainColumns();
+        regenerateMeshes(buildTerrainColumns());
         // No terrainPhysicsCleanup in editor!
       }
     }
@@ -508,7 +515,7 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     nodes = tempNodes;
   }
 
-  private void buildTerrainColumns() {
+  private List<TerrainColumn> buildTerrainColumns() {
     if (terrainColumns == null) { 
       terrainColumns = new Dictionary<Vector3Int, TerrainColumn>();
     }
@@ -525,6 +532,7 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
       terrainColumns.Remove(key);
     }
 
+    var newTerrainCols = new List<TerrainColumn>();
     for (int x = 0; x < xSize; x++) {
       for (int z = 0; z < zSize; z++) {
         var currIdx = new Vector3Int(x,0,z);
@@ -532,9 +540,12 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
           var terrainCol = new TerrainColumn(currIdx, this);
           terrainCol.gameObj.transform.SetParent(transform);
           terrainColumns.Add(currIdx, terrainCol);
+          newTerrainCols.Add(terrainCol);
         }
       }
     }
+
+    return newTerrainCols;
   }
 
   private void buildBedrock() {
@@ -895,8 +906,7 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
       loadLevelDataNodes();
       buildTerrainLiquid();
       buildBedrock();
-      buildTerrainColumns();
-      regenerateMeshes();
+      regenerateMeshes(buildTerrainColumns());
     }
   }
 

@@ -138,7 +138,6 @@ public class WaterCompute : MonoBehaviour {
       //Debug.Log("Number of thread groups: " + numThreadGroups); 
 
       initBuffersAndRTs(fullResSize);
-      //initDebugNodes();
       clearNodes();
     }
   }
@@ -336,12 +335,6 @@ public class WaterCompute : MonoBehaviour {
     GL.Clear(true, true, c);
     RenderTexture.active = tempRT;
   }
-
-  //private void initDebugNodes() {
-  //  int debugKernelId = liquidComputeShader.FindKernel("CSFillDebugNodeData");
-  //  liquidComputeShader.SetTexture(debugKernelId, "nodeData", nodeDataRT);
-  //  liquidComputeShader.Dispatch(debugKernelId, numThreadGroups, numThreadGroups, numThreadGroups);
-  //}
 
   public void clearNodes() {
     int clearKernelId = liquidComputeShader.FindKernel("CSClearNodeData");

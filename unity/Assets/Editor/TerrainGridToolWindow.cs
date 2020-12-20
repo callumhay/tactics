@@ -180,7 +180,6 @@ public class TerrainGridToolWindow : EditorWindow {
 
   public static TerrainGrid findTerrainGrid() {
     var terrainGameObj = GameObject.Find(TerrainGrid.GAME_OBJ_NAME);
-    if (!terrainGameObj) { terrainGameObj = GameObject.FindWithTag("Terrain"); }
     if (terrainGameObj) { return terrainGameObj.GetComponent<TerrainGrid>(); }
     return null;
   }

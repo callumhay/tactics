@@ -5,15 +5,22 @@ using UnityEngine;
 public class TerrainColumn {
 
   public class Landing {
-    public Vector3Int minIdx;
-    public Vector3Int maxIdx;
-
-    public GameObject gameObj;
+    public TerrainColumn terrainColumn { get; }
+    public Vector3Int minIdx { get; }
+    public Vector3Int maxIdx { get; }
+    public GameObject gameObj { get; }
     private MeshFilter meshFilter;
     private MeshRenderer meshRenderer;
 
-    public Landing(in TerrainColumn terrainColumn, Vector3Int min, Vector3Int max) {
-      Debug.Assert(min.x <= max.x && min.y <= max.y && min.z <= max.z);
+    public Vector3 centerPosition() {
+      var result = terrainColumn.centerPosition();
+      result.y = TerrainGrid.nodeIndexToUnits((minIdx.y+maxIdx.y)/2);
+      return result;
+    }
+
+    public Landing(in TerrainColumn terrainCol, Vector3Int min, Vector3Int max) {
+      Debug.Assert(terrainCol != null && min.x <= max.x && min.y <= max.y && min.z <= max.z);
+      terrainColumn = terrainCol;
       minIdx = min;
       maxIdx = max;
 
@@ -127,7 +134,8 @@ public class TerrainColumn {
   }
 
   public static readonly int SIZE = 1;
-  public static readonly float MIN_LANDING_OVERHANG_UNITS = SIZE*2-2*TerrainGrid.unitsPerNode();
+  public static readonly float HALF_SIZE = SIZE * 0.5f;
+  public static readonly float MIN_LANDING_OVERHANG_UNITS = SIZE*2;
   public static readonly int MIN_LANDING_OVERHANG_NODES = (int)(TerrainGrid.nodesPerUnit*MIN_LANDING_OVERHANG_UNITS);
   public static readonly int NUM_ADJACENT_LANDING_NODES = (TerrainGrid.nodesPerUnit*SIZE)-1;
   public static readonly int NUM_ADJACENT_LANDING_NODES_CHECK = NUM_ADJACENT_LANDING_NODES*NUM_ADJACENT_LANDING_NODES-NUM_ADJACENT_LANDING_NODES;
@@ -165,6 +173,11 @@ public class TerrainColumn {
     }
     gameObj.transform.position = TerrainColumn.SIZE * (Vector3)_index;
     gameObj.layer = LayerMask.NameToLayer(LayerHelper.TERRAIN_LAYER_NAME);
+  }
+
+  public Vector3 centerPosition() {
+    var nodeIdx = terrain.terrainColumnNodeIndex(this, Vector3Int.zero);
+    return terrain.nodeIndexToUnitsVec3(nodeIdx) + new Vector3(HALF_SIZE,0,HALF_SIZE);
   }
 
   private int numNodesX() { return TerrainColumn.SIZE * TerrainGrid.nodesPerUnit; }
