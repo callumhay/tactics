@@ -124,7 +124,7 @@ public class TerrainGridToolWindow : EditorWindow {
         
         EditorGUILayout.Space();
         EditorGUILayout.PropertyField(groundUpOnlyProp);
-        EditorGUILayout.Slider(setLevelValProp, 1.0f, terrainGrid.ySize*TerrainColumn.SIZE, "Set Level", GUILayout.ExpandWidth(true));
+        EditorGUILayout.Slider(setLevelValProp, 1.0f, terrainGrid.yUnitSize(), "Set Level", GUILayout.ExpandWidth(true));
         
         EditorGUILayout.Space();
         EditorGUILayout.Slider(matIntensityProp, 0.01f, 1.0f, "Material Intensity");
@@ -143,7 +143,7 @@ public class TerrainGridToolWindow : EditorWindow {
         EditorGUILayout.IntSlider(colInsetNegXAmtProp, 0, maxAllowableInset, "Column Inset/Outset -X", GUILayout.ExpandWidth(true));
         EditorGUILayout.IntSlider(colInsetZAmtProp, 0, maxAllowableInset, "Column Inset/Outset +Z", GUILayout.ExpandWidth(true));
         EditorGUILayout.IntSlider(colInsetNegZAmtProp, 0, maxAllowableInset, "Column Inset/Outset -Z", GUILayout.ExpandWidth(true));
-        EditorGUILayout.Slider(setLevelValProp, 1.0f, terrainGrid.ySize*TerrainColumn.SIZE, "Set Level", GUILayout.ExpandWidth(true));
+        EditorGUILayout.Slider(setLevelValProp, 1.0f, terrainGrid.yUnitSize(), "Set Level", GUILayout.ExpandWidth(true));
         EditorGUILayout.Space();
         EditorGUILayout.PropertyField(paintMatProp);
         break;
@@ -159,7 +159,7 @@ public class TerrainGridToolWindow : EditorWindow {
         EditorGUILayout.PropertyField(showEmptyNodesProp, GUILayout.ExpandWidth(true));
         EditorGUILayout.PropertyField(showSurfaceNodesProp, GUILayout.ExpandWidth(true));
         EditorGUILayout.PropertyField(showAboveSurfaceNodesProp, GUILayout.ExpandWidth(true));
-        EditorGUILayout.Slider(setLevelValProp, 1.0f, terrainGrid.ySize*TerrainColumn.SIZE, "Set Level", GUILayout.ExpandWidth(true));
+        EditorGUILayout.Slider(setLevelValProp, 1.0f, terrainGrid.yUnitSize(), "Set Level", GUILayout.ExpandWidth(true));
         EditorGUILayout.Space();
         EditorGUILayout.PropertyField(paintMatProp);
 

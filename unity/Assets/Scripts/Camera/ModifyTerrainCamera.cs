@@ -30,7 +30,7 @@ public class ModifyTerrainCamera : MonoBehaviour {
   private void addIsoValuesAtHit(in RaycastHit hit, float val) {
     var terrain = hit.transform.parent.GetComponent<TerrainGrid>();
     if (terrain) {
-      var hitNodes = terrain.getNodesInsideSphere(hit.point, radius, false, false, terrain.ySize*TerrainColumn.SIZE);
+      var hitNodes = terrain.getNodesInsideSphere(hit.point, radius, false, false, terrain.yUnitSize());
       terrain.addIsoValuesToNodes(val, hitNodes);
     }
   }

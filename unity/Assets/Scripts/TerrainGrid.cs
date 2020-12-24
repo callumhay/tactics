@@ -16,6 +16,11 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
   public int ySize { get { return levelData.ySize; } }
   public int zSize { get { return levelData.zSize; } }
 
+  public int xUnitSize() { return xSize * TerrainColumn.SIZE; }
+  public int yUnitSize() { return ySize * TerrainColumn.SIZE; }
+  public int zUnitSize() { return zSize * TerrainColumn.SIZE; }
+  public Vector3Int unitSizeVec3() { return new Vector3Int(xUnitSize(), yUnitSize(), zUnitSize()); }
+
   // Live data used in the editor and in-game, note that we serialize these fields so that we can undo/redo edit operations
   private TerrainGridNode[,,] nodes; // Does not include the outer "ghost" nodes with zeroed isovalues
   private Dictionary<Vector3Int, TerrainColumn> terrainColumns;

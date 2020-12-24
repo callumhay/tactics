@@ -85,7 +85,6 @@ public class SquareSelectionCaret : MonoBehaviour {
     if (currLanding != null) { 
       currLanding.gameObj.SetActive(false);
     }
-
     landing.gameObj.SetActive(true);
     currLanding = landing;
   }
@@ -106,10 +105,15 @@ public class SquareSelectionCaret : MonoBehaviour {
     var bounds = meshFilter.mesh.bounds;
     var scale = CARET_HEIGHT / bounds.size.y;
     transform.localScale = new Vector3(scale,scale,scale);
-    transform.localPosition = caretLocalPosition();
+    placeCaret(terrainGrid.terrainColumn(new Vector2Int(0,0)));
   }
 
   void Update() {
+    if (currLanding == null || currLanding.gameObj == null) { 
+      gameObject.SetActive(false);
+      return;
+    }
+
     var currEulerAngles = transform.localRotation.eulerAngles;
     currEulerAngles.y += rotationSpeed * Time.deltaTime;
     transform.localRotation = Quaternion.Euler(currEulerAngles);

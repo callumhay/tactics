@@ -43,7 +43,7 @@ public class VolumeRaymarcher : MonoBehaviour {
     //Debug.Log("Resolution: " + volResolution + ", number of nodes: " + numNodesVec);
     //Debug.Log("Border (Float): " + resBorder + ", Front (Int): " + resBorderFrontInt + ", Back (Int): " + resBorderBackInt);
 
-    var volumeUnitSize = new Vector3(terrainGrid.xSize, terrainGrid.ySize, terrainGrid.zSize)*TerrainColumn.SIZE;
+    var volumeUnitSize = (Vector3)terrainGrid.unitSizeVec3();
     // Set the raycasting material
     if (!meshRenderer.sharedMaterial) {
       meshRenderer.sharedMaterial = new Material(Resources.Load<Material>("Materials/VolumeRaymarchMat")); // "Materials/DebugDiffuseMat"
