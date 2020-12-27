@@ -7,7 +7,22 @@ using UnityEngine.Events;
 
 [ExecuteAlways]
 public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver {
+
   public static readonly string GAME_OBJ_NAME = "Terrain";
+  public static TerrainGrid FindTerrainGrid() {
+    var terrainGO = GameObject.Find(GAME_OBJ_NAME);
+    if (!terrainGO) {
+      Debug.LogError("Could not find '" + GAME_OBJ_NAME + "' GameObject!");
+      return null;
+    }
+    var terrainGrid = terrainGO.GetComponent<TerrainGrid>();
+    if (!terrainGrid) {
+      Debug.LogError("Could not find TerrainGrid component!");
+      return null;
+    }
+    return terrainGrid;
+  }
+
   public static readonly int nodesPerUnit = 5;
 
   public LevelData levelData;
@@ -402,7 +417,7 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     if (debrisToLiquidNeedsUpdate && debrisNodeDict != null && debrisNodeDict.Count > 0 && debrisTimeCounter >= debrisUpdateTime) {
       debrisTimeCounter = 0;
       debrisToLiquidNeedsUpdate = false;
-      terrainLiquid.waterCompute.readUpdateNodesFromLiquid(nodes);
+      terrainLiquid.liquidCompute.readUpdateNodesFromLiquid(nodes);
 
       // Go through all the nodes that might be inside the debris, if any have liquid in them then we check to make sure
       // it's actually inside the debris and displace it to the closest empty non-terrain node if it is
@@ -423,7 +438,7 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
         var debrisGO = debrisDictPair.Key;
         var debrisRB = debrisGO.GetComponent<Rigidbody>();
         if (liquidAmt > 0) {
-          debrisRB.drag = 15*liquidAmt*terrainLiquid.waterCompute.liquidDensity / debrisRB.mass;
+          debrisRB.drag = 15*liquidAmt*terrainLiquid.liquidCompute.liquidDensity / debrisRB.mass;
         }
         else {
           var debrisCollider = debrisGO.GetComponent<Collider>();
@@ -432,7 +447,7 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
       }
       var changedLiquidNodes = displaceNodeLiquid(affectedLiquidNodes, allCurrAffectedNodes);
       if (changedLiquidNodes.Count > 0) {
-        terrainLiquid.waterCompute.writeUpdateDebrisDiffToLiquid(debrisNodeDict, changedLiquidNodes);
+        terrainLiquid.liquidCompute.writeUpdateDebrisDiffToLiquid(debrisNodeDict, changedLiquidNodes);
       }
     }
     
@@ -563,7 +578,7 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     terrainLiquid.gameObj.transform.SetParent(transform);
     terrainLiquid.gameObj.transform.SetAsFirstSibling();
     terrainLiquid.initAll(nodes);
-    terrainLiquid.waterCompute.enableSimulation = Application.IsPlaying(gameObject);
+    terrainLiquid.liquidCompute.enableSimulation = Application.IsPlaying(gameObject);
   }
 
   private void regenerateMeshes(/*bool updateComputeBuffer = false*/) {
@@ -730,7 +745,7 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
   public void mergeDebrisIntoTerrain(GameObject debrisGO) {
     // We MUST read the current state of the fluid simulation first so that we know what nodes have liquid in them
     // so that it can be properly found and displaced by the merging debris
-    terrainLiquid.waterCompute.readUpdateNodesFromLiquid(nodes);
+    terrainLiquid.liquidCompute.readUpdateNodesFromLiquid(nodes);
 
     // Get the bounding box of the debris in worldspace - we use this as a rough estimate
     // of which nodes we need to iterate through to convert the mesh back into nodes
@@ -779,7 +794,7 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     Destroy(debrisGO);
 
     // Update the liquid simulation with the newly merged terrain nodes and any remaining debris
-    terrainLiquid.waterCompute.writeUpdateNodesAndDebrisToLiquid(nodes, debrisNodeDict);
+    terrainLiquid.liquidCompute.writeUpdateNodesAndDebrisToLiquid(nodes, debrisNodeDict);
   }
 
   public HashSet<TerrainColumn> terrainPhysicsCleanup() {
@@ -806,8 +821,8 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     regenerateMeshes(resultTCs);
 
     // Read/write from/to the liquid simulation
-    terrainLiquid.waterCompute.readUpdateNodesFromLiquid(nodes);
-    terrainLiquid.waterCompute.writeUpdateNodesAndDebrisToLiquid(nodes, debrisNodeDict);
+    terrainLiquid.liquidCompute.readUpdateNodesFromLiquid(nodes);
+    terrainLiquid.liquidCompute.writeUpdateNodesAndDebrisToLiquid(nodes, debrisNodeDict);
 
     return resultTCs;
   }
@@ -942,7 +957,7 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     var affectedTCs = regenerateMeshes(updateNodes);
     
     // Update the liquid so we can see it in the editor
-    terrainLiquid.waterCompute.writeUpdateNodesToLiquid(nodes);
+    terrainLiquid.liquidCompute.writeUpdateNodesToLiquid(nodes);
 
     levelData.updateFromNodes(nodes, updateNodes);
     EditorUtility.SetDirty(levelData);

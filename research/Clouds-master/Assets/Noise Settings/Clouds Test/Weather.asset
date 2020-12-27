@@ -13,8 +13,8 @@ MonoBehaviour:
   m_Name: Weather
   m_EditorClassIdentifier: 
   seed: 9
-  numLayers: 4
-  scale: 2.12
-  lacunarity: 1.36
-  persistence: 0.58
+  numLayers: 2
+  scale: 1.61
+  lacunarity: 0.14
+  persistence: 1.13
   offset: {x: -69.75, y: 50.2}

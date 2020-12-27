@@ -16,6 +16,8 @@ public class RainWeatherData : WeatherData {
   private ParticleSystem[] particleSystems;
 
   public override void init(WeatherController weatherController) {
+    if (!weatherController) { return; }
+    
     var terrain = weatherController.terrainGrid;
 
     rainGO = weatherController.transform.Find(GAME_OBJ_NAME).gameObject;

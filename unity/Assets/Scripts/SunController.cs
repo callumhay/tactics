@@ -13,6 +13,13 @@ public class SunController : MonoBehaviour {
   private float sunInitialIntensity;
 
   void Start() {
+    if (sun == null) {
+      // Try to find the directional light
+      var sunGO = GameObject.Find("Directional Light");
+      if (sunGO) { 
+        sun = sunGO.GetComponent<Light>();
+      }
+    }
     sunInitialIntensity = sun.intensity;
     updateSun();
   }

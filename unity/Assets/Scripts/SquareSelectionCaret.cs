@@ -91,8 +91,7 @@ public class SquareSelectionCaret : MonoBehaviour {
 
   void Start() {
     if (terrainGrid == null) {
-      var terrainGO = GameObject.Find(TerrainGrid.GAME_OBJ_NAME);
-      if (terrainGO) { terrainGrid = terrainGO.GetComponent<TerrainGrid>(); }
+      terrainGrid = TerrainGrid.FindTerrainGrid();
     }
     meshFilter = GetComponent<MeshFilter>();
     if (!meshFilter) { meshFilter = gameObject.AddComponent<MeshFilter>(); }

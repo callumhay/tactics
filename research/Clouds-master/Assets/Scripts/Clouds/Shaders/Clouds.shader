@@ -53,7 +53,6 @@ Shader "Hidden/Clouds"
             
             SamplerState samplerNoiseTex;
             SamplerState samplerDetailNoiseTex;
-            SamplerState samplerWeatherMap;
             SamplerState samplerBlueNoise;
 
             sampler2D _MainTex;
@@ -86,8 +85,6 @@ Shader "Hidden/Clouds"
             float lightAbsorptionThroughCloud;
             float darknessThreshold;
             float4 _LightColor0;
-            float4 colA;
-            float4 colB;
 
             // Animation settings
             float timeScale;
@@ -181,9 +178,6 @@ Shader "Hidden/Clouds"
                 float dstFromEdgeZ = min(containerEdgeFadeDst, min(rayPos.z - boundsMin.z, boundsMax.z - rayPos.z));
                 float edgeWeight = min(dstFromEdgeZ,dstFromEdgeX)/containerEdgeFadeDst;
                 
-                // Calculate height gradient from weather map
-                //float2 weatherUV = (size.xz * .5 + (rayPos.xz-boundsCentre.xz)) / max(size.x,size.z);
-                //float weatherMap = WeatherMap.SampleLevel(samplerWeatherMap, weatherUV, mipLevel).x;
                 float gMin = .2;
                 float gMax = .7;
                 float heightPercent = (rayPos.y - boundsMin.y) / size.y;
@@ -197,6 +191,7 @@ Shader "Hidden/Clouds"
                 float baseShapeDensity = shapeFBM + densityOffset * .1;
 
                 // Save sampling from detail tex if shape density <= 0
+                float result = 0;
                 if (baseShapeDensity > 0) {
                     // Sample detail noise
                     float3 detailSamplePos = uvw*detailNoiseScale + detailOffset * offsetSpeed + float3(time*.4,-time,time*0.1)*detailSpeed;
@@ -209,14 +204,15 @@ Shader "Hidden/Clouds"
                     float detailErodeWeight = oneMinusShape * oneMinusShape * oneMinusShape;
                     float cloudDensity = baseShapeDensity - (1-detailFBM) * detailErodeWeight * detailNoiseWeight;
     
-                    return cloudDensity * densityMultiplier * 0.1;
+                    result = cloudDensity * densityMultiplier * 0.1;
                 }
-                return 0;
+
+                return result;
             }
 
             // Calculate proportion of light that reaches the given point from the lightsource
             float lightmarch(float3 position) {
-                float3 dirToLight = _WorldSpaceLightPos0.xyz;
+                float3 dirToLight = _WorldSpaceLightPos0.xyz; // This is the normalized direction of the light
                 float dstInsideBox = rayBoxDst(boundsMin, boundsMax, position, 1/dirToLight).y;
                 
                 float stepSize = dstInsideBox/numStepsLight;
@@ -241,9 +237,6 @@ Shader "Hidden/Clouds"
                 }
                 else if (debugViewMode == 2) {
                     channels = DetailNoiseTex.SampleLevel(samplerDetailNoiseTex, samplePos, 0);
-                }
-                else if (debugViewMode == 3) {
-                    channels = WeatherMap.SampleLevel(samplerWeatherMap, samplePos.xy, 0);
                 }
 
                 if (debugShowAllChannels) {
@@ -305,9 +298,8 @@ Shader "Hidden/Clouds"
                 
                 
                 
-                const float stepSize = 11;
-
                 // March through volume:
+                const float stepSize = 11;
                 float transmittance = 1;
                 float3 lightEnergy = 0;
 

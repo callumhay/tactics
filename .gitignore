@@ -27,3 +27,8 @@ unity/UnityEditor.TestRunner.csproj
 unity/UnityEditor.UI.csproj
 unity/UnityEngine.TestRunner.csproj
 unity/UnityEngine.UI.csproj
+unity/Library/
+unity/Temp/
+unity/obj/
+unity/Assembly-CSharp.csproj
+unity/Assembly-CSharp-Editor.csproj

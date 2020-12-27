@@ -20,14 +20,14 @@ MonoBehaviour:
     min: 0
     max: 360
   skyIntensityMode:
-    m_OverrideState: 0
-    m_Value: 2
+    m_OverrideState: 1
+    m_Value: 0
   exposure:
     m_OverrideState: 0
-    m_Value: 0
+    m_Value: -1.96
   multiplier:
     m_OverrideState: 0
-    m_Value: 1
+    m_Value: 0.17
     min: 0
   upperHemisphereLuxValue:
     m_OverrideState: 0
@@ -132,7 +132,7 @@ MonoBehaviour:
     showEyeDropper: 1
   maxFogDistance:
     m_OverrideState: 1
-    m_Value: 500
+    m_Value: 200
     min: 0
   mipFogMaxMip:
     m_OverrideState: 0
@@ -152,7 +152,7 @@ MonoBehaviour:
     m_Value: 0
   maximumHeight:
     m_OverrideState: 1
-    m_Value: 1000
+    m_Value: 500
   albedo:
     m_OverrideState: 0
     m_Value: {r: 0.5660378, g: 0.5660378, b: 0.5660378, a: 1}
@@ -161,7 +161,7 @@ MonoBehaviour:
     showEyeDropper: 1
   meanFreePath:
     m_OverrideState: 1
-    m_Value: 300
+    m_Value: 100
     min: 1
   enableVolumetricFog:
     m_OverrideState: 1

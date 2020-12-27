@@ -18,7 +18,6 @@ public class WeatherMap : MonoBehaviour {
 
     List<ComputeBuffer> buffersToRelease;
     public Vector2 minMax = new Vector2 (0, 1);
-    //public int[] minMaxTest;
 
     public void UpdateMap () {
         var sw = System.Diagnostics.Stopwatch.StartNew ();
@@ -29,6 +28,9 @@ public class WeatherMap : MonoBehaviour {
             return;
         }
         buffersToRelease = new List<ComputeBuffer> ();
+
+        int mainKernel = noiseCompute.FindKernel("CSMain");
+        int normalizeKernel = noiseCompute.FindKernel("CSNormalize");
 
         var prng = new System.Random (noiseSettings.seed);
         var offsets = new Vector4[noiseSettings.numLayers];
@@ -43,20 +45,19 @@ public class WeatherMap : MonoBehaviour {
         CreateBuffer (new SimplexNoiseSettings.DataStruct[] { settings }, noiseSettings.Stride, "noiseSettings", 0);
         noiseCompute.SetTexture (0, "Result", weatherMap);
         noiseCompute.SetInt ("resolution", resolution);
+
         var minMaxBuffer = CreateBuffer (new int[] { int.MaxValue, 0 }, sizeof (int), "minMaxBuffer", 0);
         noiseCompute.SetBuffer (1, "minMaxBuffer", minMaxBuffer);
         noiseCompute.SetVector ("minMax", minMax);
-        noiseCompute.SetVector("params", testParams);
+        noiseCompute.SetVector ("params", testParams);
 
         int threadGroupSize = 16;
         int numThreadGroups = Mathf.CeilToInt (resolution / (float) threadGroupSize);
+
         noiseCompute.Dispatch (0, numThreadGroups, numThreadGroups, 1);
 
         noiseCompute.SetTexture (1, "Result", weatherMap);
-        //noiseCompute.Dispatch (1, numThreadGroups, numThreadGroups, 1);
-
-        //minMaxTest = new int[2];
-        //minMaxBuffer.GetData (minMaxTest);
+        //noiseCompute.Dispatch (normalizeKernel, numThreadGroups, numThreadGroups, 1);
 
         // Release buffers
         foreach (var buffer in buffersToRelease) {
