@@ -12,4 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3e697fde4146e4109bd231935cde0deb, type: 3}
   m_Name: HeavyRain
   m_EditorClassIdentifier: 
+  windDirectionX: 1
+  windDirectionZ: 1
+  windIntensity: 10
   rainIntensity: 1

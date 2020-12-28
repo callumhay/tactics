@@ -247,21 +247,21 @@ Material:
     - _ZWrite: 1
     - backScattering: 0.33
     - baseBrightness: 1
-    - baseSpeed: 1
-    - cloudScale: 1
+    - baseSpeed: 0.284
+    - cloudScale: 0.4
     - darknessThreshold: 0.2
-    - densityMultiplier: 1.07
-    - densityOffset: -4.55
-    - detailNoiseScale: 5
-    - detailNoiseWeight: 1.33
-    - detailSpeed: 2
+    - densityMultiplier: 1.12
+    - densityOffset: -2.5
+    - detailNoiseScale: 3
+    - detailNoiseWeight: 3.36
+    - detailSpeed: 0.26
     - forwardScattering: 0.811
     - lightAbsorptionThroughCloud: 1
     - lightAbsorptionTowardSun: 1
     - numStepsLight: 8
-    - phaseFactor: 0.369
-    - rayOffsetStrength: 5.6
-    - timeScale: 1
+    - phaseFactor: 0.312
+    - rayOffsetStrength: 4.5
+    - timeScale: 0.1
     m_Colors:
     - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
     - _BaseColorMap_MipInfo: {r: 0, g: 0, b: 0, a: 0}

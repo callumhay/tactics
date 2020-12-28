@@ -10,10 +10,6 @@ float phase(float4 phaseParams, float a) {
   return phaseParams.z + hgBlend*phaseParams.w;
 }
 
-float remap(float v, float minOld, float maxOld, float minNew, float maxNew) {
-  return minNew + (v-minOld) * (maxNew - minNew) / (maxOld-minOld);
-}
-
 // Returns (dstToBox, dstInsideBox). If ray misses box, dstInsideBox will be zero
 float3 rayBoxDst(float3 boundsMin, float3 boundsMax, float3 rayOrigin, float3 invRaydir) {
   // Adapted from: http://jcgt.org/published/0007/03/04/
@@ -42,7 +38,7 @@ float3 rayBoxDst(float3 boundsMin, float3 boundsMax, float3 rayOrigin, float3 in
 float sampleDensity(
   Texture3D shapeNoiseTex, Texture3D detailNoiseTex, SamplerState cloudNoiseSampler,
   float3 rayPos, float time, float scale, float3 boundsMin, float3 boundsMax, float3 shapeOffset,
-  float4 shapeNoiseWeights, float densityOffset, float baseSpeed, float detailSpeed,
+  float4 shapeNoiseWeights, float densityOffset, float2 windDir, float baseSpeed, float detailSpeed,
   float detailNoiseScale, float3 detailOffset, float3 detailNoiseWeights, float detailNoiseWeight,
   float densityMultiplier
 ) {
@@ -52,21 +48,23 @@ float sampleDensity(
   const float baseScale = 1/1000.0;
   const float offsetSpeed = 1/100.0;
 
+  float3 windDir3 = -float3(windDir.x, 1, windDir.y);
+
   // Calculate texture sample positions
   float3 size = boundsMax - boundsMin;
   float3 uvw = (size * 0.5 + rayPos) * baseScale * scale;
-  float3 shapeSamplePos = uvw + shapeOffset * offsetSpeed + float3(time, time*0.1, time*0.2) * baseSpeed;
+  float3 shapeSamplePos = uvw + shapeOffset * offsetSpeed + float3(time, time*0.1, time*0.2) * windDir3 * baseSpeed;
 
   // Calculate falloff at along x/z edges of the cloud container
-  const float containerEdgeFadeDst = 50;
+  const float containerEdgeFadeDst = 100;
   float dstFromEdgeX = min(containerEdgeFadeDst, min(rayPos.x - boundsMin.x, boundsMax.x - rayPos.x));
   float dstFromEdgeZ = min(containerEdgeFadeDst, min(rayPos.z - boundsMin.z, boundsMax.z - rayPos.z));
-  float edgeWeight = min(dstFromEdgeZ,dstFromEdgeX) / containerEdgeFadeDst;
+  float edgeWeight = smoothstep(0, containerEdgeFadeDst, min(dstFromEdgeZ,dstFromEdgeX));
 
-  float gMin = 0.2;
-  float gMax = 0.7;
+  float gMin = 0.25;
+  float gMax = 0.75;
   float heightPercent = (rayPos.y - boundsMin.y) / size.y;
-  float heightGradient = saturate(remap(heightPercent, 0.0, gMin, 0, 1)) * saturate(remap(heightPercent, 1.0, gMax, 0, 1));
+  float heightGradient = smoothstep(0,gMin,heightPercent) * smoothstep(1,gMax,heightPercent);
   heightGradient *= edgeWeight;
 
   // Calculate base shape density
@@ -79,7 +77,7 @@ float sampleDensity(
   float result = 0;
   if (baseShapeDensity > 0) {
     // Sample detail noise
-    float3 detailSamplePos = uvw*detailNoiseScale + detailOffset * offsetSpeed + float3(time*0.4,-time,time*0.1)*detailSpeed;
+    float3 detailSamplePos = uvw*detailNoiseScale + detailOffset * offsetSpeed + float3(time*0.4,-time,time*0.1) * windDir3 * detailSpeed;
     float4 detailNoise = SAMPLE_TEXTURE3D_LOD(detailNoiseTex, cloudNoiseSampler, detailSamplePos, mipLevel);
     float3 normalizedDetailWeights = detailNoiseWeights / dot(detailNoiseWeights, 1);
     float detailFBM = dot(detailNoise.rgb, normalizedDetailWeights);
@@ -102,7 +100,7 @@ void CloudRaymarch_float(
   float3 rayPos, float3 rayDir, float depth, float3 boundsMin, float3 boundsMax, float2 screenPos, float2 screenDim,
   float rayOffsetStrength, float3 sunLightDir, float3 sunLightColour, float4 phaseParams,
   float3 sceneColour, float time, float scale, float3 shapeOffset, float4 shapeNoiseWeights,
-  float densityOffset, float baseSpeed, float detailSpeed, float detailNoiseScale, float3 detailOffset,
+  float densityOffset, float2 windDir, float baseSpeed, float detailSpeed, float detailNoiseScale, float3 detailOffset,
   float3 detailNoiseWeights, float detailNoiseWeight, float densityMultiplier, int numStepsLight,
   float darknessThreshold, float lightAbsorptionTowardSun, float lightAbsorptionThroughCloud,
   out float4 colour
@@ -138,7 +136,7 @@ void CloudRaymarch_float(
     currRayPos = entryPoint + rayDir * dstTravelled;
     float density = sampleDensity(shapeNoiseTex, detailNoiseTex, cloudNoiseSampler, 
       currRayPos, time, scale, boundsMin, boundsMax, shapeOffset, shapeNoiseWeights,
-      densityOffset, baseSpeed, detailSpeed, detailNoiseScale, detailOffset, 
+      densityOffset, windDir, baseSpeed, detailSpeed, detailNoiseScale, detailOffset, 
       detailNoiseWeights, detailNoiseWeight, densityMultiplier);
 
     if (density > 0) {
@@ -152,7 +150,7 @@ void CloudRaymarch_float(
         position += sunLightDir * lightStepSize;
         totalDensity += max(0, sampleDensity(shapeNoiseTex, detailNoiseTex, cloudNoiseSampler, 
           position, time, scale, boundsMin, boundsMax, shapeOffset, shapeNoiseWeights,
-          densityOffset, baseSpeed, detailSpeed, detailNoiseScale, detailOffset, 
+          densityOffset, windDir, baseSpeed, detailSpeed, detailNoiseScale, detailOffset, 
           detailNoiseWeights, detailNoiseWeight, densityMultiplier) * lightStepSize);
       }
 

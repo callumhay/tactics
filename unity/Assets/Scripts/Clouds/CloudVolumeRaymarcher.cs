@@ -57,4 +57,14 @@ public class CloudVolumeRaymarcher : MonoBehaviour {
 
     initAll();
   }
+
+  public void setWeather(WeatherData weatherData) {
+    var windDir = weatherData.windDirection();
+    meshRenderer.sharedMaterial.SetVector("windDir", new Vector3(windDir.x, windDir.y, 0));
+    var baseSpeed = Mathf.Lerp(0.1f, 0.35f, weatherData.windIntensity/10f);
+    meshRenderer.sharedMaterial.SetFloat("baseSpeed", baseSpeed);
+    meshRenderer.sharedMaterial.SetFloat("detailSpeed", 0.5f*baseSpeed);
+  }
+
+
 }
