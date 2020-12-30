@@ -247,20 +247,20 @@ Material:
     - _ZWrite: 1
     - backScattering: 0.33
     - baseBrightness: 1
-    - baseSpeed: 0.284
-    - cloudScale: 0.4
+    - baseSpeed: 0.35
+    - cloudScale: 0.55
     - darknessThreshold: 0.2
-    - densityMultiplier: 1.12
-    - densityOffset: -2.5
-    - detailNoiseScale: 3
-    - detailNoiseWeight: 3.36
-    - detailSpeed: 0.26
+    - densityMultiplier: 0.54
+    - densityOffset: -2.88
+    - detailNoiseScale: 2.2
+    - detailNoiseWeight: 4.61
+    - detailSpeed: 0.175
     - forwardScattering: 0.811
     - lightAbsorptionThroughCloud: 1
     - lightAbsorptionTowardSun: 1
     - numStepsLight: 8
     - phaseFactor: 0.312
-    - rayOffsetStrength: 4.5
+    - rayOffsetStrength: 4.9
     - timeScale: 0.1
     m_Colors:
     - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
@@ -288,6 +288,7 @@ Material:
     - shapeOffset: {r: 0, g: 0, b: 0, a: 0}
     - sunLightColour: {r: 1, g: 0.95686275, b: 0.8392157, a: 1}
     - sunLightDir: {r: -0.18301268, g: 0.9659258, b: 0.18301265, a: 0}
+    - windDir: {r: 0.70710677, g: 0.70710677, b: 0, a: 0}
   m_BuildTextureStacks: []
 --- !u!114 &2707910472392719402
 MonoBehaviour:

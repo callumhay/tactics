@@ -213,7 +213,7 @@ public class LiquidCompute : MonoBehaviour {
   }
 
   private void FixedUpdate() {
-    if (!enableSimulation || liquidComputeShader == null || volComponent == null) { return; }
+    if (!enableSimulation || nodeDataRT == null || liquidComputeShader == null || volComponent == null) { return; }
     
     liquidComputeShader.SetFloat("dt", applyCFL(Time.fixedDeltaTime));
     advectVelocity();

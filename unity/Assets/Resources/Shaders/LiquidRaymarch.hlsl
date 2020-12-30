@@ -1,6 +1,7 @@
 #ifndef RAYMARCH_HLSL_INCLUDED
 #define RAYMARCH_HLSL_INCLUDED
 
+#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
 #include "IntersectBox.hlsl"
 #include "NodeDefs.hlsl"
 #include "SimplexNoise.hlsl"
@@ -10,9 +11,10 @@
 
 void DoSample(Texture3D volumeTex, SamplerState volumeSampler, float3 uvw, float weight,
   float nodeVolume, float thicknessMultiplier, inout float4 colour) {
-  float4 node = SAMPLE_TEXTURE3D(volumeTex, volumeSampler, uvw);
+  float4 node = SAMPLE_TEXTURE3D_LOD(volumeTex, volumeSampler, uvw, 0);
 
   float nodeVolPercentage = clamp(thicknessMultiplier*nodeLiquidVolume(node) / nodeVolume, 0, 1);
+  nodeVolPercentage = nodeVolPercentage <= nodeVolume*0.05 ? 0 : nodeVolPercentage;
   //float nodeVolPercentage = saturate(smoothstep(0, nodeVolume, 10*nodeLiquidVolume(node)));
   //float4 sampleColour = nodeLiquidVolume(node) > nodeVolume ? float4(1,0,0,nodeVolPercentage) : (nodeSettled(node) ==  SETTLED_NODE) ? float4(0,1,0,nodeVolPercentage) : float4(1, 1, 1, nodeVolPercentage);//((nodeType(node) == SOLID_NODE_TYPE) ? float4(1,0,0,1) : float4(1, 1, 1, nodeVolPercentage));
   float4 sampleColour = weight * float4(1,1,1,nodeVolPercentage);
@@ -27,12 +29,12 @@ float3 calcUVW(float3 borderFront, float resNoBorderLen, float3 currPos, float3 
 float3 calcIsoNormal(Texture3D volumeTex, SamplerState volumeSampler, float3 uvwCenter, float resolution) {
   float cellSize = 1.0 / resolution;
 
-  float volL = nodeLiquidVolume(SAMPLE_TEXTURE3D(volumeTex, volumeSampler, uvwCenter - float3(cellSize, 0.0, 0.0)));
-  float volR = nodeLiquidVolume(SAMPLE_TEXTURE3D(volumeTex, volumeSampler, uvwCenter + float3(cellSize, 0.0, 0.0)));
-  float volB = nodeLiquidVolume(SAMPLE_TEXTURE3D(volumeTex, volumeSampler, uvwCenter - float3(0.0, cellSize, 0.0)));
-  float volT = nodeLiquidVolume(SAMPLE_TEXTURE3D(volumeTex, volumeSampler, uvwCenter + float3(0.0, cellSize, 0.0)));
-  float volD = nodeLiquidVolume(SAMPLE_TEXTURE3D(volumeTex, volumeSampler, uvwCenter - float3(0.0, 0.0, cellSize)));
-  float volU = nodeLiquidVolume(SAMPLE_TEXTURE3D(volumeTex, volumeSampler, uvwCenter + float3(0.0, 0.0, cellSize)));
+  float volL = nodeLiquidVolume(SAMPLE_TEXTURE3D_LOD(volumeTex, volumeSampler, uvwCenter - float3(cellSize, 0.0, 0.0),0));
+  float volR = nodeLiquidVolume(SAMPLE_TEXTURE3D_LOD(volumeTex, volumeSampler, uvwCenter + float3(cellSize, 0.0, 0.0),0));
+  float volB = nodeLiquidVolume(SAMPLE_TEXTURE3D_LOD(volumeTex, volumeSampler, uvwCenter - float3(0.0, cellSize, 0.0),0));
+  float volT = nodeLiquidVolume(SAMPLE_TEXTURE3D_LOD(volumeTex, volumeSampler, uvwCenter + float3(0.0, cellSize, 0.0),0));
+  float volD = nodeLiquidVolume(SAMPLE_TEXTURE3D_LOD(volumeTex, volumeSampler, uvwCenter - float3(0.0, 0.0, cellSize),0));
+  float volU = nodeLiquidVolume(SAMPLE_TEXTURE3D_LOD(volumeTex, volumeSampler, uvwCenter + float3(0.0, 0.0, cellSize),0));
 
   return float3(volL-volR, volB-volT, volD-volU);
 }
@@ -40,7 +42,8 @@ float3 calcIsoNormal(Texture3D volumeTex, SamplerState volumeSampler, float3 uvw
 void LiquidRaymarch_float(
   Texture3D volumeTex, SamplerState volumeSampler, 
   Texture2D jitterTex, SamplerState jitterSampler,
-  float eyeDepthAlongRay, float cameraFarPlane, float2 pos, float3 rayOrigin, float3 rayDir, float3 boxMin, float3 boxMax, 
+  float eyeDepthAlongRay, float cameraFarPlane, float2 screenPos, float2 screenDim, 
+  float3 rayOrigin, float3 rayDir, float3 boxMin, float3 boxMax, 
   int3 borderFront, int3 borderBack, float resolution, float thicknessMultiplier, float nodeVolume,
   float time, out float4 colour, out float depthOffset, out float3 nNormal) {
   
@@ -62,7 +65,7 @@ void LiquidRaymarch_float(
   float3 resVec = float3(resolution, resolution, resolution);
   float3 resNoBorderVec = resVec-borderVec;
   float resNoBorderLen = length(resNoBorderVec);
-  float3 resNoBorderVecDivRes = resNoBorderVec / (float)resolution;
+  //float3 resNoBorderVecDivRes = resNoBorderVec / (float)resolution;
 
   // Calculate the intersection points of the eye ray to the box
   float3 pNear = rayOrigin + rayDir*tNear;
@@ -70,36 +73,33 @@ void LiquidRaymarch_float(
   float3 nearToFarVec = pFar-pNear;
   float nearFarLen = length(nearToFarVec);
 
-  float bestSamples = 2.0 * (nearFarLen / boxMinMaxLen) * resNoBorderLen;
-  float fSamples = clamp(bestSamples, MIN_ITERATIONS, MAX_ITERATIONS);
-  int nSamples = floor(fSamples);
+  int nSamples = ceil((nearFarLen / boxMinMaxLen) * resNoBorderLen);
   float3 stepVec = nearToFarVec / (nSamples-1.0);
+  float stepLen = nearFarLen / (nSamples-1.0);
 
   // Perform a jitter along the ray
-  float jitterOffset = SAMPLE_TEXTURE2D(jitterTex, jitterSampler, pos.xy).r; // Random values in [0,1)
-  float3 currPos = pNear + stepVec*jitterOffset;
+  float jitterVal = SAMPLE_TEXTURE2D_LOD(jitterTex, jitterSampler, screenPos*screenDim*3.0/1000.0, 0).r;
+  float distTravelled = stepLen*jitterVal;
+  float depthTravelled = tNear;
 
   // Raymarch to find the accumulation of liquid (up to saturation or until we hit the end of the ray)
   colour = float4(0,0,0,0);
   float3 uvw = float3(0,0,0);
-  int i = 0;
-  [unroll(MAX_ITERATIONS)]
-  for (; i < nSamples; i++) {
+  float3 currPos = float3(0,0,0);
+  while (distTravelled < nearFarLen) {
+    currPos = pNear + distTravelled * rayDir;
     uvw = calcUVW(borderFront, resNoBorderLen, currPos, boxMin, boxMinMaxLen);
     DoSample(volumeTex, volumeSampler, uvw, 1, nodeVolume, thicknessMultiplier, colour);
-    currPos += stepVec;
     if (colour.a > 0.99) { break; }
+    distTravelled += stepLen;
+    depthTravelled += stepLen;
   }
-  
   clip(colour.a - 1e-4); // Discard the fragment if there's no alpha
 
-  depthOffset = length(currPos-pNear)-tFar;
+  depthOffset = depthTravelled-tFar;
   
-  float noiseVal = sumSNoise(float4(currPos-stepVec, 0.2*time), 2, 0.5, 1.5, 0.75); //snoise(float4(currPos-stepVec, 0.2*time));
-  nNormal = calcIsoNormal(volumeTex, volumeSampler, uvw, resolution) + 0.0025*float3(noiseVal,noiseVal,noiseVal);
-  float normalLen = length(nNormal);
-  nNormal = normalLen < 1e-12 ? normalize(-stepVec) : nNormal/normalLen;
-
+  float noiseVal = sumSNoise(float4(currPos, 0.1*time), 2, 0.5, 1.5, 0.75);
+  nNormal = normalize(calcIsoNormal(volumeTex, volumeSampler, uvw, resolution) + 0.001*float3(noiseVal,noiseVal,noiseVal));
   colour = saturate(colour);
 }
 
