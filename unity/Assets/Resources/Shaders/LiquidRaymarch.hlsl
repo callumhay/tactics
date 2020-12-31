@@ -51,7 +51,7 @@ void LiquidRaymarch_float(
   float tNear = 0.0; float tFar = 0.0;
   IntersectBox_float(rayOrigin, rayDir, boxMin, boxMax, tNear, tFar);
 
-  tNear = max(0, tNear); // If the camera is inside the volume then just start/end at the camera
+  tNear = max(0, tNear);  // If the camera is inside the volume then just start/end at the camera
   tFar = min(tFar, eyeDepthAlongRay); // We only march as far as the end of the volume or the front of the closest object in the depth buffer
   clip(tFar - tNear); // Check for an intersection hit (negative values mean there was no hit so we clip them)
 
