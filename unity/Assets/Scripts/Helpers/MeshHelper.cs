@@ -57,6 +57,136 @@ public static class MeshHelper {
     };
   }
 
+  public struct DomeSphereData {
+    public float radius;
+    public Vector3 center;
+  }
+  public static DomeSphereData BuildDomeData(float domeHeight, float domeRadius, int longitudeSlices, int latitudeSlices, List<int> tris, List<Vector3> verts) {
+    float sphereRadius = (domeRadius*domeRadius + domeHeight*domeHeight) / (2*domeHeight);
+
+    // Figure out how many longitude slices we need to get the right height
+    float sphereDia = 2*sphereRadius;
+    float heightPerSlice = domeHeight / longitudeSlices;
+
+    int sphereLatSlices = Mathf.CeilToInt(sphereDia / heightPerSlice);
+
+    var sphereTris = new List<int>();
+    var sphereVerts = new List<Vector3>();
+    BuildSphereData(sphereRadius, longitudeSlices, sphereLatSlices, sphereTris, sphereVerts, latitudeSlices);
+
+    // Cut off all vertices and triangles below the height of the dome
+    float cutoffY = sphereRadius-domeHeight-1e-6f;
+    float smallestY = float.MaxValue;
+    for (int i = 0; i < sphereTris.Count; i += 3) {
+      var vert0 = sphereVerts[sphereTris[i]];
+      var vert1 = sphereVerts[sphereTris[i+1]];
+      var vert2 = sphereVerts[sphereTris[i+2]];
+
+      var vertIdx = verts.Count;
+      var vert0y = vert0.y-cutoffY;
+      var vert1y = vert1.y-cutoffY;
+      var vert2y = vert2.y-cutoffY;
+
+      smallestY = Mathf.Min(smallestY, Mathf.Min(vert0y, Mathf.Min(vert1y, vert2y)));
+
+      verts.Add(new Vector3(vert0.x, vert0y, vert0.z)); 
+      verts.Add(new Vector3(vert1.x, vert1y, vert1.z)); 
+      verts.Add(new Vector3(vert2.x, vert2y, vert2.z));
+      tris.Add(vertIdx); tris.Add(vertIdx+1); tris.Add(vertIdx+2);
+    }
+
+    for (int i = 0; i < verts.Count; i++) {
+      var vert = verts[i];
+      if (Mathf.Approximately(vert.y, smallestY)) {
+        vert.y = 0;
+        verts[i] = vert;
+      }
+    }
+
+    DomeSphereData result;
+    result.radius = sphereRadius;
+    result.center = new Vector3(0,-sphereRadius+domeHeight, 0);
+    return result;
+  }
+
+  private static void BuildSphereData(float radius, int longitudeSlices, int latitudeSlices, List<int> tris, List<Vector3> verts, int domeLatitudeSlices=-1) {
+    bool isSphere = domeLatitudeSlices <= 0;
+    int domeOrSphereLatSlices = isSphere ? latitudeSlices : domeLatitudeSlices;
+
+    #region Vertices
+    var vertices = new Vector3[(longitudeSlices+1) * domeOrSphereLatSlices + (domeLatitudeSlices <= 0 ? 2 : 1)];
+    float _pi = Mathf.PI;
+    float _2pi = _pi * 2f;
+
+    vertices[0] = Vector3.up * radius;
+    
+    for (int lat = 0; lat < domeOrSphereLatSlices; lat++) {
+      float a1 = _pi * (float)(lat+1) / (latitudeSlices+1);
+      float sin1 = Mathf.Sin(a1);
+      float cos1 = Mathf.Cos(a1);
+    
+      for (int lon = 0; lon <= longitudeSlices; lon++) {
+        float a2 = _2pi * (float)(lon == longitudeSlices ? 0 : lon) / (float)longitudeSlices;
+        float sin2 = Mathf.Sin(a2);
+        float cos2 = Mathf.Cos(a2);
+    
+        vertices[lon + lat * (longitudeSlices + 1) + 1] = new Vector3(sin1 * cos2, cos1, sin1 * sin2) * radius;
+      }
+    }
+    if (isSphere) { vertices[vertices.Length-1] = Vector3.up * -radius; }
+    verts.AddRange(vertices);
+    #endregion
+
+    //Vector3[] normales = new Vector3[vertices.Length];
+    //for (int n = 0; n < vertices.Length; n++) { normales[n] = vertices[n].normalized; }
+
+    //Vector2[] uvs = new Vector2[vertices.Length];
+    //uvs[0] = Vector2.up;
+    //uvs[uvs.Length-1] = Vector2.zero;
+    //for( int lat = 0; lat < domeOrSphereLatSlices; lat++ ) {
+    //  for( int lon = 0; lon <= longitudeSlices; lon++ ) {  uvs[lon + lat * (longitudeSlices + 1) + 1] = new Vector2( (float)lon / longitudeSlices, 1f - (float)(lat+1) / (latitudeSlices+1) ); }
+    //}
+
+    #region Triangles
+    int nbFaces = vertices.Length;
+    int nbTriangles = nbFaces * 2;
+    int nbIndexes = nbTriangles * 3;
+
+    //Top Cap
+    for (int lon = 0; lon < longitudeSlices; lon++) {
+      tris.Add(lon+2);
+      tris.Add(lon+1);
+      tris.Add(0);
+    }
+    
+    //Middle
+    for (int lat = 0; lat < domeOrSphereLatSlices - 1; lat++) {
+      for ( int lon = 0; lon < longitudeSlices; lon++) {
+        int current = lon + lat * (longitudeSlices + 1) + 1;
+        int next = current + longitudeSlices + 1;
+    
+        tris.Add(current);
+        tris.Add(current + 1);
+        tris.Add(next + 1);
+    
+        tris.Add(current);
+        tris.Add(next + 1);
+        tris.Add(next);
+      }
+    }
+    
+    if (isSphere) {
+      //Bottom Cap
+      for (int lon = 0; lon < longitudeSlices; lon++) {
+        tris.Add(vertices.Length - 1);
+        tris.Add(vertices.Length - (lon+2) - 1);
+        tris.Add(vertices.Length - (lon+1) - 1);
+      }
+    }
+    #endregion
+  }
+
+
     /*
   public void appendQuad(float zPos, float xSize, float ySize, ref List<Vector3> vertices, ref List<int> triangles) {
     var size = new Vector3(xSize, ySize, 0);

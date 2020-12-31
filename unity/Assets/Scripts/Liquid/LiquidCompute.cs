@@ -13,6 +13,13 @@ struct LiquidNodeUpdate {
   public Vector3 velocity;
   public float isDiff; // Used to determine whether a value was changed or not on the GPU (>0 means it changed)
 
+  public LiquidNodeUpdate(float isoVal, float liquidVol, Vector3 vel, float diff) {
+    terrainIsoVal = isoVal;
+    liquidVolume = liquidVol;
+    velocity = vel;
+    isDiff = diff;
+  }
+
   public static int flattenedNodeIdx(in Vector3Int nodeIdx, in Vector3Int borderFront, int size) {
     return LevelData.node3DIndexToFlatIndex(borderFront.x+nodeIdx.x, borderFront.y+nodeIdx.y, borderFront.z+nodeIdx.z, size, size);
   }
@@ -341,18 +348,23 @@ public class LiquidCompute : MonoBehaviour {
     liquidComputeShader.SetTexture(clearKernelId, "nodeData", nodeDataRT);
     liquidComputeShader.Dispatch(clearKernelId, numThreadGroups, numThreadGroups, numThreadGroups);
 
-    // Clear the update node buffer
+    // Clear the update node buffer (make sure to keep the boundaries!)
     var fullResSize = volComponent.getFullResSize();
     var bufferCount = fullResSize*fullResSize*fullResSize;
-    LiquidNodeUpdate initUpdate;
-    initUpdate.terrainIsoVal = 0;
-    initUpdate.liquidVolume = 0;
-    initUpdate.velocity = Vector3.zero;
-    initUpdate.isDiff = 1;
+    var borderFront = volComponent.getBorderFront();
+    var borderBack  = volComponent.getBorderBack();
+    var internalResSize = new Vector3Int(fullResSize, fullResSize, fullResSize) - (borderFront + borderBack);
+
+    var initClearUpdate = new LiquidNodeUpdate(0,0,Vector3.zero,0);
+    var initBorderUpdate = new LiquidNodeUpdate(1,0,Vector3.zero,0);
+
     var nodeCBArr = updateNodeComputeBuf.BeginWrite<LiquidNodeUpdate>(0, bufferCount);
     for (int i = 0; i < bufferCount; i++) {
-      nodeCBArr[i] = initUpdate;
+      var nodeIdx = LiquidNodeUpdate.unflattenedNodeIdx(i, borderFront, fullResSize);
+       nodeCBArr[i] = (nodeIdx.x < 0 || nodeIdx.y < 0 || nodeIdx.z < 0 || nodeIdx.x >= internalResSize.x ||
+          nodeIdx.y >= internalResSize.y || nodeIdx.z >= internalResSize.z) ? initBorderUpdate : initClearUpdate;
     }
+
     updateNodeComputeBuf.EndWrite<LiquidNodeUpdate>(bufferCount);
     volComponent.updateNodeTexture(nodeDataRT);
   }

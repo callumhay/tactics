@@ -10,7 +10,6 @@ float phase(float4 phaseParams, float a) {
   return phaseParams.z + hgBlend*phaseParams.w;
 }
 
-// Returns (dstToBox, dstInsideBox). If ray misses box, dstInsideBox will be zero
 float3 rayBoxDst(float3 boundsMin, float3 boundsMax, float3 rayOrigin, float3 invRaydir) {
   // Adapted from: http://jcgt.org/published/0007/03/04/
   float3 t0 = (boundsMin - rayOrigin) * invRaydir;
@@ -34,6 +33,45 @@ float3 rayBoxDst(float3 boundsMin, float3 boundsMax, float3 rayOrigin, float3 in
   return float3(dstToBox, dstInsideBox, dstB-dstA);
 }
 
+float2 ray2SphereIntersect(float3 center, float radiusInner, float radiusOuter, float3 rayOrigin, float3 rayDir) {
+  float3 m = rayOrigin-center;
+  float mm = dot(m,m);
+  float b = dot(m, rayDir);
+  float cInner = mm - radiusInner*radiusInner;
+
+  clip(-cInner);
+  float discr = b*b - cInner;
+  clip(discr);
+  float tInner = -b + sqrt(discr); // where (rayOrigin + tInner*rayDir) is the intersection point with the inner sphere
+
+  // If we're here then the ray intersects with the inner sphere and must therefore intersect with the outer sphere as well
+  float cOuter = mm - radiusOuter*radiusOuter;
+  discr = b*b - cOuter;
+  float tOuter = -b + sqrt(discr);
+
+  float dstToInnerSphere = max(0, tInner);
+  float dstBetweenSpheres = max(0, tOuter-dstToInnerSphere);
+
+  return float2(dstToInnerSphere, dstBetweenSpheres);
+}
+
+float lightRay2SphereIntersect(float3 center, float radiusInner, float radiusOuter, float3 rayOrigin, float3 rayDir) {
+
+  // Pretend like the clouds are a box with a thickness of radiusOuter-radiusInner
+  //float3 boundsMin = center + float3(-5000,radiusInner,-5000);
+  //float3 boundsMax = center + float3(5000,radiusOuter,5000);
+  //return rayBoxDst(boundsMin, boundsMax, rayOrigin, 1.0/rayDir).y;
+ 
+  // We assume the ray origin is always between the two radii, we need to figure out which of the two shells the ray intersects...
+  float3 m = rayOrigin-center;
+  float mm = dot(m,m);
+  float b = dot(m, rayDir);
+  float c = min(mm - radiusOuter*radiusOuter, mm - radiusInner*radiusInner);
+  float discr = b*b - c;
+  return (c > 0 || discr < 0) ? 0 : min(radiusOuter-radiusInner, max(0, -b + sqrt(discr)));
+ 
+}
+
 
 float sampleDensity(
   Texture3D shapeNoiseTex, Texture3D detailNoiseTex, SamplerState cloudNoiseSampler,
@@ -55,6 +93,7 @@ float sampleDensity(
   float3 uvw = (size * 0.5 + rayPos) * baseScale * scale;
   float3 shapeSamplePos = uvw + shapeOffset * offsetSpeed + float3(time, time*0.1, time*0.2) * windDir3 * baseSpeed;
 
+/*
   // Calculate falloff at along x/z edges of the cloud container
   const float containerEdgeFadeDst = 100;
   float dstFromEdgeX = min(containerEdgeFadeDst, min(rayPos.x - boundsMin.x, boundsMax.x - rayPos.x));
@@ -64,13 +103,15 @@ float sampleDensity(
   float gMin = 0.25;
   float gMax = 0.75;
   float heightPercent = (rayPos.y - boundsMin.y) / size.y;
-  float heightGradient = smoothstep(0,gMin,heightPercent) * smoothstep(1,gMax,heightPercent);
-  heightGradient *= edgeWeight;
+  float containerGradient = smoothstep(0,gMin,heightPercent) * smoothstep(1,gMax,heightPercent);
+  containerGradient *= edgeWeight;
+  */
+  float containerGradient = 1;
 
   // Calculate base shape density
   float4 shapeNoise = SAMPLE_TEXTURE3D_LOD(shapeNoiseTex, cloudNoiseSampler, shapeSamplePos,0);
   float4 normalizedShapeWeights = shapeNoiseWeights / dot(shapeNoiseWeights, 1.0);
-  float shapeFBM = dot(shapeNoise, normalizedShapeWeights) * heightGradient;
+  float shapeFBM = dot(shapeNoise, normalizedShapeWeights) * containerGradient;
   float baseShapeDensity = shapeFBM + densityOffset * 0.1;
 
   // Save sampling from detail tex if shape density <= 0
@@ -103,17 +144,21 @@ void CloudRaymarch_float(
   float densityOffset, float2 windDir, float baseSpeed, float detailSpeed, float detailNoiseScale, float3 detailOffset,
   float3 detailNoiseWeights, float detailNoiseWeight, float densityMultiplier, int numStepsLight,
   float darknessThreshold, float lightAbsorptionTowardSun, float lightAbsorptionThroughCloud,
+  float innerRadius, float outerRadius, float3 sphereCenter,
   out float4 colour
 ) {
 
+
   // Cloud container intersection info:
-  float3 rayToContainerInfo = rayBoxDst(boundsMin, boundsMax, rayPos, 1.0/rayDir);
-  clip(rayToContainerInfo.z);
-  float dstToBox = rayToContainerInfo.x;
-  float dstInsideBox = rayToContainerInfo.y;
+  float2 rayToDomeInfo = ray2SphereIntersect(sphereCenter, innerRadius, outerRadius, rayPos, rayDir);
+  float dstToDome = rayToDomeInfo.x;
+  float dstInsideDome = rayToDomeInfo.y;
+
+  //colour = float4(depth/500,0,0,1);
+  //return;
 
   // Point of intersection with the cloud container
-  float3 entryPoint = rayPos + rayDir * dstToBox;
+  float3 entryPoint = rayPos + rayDir * dstToDome;
 
   // Random starting offset (makes low-res results noisy rather than jagged/glitchy, which is nicer)
   float randomOffset = SAMPLE_TEXTURE2D_LOD(blueNoiseTex, blueNoiseSampler, screenPos*screenDim*3.0/1000.0, 0).r;
@@ -124,7 +169,7 @@ void CloudRaymarch_float(
   float phaseVal = phase(phaseParams, cosAngle);
 
   float dstTravelled = randomOffset;
-  float dstLimit = min(depth-dstToBox, dstInsideBox);
+  float dstLimit = min(depth-dstToDome, dstInsideDome);
 
   // March through volume:
   const float stepSize = 11;
@@ -142,8 +187,8 @@ void CloudRaymarch_float(
     if (density > 0) {
       // Calculate proportion of light that reaches the given point from the lightsource
       float3 position = currRayPos;
-      float lightDstInsideBox = rayBoxDst(boundsMin, boundsMax, position, 1.0/sunLightDir).y;
-      float lightStepSize = lightDstInsideBox/numStepsLight;
+      float lightDstInsideDome = lightRay2SphereIntersect(sphereCenter, innerRadius, outerRadius, position, sunLightDir); //rayBoxDst(boundsMin, boundsMax, position, 1.0/sunLightDir).y;
+      float lightStepSize = lightDstInsideDome/numStepsLight;
       float totalDensity = 0;
       
       for (int step = 0; step < numStepsLight; step++) {
