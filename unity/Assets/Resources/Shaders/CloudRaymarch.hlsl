@@ -69,9 +69,7 @@ float lightRay2SphereIntersect(float3 center, float radiusInner, float radiusOut
   float c = min(mm - radiusOuter*radiusOuter, mm - radiusInner*radiusInner);
   float discr = b*b - c;
   return (c > 0 || discr < 0) ? 0 : min(radiusOuter-radiusInner, max(0, -b + sqrt(discr)));
- 
 }
-
 
 float sampleDensity(
   Texture3D shapeNoiseTex, Texture3D detailNoiseTex, SamplerState cloudNoiseSampler,
@@ -93,10 +91,7 @@ float sampleDensity(
   float3 uvw = (size * 0.5 + rayPos) * baseScale * scale;
   float3 shapeSamplePos = uvw + shapeOffset * offsetSpeed + float3(time, time*0.1, time*0.2) * windDir3 * baseSpeed;
 
-  // Fade the clouds around the horizon
-  const float yFalloffEdgeDist = 10;
-  float edgeWeight = smoothstep(0, yFalloffEdgeDist, rayPos.y-boundsMin.y);
-  float containerGradient = edgeWeight;
+  float containerGradient = 1;
 
   // Calculate base shape density
   float4 shapeNoise = SAMPLE_TEXTURE3D_LOD(shapeNoiseTex, cloudNoiseSampler, shapeSamplePos,0);
@@ -138,13 +133,19 @@ void CloudRaymarch_float(
   out float4 colour
 ) {
 
-  // Cloud container intersection info:
+  // Cloud container intersection info
   float2 rayToDomeInfo = ray2SphereIntersect(sphereCenter, innerRadius, outerRadius, rayPos, rayDir);
   float dstToDome = rayToDomeInfo.x;
   float dstInsideDome = rayToDomeInfo.y;
 
   // Point of intersection with the cloud container
   float3 entryPoint = rayPos + rayDir * dstToDome;
+
+  // If the eye ray intersects the horizon plane (y=0) then we clip so that we don't
+  // draw clouds over the horizon line. 
+  // NOTE: The max operation handles the special case where the eye is positioned below the horizon plane.
+  float rayTGround = -max(0,rayPos.y) / (rayDir.y+1e-10);
+  clip(-rayTGround);
 
   // Random starting offset (makes low-res results noisy rather than jagged/glitchy, which is nicer)
   float randomOffset = SAMPLE_TEXTURE2D_LOD(blueNoiseTex, blueNoiseSampler, screenPos*screenDim*3.0/1000.0, 0).r;

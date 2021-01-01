@@ -5,12 +5,10 @@ using UnityEngine;
 [ExecuteAlways]
 public class CloudVolumeRaymarcher : MonoBehaviour {
 
-  public static readonly float CLOUD_HEIGHT = 200;
-  public static readonly float REAL_WORLD_TO_GAME_SCALE = CLOUD_HEIGHT / 1828f;
-  public static readonly float DIST_TO_HORIZON = 5000 * REAL_WORLD_TO_GAME_SCALE;
   public static readonly float CLOUD_CONTAINER_THICKNESS = 500;
 
   public TerrainGrid terrainGrid;
+  public float cloudHeight = 500;
   public int domeLongitudeSlices = 10;
   public int domeLatitudeSlices  = 13;
 
@@ -18,10 +16,14 @@ public class CloudVolumeRaymarcher : MonoBehaviour {
   private MeshFilter meshFilter;
   private MeshRenderer meshRenderer;
 
+  public float realWorldToGameScale() { return cloudHeight / 1828f; }
+  public float distToHorizon() { return 5000f * realWorldToGameScale(); }
+
+
   public void initAll() {
     // Create a dome that will hold the clouds - horizon to sky across the panorama
-    float domeHeight = CLOUD_HEIGHT + CLOUD_CONTAINER_THICKNESS;
-    float domeRadius = DIST_TO_HORIZON + CLOUD_CONTAINER_THICKNESS;
+    float domeHeight = cloudHeight + CLOUD_CONTAINER_THICKNESS;
+    float domeRadius = distToHorizon() + CLOUD_CONTAINER_THICKNESS;
     var tris = new List<int>();
     var verts = new List<Vector3>();
     var domeSphereData = MeshHelper.BuildDomeData(domeHeight, domeRadius, domeLongitudeSlices, domeLatitudeSlices, tris, verts);
