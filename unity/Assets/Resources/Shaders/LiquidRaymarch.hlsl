@@ -13,9 +13,8 @@ void DoSample(Texture3D volumeTex, SamplerState volumeSampler, float3 uvw, float
   float nodeVolume, float thicknessMultiplier, inout float4 colour) {
   float4 node = SAMPLE_TEXTURE3D_LOD(volumeTex, volumeSampler, uvw, 0);
 
-  float nodeVolPercentage = clamp(thicknessMultiplier*nodeLiquidVolume(node) / nodeVolume, 0, 1);
-  nodeVolPercentage = nodeVolPercentage <= nodeVolume*0.05 ? 0 : nodeVolPercentage;
-  //float nodeVolPercentage = saturate(smoothstep(0, nodeVolume, 10*nodeLiquidVolume(node)));
+  float nodeVolPercentage = smoothstep(0, nodeVolume, thicknessMultiplier*nodeLiquidVolume(node));
+  nodeVolPercentage = nodeVolPercentage <= 0.05 ? 0 : nodeVolPercentage;
   //float4 sampleColour = nodeLiquidVolume(node) > nodeVolume ? float4(1,0,0,nodeVolPercentage) : (nodeSettled(node) ==  SETTLED_NODE) ? float4(0,1,0,nodeVolPercentage) : float4(1, 1, 1, nodeVolPercentage);//((nodeType(node) == SOLID_NODE_TYPE) ? float4(1,0,0,1) : float4(1, 1, 1, nodeVolPercentage));
   float4 sampleColour = weight * float4(1,1,1,nodeVolPercentage);
   colour.rgb = (1-sampleColour.a)*colour.rgb + sampleColour.a * sampleColour.rgb;
@@ -72,7 +71,7 @@ void LiquidRaymarch_float(
   float3 nearToFarVec = pFar-pNear;
   float nearFarLen = length(nearToFarVec);
 
-  int nSamples = min(256, max(2, 2*ceil((nearFarLen / boxMinMaxLen) * resNoBorderLen)));
+  int nSamples = clamp(2*ceil((nearFarLen / boxMinMaxLen) * resNoBorderLen), 2, 128);
   float3 stepVec = nearToFarVec / (float)(nSamples);
   float stepLen = nearFarLen / (float)(nSamples);
 
