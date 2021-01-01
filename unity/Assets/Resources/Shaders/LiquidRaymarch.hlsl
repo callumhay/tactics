@@ -1,13 +1,9 @@
 #ifndef RAYMARCH_HLSL_INCLUDED
 #define RAYMARCH_HLSL_INCLUDED
 
-#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
 #include "IntersectBox.hlsl"
 #include "NodeDefs.hlsl"
 #include "SimplexNoise.hlsl"
-
-#define MIN_ITERATIONS 3
-#define MAX_ITERATIONS 64
 
 void DoSample(Texture3D volumeTex, SamplerState volumeSampler, float3 uvw, float weight,
   float nodeVolume, float thicknessMultiplier, inout float4 colour) {
@@ -65,7 +61,6 @@ void LiquidRaymarch_float(
   float3 resVec = float3(resolution, resolution, resolution);
   float3 resNoBorderVec = resVec-borderVec;
   float resNoBorderLen = length(resNoBorderVec);
-  //float3 resNoBorderVecDivRes = resNoBorderVec / (float)resolution;
 
   // Calculate the intersection points of the eye ray to the box
   float3 pNear = rayOrigin + rayDir*tNear;
@@ -73,9 +68,9 @@ void LiquidRaymarch_float(
   float3 nearToFarVec = pFar-pNear;
   float nearFarLen = length(nearToFarVec);
 
-  int nSamples = ceil((nearFarLen / boxMinMaxLen) * resNoBorderLen);
-  float3 stepVec = nearToFarVec / (nSamples-1.0);
-  float stepLen = nearFarLen / (nSamples-1.0);
+  int nSamples = min(256, max(2, 2*ceil((nearFarLen / boxMinMaxLen) * resNoBorderLen)));
+  float3 stepVec = nearToFarVec / (float)(nSamples);
+  float stepLen = nearFarLen / (float)(nSamples);
 
   // Perform a jitter along the ray
   float jitterVal = SAMPLE_TEXTURE2D_LOD(jitterTex, jitterSampler, screenPos*screenDim*3.0/1000.0, 0).r;
