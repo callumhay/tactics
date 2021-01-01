@@ -42,8 +42,6 @@ public class CloudVolumeRaymarcher : MonoBehaviour {
 
       var innerRadius = domeSphereData.radius-CLOUD_CONTAINER_THICKNESS;
       var bounds = mesh.bounds;
-      //bounds.max += new Vector3(CLOUD_CONTAINER_THICKNESS,CLOUD_CONTAINER_THICKNESS,CLOUD_CONTAINER_THICKNESS);
-      //bounds.min -= new Vector3(CLOUD_CONTAINER_THICKNESS, 0, CLOUD_CONTAINER_THICKNESS);
 
       meshRenderer.sharedMaterial.SetVector("boundsMax", bounds.max);
       meshRenderer.sharedMaterial.SetVector("boundsMin", bounds.min);
@@ -52,10 +50,7 @@ public class CloudVolumeRaymarcher : MonoBehaviour {
       meshRenderer.sharedMaterial.SetFloat("outerRadius", domeSphereData.radius);
       meshRenderer.sharedMaterial.SetVector("sphereCenter", domeSphereData.center);
 
-      var sunLightGO = GameObject.Find("Directional Light");
-      var sunLight = sunLightGO.GetComponent<Light>();
-      meshRenderer.sharedMaterial.SetVector("sunLightDir", -sunLightGO.transform.forward.normalized);
-      meshRenderer.sharedMaterial.SetVector("sunLightColour", sunLight.color);
+      updateSunLight();
     }
   }
 
@@ -75,8 +70,19 @@ public class CloudVolumeRaymarcher : MonoBehaviour {
     initAll();
   }
 
+  private void FixedUpdate() {
+    updateSunLight();
+  }
+
   private void OnValidate() {
     Invoke("initAll", 0);
+  }
+
+  private void updateSunLight() {
+    var sunLightGO = GameObject.Find("Directional Light");
+    var sunLight = sunLightGO.GetComponent<Light>();
+    meshRenderer.sharedMaterial.SetVector("sunLightDir", -sunLightGO.transform.forward.normalized);
+    meshRenderer.sharedMaterial.SetVector("sunLightColour", sunLight.color);
   }
 
   public void setWeather(WeatherData weatherData) {

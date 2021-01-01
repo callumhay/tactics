@@ -1,13 +1,9 @@
 #ifndef RAYMARCH_HLSL_INCLUDED
 #define RAYMARCH_HLSL_INCLUDED
 
-#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
 #include "IntersectBox.hlsl"
 #include "NodeDefs.hlsl"
 #include "SimplexNoise.hlsl"
-
-#define MIN_ITERATIONS 3
-#define MAX_ITERATIONS 64
 
 void DoSample(Texture3D volumeTex, SamplerState volumeSampler, float3 uvw, float weight,
   float nodeVolume, float thicknessMultiplier, inout float4 colour) {

@@ -93,20 +93,10 @@ float sampleDensity(
   float3 uvw = (size * 0.5 + rayPos) * baseScale * scale;
   float3 shapeSamplePos = uvw + shapeOffset * offsetSpeed + float3(time, time*0.1, time*0.2) * windDir3 * baseSpeed;
 
-/*
-  // Calculate falloff at along x/z edges of the cloud container
-  const float containerEdgeFadeDst = 100;
-  float dstFromEdgeX = min(containerEdgeFadeDst, min(rayPos.x - boundsMin.x, boundsMax.x - rayPos.x));
-  float dstFromEdgeZ = min(containerEdgeFadeDst, min(rayPos.z - boundsMin.z, boundsMax.z - rayPos.z));
-  float edgeWeight = smoothstep(0, containerEdgeFadeDst, min(dstFromEdgeZ,dstFromEdgeX));
-
-  float gMin = 0.25;
-  float gMax = 0.75;
-  float heightPercent = (rayPos.y - boundsMin.y) / size.y;
-  float containerGradient = smoothstep(0,gMin,heightPercent) * smoothstep(1,gMax,heightPercent);
-  containerGradient *= edgeWeight;
-  */
-  float containerGradient = 1;
+  // Fade the clouds around the horizon
+  const float yFalloffEdgeDist = 10;
+  float edgeWeight = smoothstep(0, yFalloffEdgeDist, rayPos.y-boundsMin.y);
+  float containerGradient = edgeWeight;
 
   // Calculate base shape density
   float4 shapeNoise = SAMPLE_TEXTURE3D_LOD(shapeNoiseTex, cloudNoiseSampler, shapeSamplePos,0);
@@ -148,14 +138,10 @@ void CloudRaymarch_float(
   out float4 colour
 ) {
 
-
   // Cloud container intersection info:
   float2 rayToDomeInfo = ray2SphereIntersect(sphereCenter, innerRadius, outerRadius, rayPos, rayDir);
   float dstToDome = rayToDomeInfo.x;
   float dstInsideDome = rayToDomeInfo.y;
-
-  //colour = float4(depth/500,0,0,1);
-  //return;
 
   // Point of intersection with the cloud container
   float3 entryPoint = rayPos + rayDir * dstToDome;
