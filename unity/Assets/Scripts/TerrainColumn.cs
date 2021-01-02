@@ -179,6 +179,7 @@ public class TerrainColumn {
     var nodeIdx = terrain.terrainColumnNodeIndex(this, Vector3Int.zero);
     return terrain.nodeIndexToUnitsVec3(nodeIdx) + new Vector3(HALF_SIZE,0,HALF_SIZE);
   }
+  public Bounds bounds() { return meshFilter.sharedMesh.bounds; }
 
   private int numNodesX() { return TerrainColumn.SIZE * TerrainGrid.nodesPerUnit; }
   private int numNodesY() { return terrain.ySize  * TerrainGrid.nodesPerUnit; }
