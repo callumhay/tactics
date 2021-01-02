@@ -407,6 +407,10 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
       }
     }
     #endif
+
+    (var reflProbeGO, var reflProbePlacer) = ReflectionProbePlacer.buildOrFindReflProbes();
+    reflProbeGO.transform.SetParent(transform);
+    reflProbeGO.transform.SetAsFirstSibling();
   }
 
   public static readonly float debrisUpdateTime = DebrisCollisionMonitor.moveEventUpdateTime*2;

@@ -5,7 +5,8 @@ using UnityEngine;
 [CreateAssetMenu(fileName="RainData", menuName="Tactics/Weather/Rain")]
 public class RainWeatherData : WeatherData {
 
-  private static readonly string GAME_OBJ_NAME = "Rain";
+  public static readonly string GAME_OBJ_NAME = "Rain";
+  
   private static readonly float LIGHT_RAIN_RATE_PER_SQR_UNIT = 0.5f;
   private static readonly float HEAVY_RAIN_RATEE_PER_SQR_UNIT = 3.5f;
   private static readonly float ABS_MIN_FALL_VEL = 10f;
@@ -15,6 +16,7 @@ public class RainWeatherData : WeatherData {
   public float rainIntensity = 0.5f;
 
   private GameObject rainGO;
+  private ParticleSystem parentParticleSystem;
   private ParticleSystem[] particleSystems;
 
   public override void init(WeatherController weatherController) {
@@ -25,6 +27,7 @@ public class RainWeatherData : WeatherData {
 
     rainGO = weatherController.transform.Find(GAME_OBJ_NAME).gameObject;
     rainGO.transform.position = terrain.transform.position;
+    parentParticleSystem = rainGO.GetComponent<ParticleSystem>();
     particleSystems = rainGO.GetComponentsInChildren<ParticleSystem>();
 
     // Make sure the rain is properly positioned over the terrain
@@ -85,6 +88,8 @@ public class RainWeatherData : WeatherData {
     var rainParentPS = rainGO.GetComponent<ParticleSystem>();
     rainParentPS.Simulate(2*particleMinLifetime, true, true, true);
     rainParentPS.Play(true);
+
+    rainGO.SetActive(true);
   }
 
 }

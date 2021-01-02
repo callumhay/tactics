@@ -1,14 +1,27 @@
-﻿using System.Collections;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Rendering.HighDefinition;
 
+[ExecuteAlways]
 public class ReflectionProbePlacer : MonoBehaviour {
+  public static readonly string GAME_OBJ_NAME = "Reflection Probes";
+
   private static readonly float PROBE_HEIGHT_SPACING = 2*TerrainColumn.SIZE;
-
   [Range(1,10)] public int placementFrequency = 10; // Approx. number of columns squared per probe
-  public int probeResolution = 128;
 
-  private List<ReflectionProbe> reflectionProbes;
+  private List<ReflectionProbe> reflectionProbes = new List<ReflectionProbe>();
+
+  public static (GameObject, ReflectionProbePlacer) buildOrFindReflProbes() {
+    var reflProbeGO = GameObject.Find(GAME_OBJ_NAME);
+    if (!reflProbeGO) {
+      reflProbeGO = new GameObject(GAME_OBJ_NAME);
+    }
+    var reflProbePlacer = reflProbeGO.GetComponent<ReflectionProbePlacer>();
+    if (!reflProbePlacer) {
+      reflProbePlacer = reflProbeGO.AddComponent<ReflectionProbePlacer>();
+    }
+    return (reflProbeGO, reflProbePlacer);
+  }
 
   private void regenerateProbes() {
     clear();
@@ -32,7 +45,7 @@ public class ReflectionProbePlacer : MonoBehaviour {
     int colIdxPerProbeZ = Mathf.CeilToInt(terrainSizeZ / (float)numProbesZ)-1;
 
     var tempVec2Int = new Vector2Int();
-    reflectionProbes = new List<ReflectionProbe>();
+    //reflectionProbes = new List<ReflectionProbe>();
     for (int x = 0; x < numProbesX; x++) {
       int minXColIdx = x*colIdxPerProbeX;
       int maxXColIdx = minXColIdx + colIdxPerProbeX;
@@ -62,16 +75,30 @@ public class ReflectionProbePlacer : MonoBehaviour {
         // Build the GameObject and ReflectionProbe component and add them to this
         float probeXPos = x*probeUnitsX + halfProbeUnitsX;
         float probeZPos = z*probeUnitsZ + halfProbeUnitsZ;
-        var probeGO = new GameObject("Reflection Probe (" + x + "," + z + ")");
+        
+        var probeGOName = "Reflection Probe (" + x + "," + z + ")";
+        var probeGO = transform.Find(probeGOName)?.gameObject;
+        if (!probeGO) { probeGO = new GameObject(probeGOName); }
         probeGO.transform.SetParent(transform);
         probeGO.transform.position = new Vector3(probeXPos, maxColY + PROBE_HEIGHT_SPACING, probeZPos);
 
-        var probe = probeGO.AddComponent<ReflectionProbe>();
+        var probe = probeGO.GetComponent<ReflectionProbe>();
+        if (!probe) { probe = probeGO.AddComponent<ReflectionProbe>(); }
         probe.timeSlicingMode = UnityEngine.Rendering.ReflectionProbeTimeSlicingMode.IndividualFaces;
-        probe.refreshMode = UnityEngine.Rendering.ReflectionProbeRefreshMode.ViaScripting;
         probe.mode = UnityEngine.Rendering.ReflectionProbeMode.Realtime;
-        probe.resolution = probeResolution;
+        probe.refreshMode = UnityEngine.Rendering.ReflectionProbeRefreshMode.OnAwake;
+        probe.hdr = true;
+        probe.resolution = 128;
+        probe.nearClipPlane = 0.3f;
+        probe.farClipPlane  = 10000f;
+        probe.cullingMask &= ~(1 << LayerMask.NameToLayer(LayerHelper.WATER_LAYER_NAME));
 
+        // Hack to get resolution working in HDRP
+        var hdProbe = probeGO.GetComponent<HDProbe>();
+        if (hdProbe) {
+          hdProbe.resolution = PlanarReflectionAtlasResolution.PlanarReflectionResolution128;
+        }
+        
         reflectionProbes.Add(probe);
       }
 
@@ -83,8 +110,8 @@ public class ReflectionProbePlacer : MonoBehaviour {
   }
 
   private void clear() {
-    foreach (var probe in reflectionProbes) {
-      GameObject.Destroy(probe.gameObject);
+    for (int i = 0; i < reflectionProbes.Count; i++) {
+      GameObject.DestroyImmediate(reflectionProbes[i].gameObject);
     }
     reflectionProbes.Clear();
   }
@@ -94,7 +121,7 @@ public class ReflectionProbePlacer : MonoBehaviour {
   }
 
   private void OnValidate() {
-    Invoke("reinit", 0);
+    regenerateProbes();
   }
 
 
