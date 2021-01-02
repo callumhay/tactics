@@ -7,7 +7,7 @@ public abstract class WeatherData : ScriptableObject {
   [Range(-1,1)] public float windDirectionZ = 0;
   [Range(0,10)] public float windIntensity = 0;
 
-  //[Range(0,1)] public float cloudCoverage = 0.1f;
+  [Range(0,1)] public float overcast = 0.1f; // Make protected and change in the child classes
 
 
   public Vector2 windDirection() {

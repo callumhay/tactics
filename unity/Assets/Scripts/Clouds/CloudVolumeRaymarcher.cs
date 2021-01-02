@@ -19,7 +19,6 @@ public class CloudVolumeRaymarcher : MonoBehaviour {
   public float realWorldToGameScale() { return cloudHeight / 1828f; }
   public float distToHorizon() { return 5000f * realWorldToGameScale(); }
 
-
   public void initAll() {
     // Create a dome that will hold the clouds - horizon to sky across the panorama
     float domeHeight = cloudHeight + CLOUD_CONTAINER_THICKNESS;
@@ -89,10 +88,19 @@ public class CloudVolumeRaymarcher : MonoBehaviour {
 
   public void setWeather(WeatherData weatherData) {
     var windDir = weatherData.windDirection();
-    meshRenderer.sharedMaterial.SetVector("windDir", new Vector3(windDir.x, windDir.y, 0));
     var baseSpeed = Mathf.Lerp(0.1f, 0.35f, weatherData.windIntensity/10f);
-    meshRenderer.sharedMaterial.SetFloat("baseSpeed", baseSpeed);
-    meshRenderer.sharedMaterial.SetFloat("detailSpeed", 0.5f*baseSpeed);
+
+    var sharedMaterial = meshRenderer.sharedMaterial;
+    sharedMaterial.SetVector("windDir", new Vector3(windDir.x, windDir.y, 0));
+    sharedMaterial.SetFloat("baseSpeed", baseSpeed);
+    sharedMaterial.SetFloat("detailSpeed", 0.5f*baseSpeed);
+
+    sharedMaterial.SetFloat("cloudScale", 0.4f); // TODO: Cloud type
+    sharedMaterial.SetFloat("detailNoiseScale", 2f); // TODO: Cloud type
+    //sharedMaterial.SetFloat("detailNoiseWeight", 2f); // TODO: Cloud Type
+    
+    sharedMaterial.SetFloat("densityMultiplier", weatherData.overcast);
+    sharedMaterial.SetFloat("densityOffset", Mathf.Lerp(-8.3f, 8.3f, weatherData.overcast));
   }
 
 

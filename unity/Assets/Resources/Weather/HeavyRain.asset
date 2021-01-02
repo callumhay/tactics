@@ -15,4 +15,5 @@ MonoBehaviour:
   windDirectionX: 1
   windDirectionZ: 1
   windIntensity: 10
+  overcast: 0.448
   rainIntensity: 1
