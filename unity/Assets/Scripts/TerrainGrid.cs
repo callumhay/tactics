@@ -72,7 +72,11 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
   }
 
   public TerrainColumn terrainColumn(in Vector2Int tcIdx) { return terrainColumn(new Vector3Int(tcIdx.x, 0, tcIdx.y)); }
-  public TerrainColumn terrainColumn(in Vector3Int tcIdx) { return terrainColumns[tcIdx]; }
+  public TerrainColumn terrainColumn(in Vector3Int tcIdx) { 
+    TerrainColumn result = null;
+    terrainColumns?.TryGetValue(tcIdx, out result);
+    return result;
+  }
 
   public void getGridSnappedPoint(ref Vector3 wsPt) {
     // Find the closest column center to the given point and snap to it

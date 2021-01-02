@@ -5,11 +5,9 @@ using UnityEngine.Rendering.HighDefinition;
 [ExecuteAlways]
 public class ReflectionProbePlacer : MonoBehaviour {
   public static readonly string GAME_OBJ_NAME = "Reflection Probes";
-
   private static readonly float PROBE_HEIGHT_SPACING = 2*TerrainColumn.SIZE;
-  [Range(1,10)] public int placementFrequency = 10; // Approx. number of columns squared per probe
 
-  private List<ReflectionProbe> reflectionProbes = new List<ReflectionProbe>();
+  [Range(1,10)] public int placementFrequency = 10; // Approx. number of columns squared per probe
 
   public static (GameObject, ReflectionProbePlacer) buildOrFindReflProbes() {
     var reflProbeGO = GameObject.Find(GAME_OBJ_NAME);
@@ -24,7 +22,12 @@ public class ReflectionProbePlacer : MonoBehaviour {
   }
 
   private void regenerateProbes() {
-    clear();
+    // Track all of the existing child probes so that we know which ones are no longer in
+    // use so that we can remove them
+    var childrenToRemoveDict = new Dictionary<string, GameObject>();
+    foreach (Transform child in transform) {
+      childrenToRemoveDict.Add(child.name, child.gameObject);
+    }
 
     var terrainGrid = TerrainGrid.FindTerrainGrid();
     float terrainSizeX = terrainGrid.xSize;
@@ -44,8 +47,9 @@ public class ReflectionProbePlacer : MonoBehaviour {
     int colIdxPerProbeX = Mathf.CeilToInt(terrainSizeX / (float)numProbesX)-1;
     int colIdxPerProbeZ = Mathf.CeilToInt(terrainSizeZ / (float)numProbesZ)-1;
 
+    // Go through all the probes we need to find/build and make sure they're placed and set properly
     var tempVec2Int = new Vector2Int();
-    //reflectionProbes = new List<ReflectionProbe>();
+    var reflectionProbes = new List<ReflectionProbe>();
     for (int x = 0; x < numProbesX; x++) {
       int minXColIdx = x*colIdxPerProbeX;
       int maxXColIdx = minXColIdx + colIdxPerProbeX;
@@ -59,7 +63,8 @@ public class ReflectionProbePlacer : MonoBehaviour {
         for (int tcX = minXColIdx; tcX <= maxXColIdx; tcX++) {
           for (int tcZ = minZColIdx; tcZ <= maxZColIdx; tcZ++) {
             tempVec2Int.Set(tcX,tcZ);
-            terrainCols.Add(terrainGrid.terrainColumn(tempVec2Int));
+            var col = terrainGrid.terrainColumn(tempVec2Int);
+            if (col != null) { terrainCols.Add(col); }
           }
         }
 
@@ -76,9 +81,15 @@ public class ReflectionProbePlacer : MonoBehaviour {
         float probeXPos = x*probeUnitsX + halfProbeUnitsX;
         float probeZPos = z*probeUnitsZ + halfProbeUnitsZ;
         
+        // Find any existing probe or create a new one if it doesn't exist
         var probeGOName = "Reflection Probe (" + x + "," + z + ")";
-        var probeGO = transform.Find(probeGOName)?.gameObject;
-        if (!probeGO) { probeGO = new GameObject(probeGOName); }
+        GameObject probeGO;
+        if (childrenToRemoveDict.TryGetValue(probeGOName, out probeGO)) {
+          childrenToRemoveDict.Remove(probeGOName);
+        }
+        else {
+          probeGO = new GameObject(probeGOName);
+        }
         probeGO.transform.SetParent(transform);
         probeGO.transform.position = new Vector3(probeXPos, maxColY + PROBE_HEIGHT_SPACING, probeZPos);
 
@@ -102,18 +113,17 @@ public class ReflectionProbePlacer : MonoBehaviour {
         reflectionProbes.Add(probe);
       }
 
-      // Rerender all the probes
+      // Remove unused probes
+      foreach (var unusedGO in childrenToRemoveDict.Values) {
+        GameObject.DestroyImmediate(unusedGO);
+      }
+
+      // Rerender all the probes that are in use
       foreach (var probe in reflectionProbes) {
+        probe.gameObject.SetActive(true);
         probe.RenderProbe();
       }
     }
-  }
-
-  private void clear() {
-    for (int i = 0; i < reflectionProbes.Count; i++) {
-      GameObject.DestroyImmediate(reflectionProbes[i].gameObject);
-    }
-    reflectionProbes.Clear();
   }
 
   private void Start() {
@@ -121,7 +131,7 @@ public class ReflectionProbePlacer : MonoBehaviour {
   }
 
   private void OnValidate() {
-    regenerateProbes();
+    Invoke("regenerateProbes", 0);
   }
 
 

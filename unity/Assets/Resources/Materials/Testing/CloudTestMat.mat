@@ -282,8 +282,8 @@ Material:
     - _UVDetailsMappingMask: {r: 1, g: 0, b: 0, a: 0}
     - _UVMappingMask: {r: 1, g: 0, b: 0, a: 0}
     - _UVMappingMaskEmissive: {r: 1, g: 0, b: 0, a: 0}
-    - boundsMax: {r: 1858.5739, g: 1000, b: 1830.4062, a: 0}
-    - boundsMin: {r: -1737.7596, g: 0, b: -1821.4062, a: 0}
+    - boundsMax: {r: 1745.1904, g: 1000, b: 1659.995, a: 0}
+    - boundsMin: {r: -1736.1904, g: 0, b: -1650.995, a: 0}
     - detailNoiseWeights: {r: 1, g: 0.5, b: 0.5, a: 0}
     - detailOffset: {r: 0, g: 0, b: 0, a: 0}
     - heightOffset: {r: 0, g: 0, b: 0, a: 0}
