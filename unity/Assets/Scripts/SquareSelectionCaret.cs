@@ -49,7 +49,7 @@ public class SquareSelectionCaret : MonoBehaviour {
     var adjustedVert  = currCamera.transform.up * yAxisDir;
 
     float dirSign(float value) {
-      return Mathf.Abs(value) < 1e-4f ? 0 : (value < 0 ? -1 : 1);
+      return Mathf.Abs(value) < 1e-10f ? 0 : (value < 0 ? -1 : 1);
     }
 
     // Project the controls onto the x and z axis, based on which has a larger magnitude of
@@ -63,8 +63,19 @@ public class SquareSelectionCaret : MonoBehaviour {
     // Take the maximum projection
     float xVal = absAdjHorizX >= absAdjVertX ? adjustedHoriz.x : adjustedVert.x;
     float zVal = absAdjHorizZ >= absAdjVertZ ? adjustedHoriz.z : adjustedVert.z;
-    if (Mathf.Abs(xVal) >= Mathf.Abs(zVal)) { zVal = 0; }
-    else { xVal = 0; }
+    float absXVal = Mathf.Abs(xVal);
+    float absZVal = Mathf.Abs(zVal);
+
+    // We need to watch out for close ties between the |xVal| and |zVal|,
+    // if they are close enough to each other then use the |xAxisDir| and |zAxisDir| to break the tie
+    if (Mathf.Abs(absXVal - absZVal) < 1e-2f) {
+      float absXAxisDir = Mathf.Abs(xAxisDir);
+      float absYAxisDir = Mathf.Abs(yAxisDir);
+      if (absXAxisDir > absYAxisDir) { zVal = 0; }
+      else if (absXAxisDir < absYAxisDir) { xVal = 0; }
+    }
+    else if (absXVal > absZVal) { zVal = 0; }
+    else if (absXVal < absZVal) { xVal = 0; }
 
     nextIndex.x = (int)Mathf.Clamp(nextIndex.x + dirSign(xVal), 0, terrainGrid.xSize-1);
     nextIndex.z = (int)Mathf.Clamp(nextIndex.z + dirSign(zVal), 0, terrainGrid.zSize-1);
@@ -104,7 +115,12 @@ public class SquareSelectionCaret : MonoBehaviour {
     var bounds = meshFilter.mesh.bounds;
     var scale = CARET_HEIGHT / bounds.size.y;
     transform.localScale = new Vector3(scale,scale,scale);
-    placeCaret(terrainGrid.terrainColumn(new Vector2Int(0,0)));
+  }
+
+  void OnEnable() {
+    if (currLanding == null) {
+      placeCaret(terrainGrid.terrainColumn(new Vector2Int(0,0)));
+    }
   }
 
   void Update() {
