@@ -396,6 +396,8 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
       regenerateMeshes(buildTerrainColumns());
       terrainPhysicsCleanup();
 
+      //Debug.Log("LEVEL NAME: " + levelData.name);
+      
       //var caret = GameObject.Find("Square Selection Caret").GetComponent<SquareSelectionCaret>();
       //caret.placeCaret(terrainColumn(new Vector2Int(0,0)));
     }

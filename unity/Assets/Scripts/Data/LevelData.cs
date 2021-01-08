@@ -6,6 +6,8 @@ using UnityEngine;
 public class LevelData : ScriptableObject {
 
   public string levelName;
+  public List<SceneReference> levelScenes;
+
   [Range(1,32)] public int xSize = 10, ySize = 10, zSize = 10; // Size in units (not nodes!) of the level
   public TerrainGridNode[] nodes;
 

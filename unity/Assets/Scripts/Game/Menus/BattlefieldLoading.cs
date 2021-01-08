@@ -1,47 +1,54 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 using TMPro;
 
+#pragma warning disable 649
 public class BattlefieldLoading : MonoBehaviour {
 
-  //public static string levelDataToLoad = "";
-  [SerializeField] private Image progressBar = default;
-  [SerializeField] private TextMeshProUGUI levelNameText = default;
+  public static LevelData levelToLoad = null; // Used to load and pass instantiated level data to the loading scene
+  
+  [SerializeField] private LevelLoaderData levelLoader;
+  [SerializeField] private Image progressBar;
+  [SerializeField] private TextMeshProUGUI levelNameText;
 
   // This allows us to load multiple additive scenes so that we can make our scenes more modular
   // by included multiple scene loads which might have functionality shared across multiple levels
-  private List<AsyncOperation> asyncScenesToLoad = new List<AsyncOperation>();
+  private List<AsyncOperation> asyncScenesToLoad;
 
   private void Awake() {
     progressBar.fillAmount = 0;
-
-    // TODO: Change this so that it loads the scene from a database or something else and not the incremented index!
-    var currSceneBuildIdx = SceneManager.GetActiveScene().buildIndex;
-    asyncScenesToLoad.Add(SceneManager.LoadSceneAsync(currSceneBuildIdx + 1)); // Load the battlefield scene itself 
-
-    // TODO: Add scene modules here e.g., "Gameplay", "Environment Manager", etc.
-    //asyncScenesToLoad.Add(SceneManager.LoadSceneAsync("Gameplay", LoadSceneMode.Additive));
+    Resources.UnloadUnusedAssets();
   }
 
   private void Start() {
+    // Set any loading screen elements based on the level data
+    if (levelToLoad == null) {
+      Debug.LogWarning("The levelToLoad must be set on the " + this.GetType().Name + " before loading its scene, using default level: " + LevelLoaderData.DEFAULT_LEVEL_STR);
+      levelToLoad = levelLoader.loadLevelDataInstance(LevelLoaderData.DEFAULT_LEVEL_STR);
+    }
+    levelNameText.text = levelToLoad.levelName;
+
+    // Determine all the scenes we need to load and load them asynchronously
+    asyncScenesToLoad = levelLoader.loadLevelAsyncOperations(levelToLoad);
     StartCoroutine(asyncLoadScene());
   }
 
   IEnumerator asyncLoadScene() {
-    float totalProgress = 0f;
-    for (int i = 0; i < asyncScenesToLoad.Count; i++) {
-      var asyncSceneLoad = asyncScenesToLoad[i];
-      totalProgress += asyncSceneLoad.progress;
-    }
-    totalProgress /= asyncScenesToLoad.Count;
-    while (totalProgress < 1f) {
+    bool allDone = false;
+    while (!allDone) {
+      float totalProgress = 0f;
+      allDone = true;
+      for (int i = 0; i < asyncScenesToLoad.Count; i++) {
+        var asyncSceneLoad = asyncScenesToLoad[i];
+        totalProgress += asyncSceneLoad.progress;
+        allDone &= asyncSceneLoad.isDone;
+      }
+      totalProgress /= asyncScenesToLoad.Count;
       progressBar.fillAmount = totalProgress;
       yield return new WaitForEndOfFrame();
     }
-    progressBar.fillAmount = 1f;
   }
  
 }
