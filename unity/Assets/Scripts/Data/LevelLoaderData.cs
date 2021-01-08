@@ -12,11 +12,12 @@ public class LevelLoaderData : ScriptableObject {
 
   private static string levelDataFromLevelStr(string levelStr) { return levelStr + "_level_data"; }
   
-  public LevelData loadLevelDataInstance(string levelStr) {
-    return ScriptableObject.Instantiate<LevelData>(Resources.Load<LevelData>(LEVELS_DIRECTORY + "/" + levelDataFromLevelStr(levelStr)));
+  // NOTE: This does not instantiate the data, use this for saving purposes, but not for the game state itself!
+  public static LevelData loadLevelData(string levelStr) {
+    return Resources.Load<LevelData>(LEVELS_DIRECTORY + "/" + levelDataFromLevelStr(levelStr));
   }
 
-  public List<AsyncOperation> loadLevelAsyncOperations(LevelData levelData) {
+  public List<AsyncOperation> loadLevelSceneAsyncOperations(LevelData levelData) {
     var result = new List<AsyncOperation>();
 
     // Load core/base scenes

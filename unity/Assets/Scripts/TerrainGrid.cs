@@ -417,6 +417,13 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     (var reflProbeGO, var reflProbePlacer) = ReflectionProbePlacer.buildOrFindReflProbes();
     reflProbeGO.transform.SetParent(transform);
     reflProbeGO.transform.SetAsFirstSibling();
+
+    
+    //var saveSlot = ScriptableObject.CreateInstance<SaveSlotData>();
+    //saveSlot.currentLevel = LevelLoaderData.loadLevelData(LevelLoaderData.DEFAULT_LEVEL_STR);
+    //saveSlot.save();
+    //Debug.Log("Saving slot data to " + saveSlot.saveFilepath());
+    
   }
 
   public static readonly float debrisUpdateTime = DebrisCollisionMonitor.moveEventUpdateTime*2;

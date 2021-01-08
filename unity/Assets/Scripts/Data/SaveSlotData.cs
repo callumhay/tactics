@@ -13,10 +13,10 @@ public class SaveSlotData : ScriptableObject {
 
   [SerializeField] private string version = "0.01";
   [SerializeField] private int slotNumber = 0;
-  [SerializeField] private string currentLevel = "tutorial";
+  //public LevelData currentLevel; // TODO: Remove this (since you can't save in battle... need to implement a world map)
 
-  private string saveFilename() { return "slot" + slotNumber + ".json"; }
-  private string saveFilepath() { return Path.Combine(Application.persistentDataPath, saveFilename()); }
+  private string saveFilename() { return "save_slot" + slotNumber + ".json"; }
+  public string saveFilepath() { return Path.Combine(Application.persistentDataPath, saveFilename()); }
 
   public void save() {
     File.WriteAllText(saveFilepath(), JsonUtility.ToJson(this));

@@ -1,6 +1,10 @@
 ﻿using UnityEngine;
+using UnityEngine.SceneManagement;
 
+#pragma warning disable 649
 public class MainMenuSystem : MonoBehaviour {
+
+  [SerializeField] private SceneReference battleLoadingScene;
 
   private void Awake() {
     // Make sure only the root menu is active
@@ -12,6 +16,10 @@ public class MainMenuSystem : MonoBehaviour {
     else { 
       Debug.Log("Could not find RootMenu!");
     }
+  }
+
+  public void startGame() {
+    SceneManager.LoadScene(battleLoadingScene);
   }
   
   public void deactivateAllMenus() {

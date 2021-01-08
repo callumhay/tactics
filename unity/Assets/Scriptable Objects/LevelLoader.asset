@@ -12,6 +12,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b7524f62ea765474db96cb384133b9ed, type: 3}
   m_Name: LevelLoader
   m_EditorClassIdentifier: 
-  defaultLevel:
-    sceneAsset: {fileID: 0}
-    scenePath: 
+  battlefield:
+    sceneAsset: {fileID: 102900000, guid: 74551b08d5b6341378e5c9992de73a71, type: 3}
+    scenePath: Assets/Scenes/Battlefield.unity

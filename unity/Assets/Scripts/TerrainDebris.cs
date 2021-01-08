@@ -3,6 +3,11 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Events;
 
+// TODO:
+// - Make a prefab for debris, add all the components to it including the events
+// - Make this class a Monobehaviour that is on the prefab, remove unnecessary code
+// - Instantiate the prefab (using "instantiate") inside the TerrainGrid where this class is created
+// - Destroy the GameObject inside the TerrainGrid (it should be created and destroyed in the same class!)
 public class TerrainDebris {
   // TODO: Remove this and use materials to define the density!
   private static float density = 1000.0f; // kg/m^3
