@@ -45,27 +45,21 @@ public class LiquidCompute : MonoBehaviour {
   public static readonly int NUM_THREADS_PER_BLOCK = 8;
 
   public bool enableSimulation = false;
-  [Range(1,10000)]
-  public float liquidDensity = 1000.0f;   // kg/m^3
-  [Range(0,101325)]
-  public float atmosphericPressure = 100.0f;
-  [Range(0,1000)]
-  public float maxGravityVelocity = 20.0f;    // m/s
-  [Range(0,1000)]
-  public float maxPressureVelocity = 11.0f;     // m/s
-  [Range(0,100)]
-  public float friction = 6.0f;
-  [Range(0,10000)]
-  public float gravityMagnitude = 9.81f;
-  [Range(0,1)]
-  public float vorticityConfinement = 0.012f;
-  [Range(1,100)]
-  public float flowMultiplier = 1.0f;
-  [Range(1,128)]
-  public int numPressureIters = 40;
+
+  [Range(1,10000)]  public float liquidDensity = 1000.0f;   // kg/m^3
+  [Range(0,101325)] public float atmosphericPressure = 100.0f;
+  [Range(0,1000)]   public float maxGravityVelocity = 20.0f;    // m/s
+  [Range(0,1000)]   public float maxPressureVelocity = 11.0f;     // m/s
+  [Range(0,100)]    public float friction = 6.0f;
+  [Range(0,10000)]  public float gravityMagnitude = 9.81f;
+  [Range(0,1)]      public float vorticityConfinement = 0.012f;
+  [Range(1,100)]    public float flowMultiplier = 1.0f;
+  [Range(1,128)]    public int numPressureIters = 40;
+
+  [SerializeField] private ComputeShader liquidComputeShader;
   
   private int numThreadGroups;
-  private ComputeShader liquidComputeShader;
+  
   private int advectKernelId;
   private int applyExtForcesKernelId;
   private int curlKernelId;
@@ -89,16 +83,15 @@ public class LiquidCompute : MonoBehaviour {
   private RenderTexture tempPressurePong;
   private ComputeBuffer flowsBuffer;
 
-  ComputeBuffer updateNodeComputeBuf; // CPU -> GPU buffer - allows us to tell the water simulation about the terrain
-  ComputeBuffer readNodeComputeBuf;   // GPU -> CPU buffer - allows us to tell the terrain about the water simulation
-  float[] readNodeCPUArr; // Temp buffer for reading nodes from GPU to CPU
+  private ComputeBuffer updateNodeComputeBuf; // CPU -> GPU buffer - allows us to tell the water simulation about the terrain
+  private ComputeBuffer readNodeComputeBuf;   // GPU -> CPU buffer - allows us to tell the terrain about the water simulation
+  private float[] readNodeCPUArr; // Temp buffer for reading nodes from GPU to CPU
 
   private LiquidVolumeRaymarcher volComponent;
 
   private Vector3Int currBorderBack;
   private Vector3Int currBorderFront;
   private int currFullResSize;
-
 
   public void initAll(LiquidVolumeRaymarcher _volComponent) {
     volComponent = _volComponent;

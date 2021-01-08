@@ -4,19 +4,20 @@ using UnityEngine;
 [PreferBinarySerialization]
 [CreateAssetMenu(fileName="New Level", menuName="Tactics/Level")]
 public class LevelData : ScriptableObject {
-  public static readonly string emptyLevelAssetPath = "Assets/Resources/Levels/Empty Level.asset";
 
   public string levelName;
-  [Range(1,32)]
-  public int xSize = 10, ySize = 10, zSize = 10; // Size in units (not nodes!) of the level
+  [Range(1,32)] public int xSize = 10, ySize = 10, zSize = 10; // Size in units (not nodes!) of the level
   public TerrainGridNode[] nodes;
 
+  /*
   private void OnValidate() {
+    // This slows things down considerably... figure out a better way or just keep commented out
     var terrainGrid = FindObjectOfType<TerrainGrid>();
     if (terrainGrid != null) {
       terrainGrid.OnValidate();
     }
   }
+  */
 
   public static int node3DIndexToFlatIndex(int x, int y, int z, int numNodesY, int numNodesZ) {
     return z + (y*numNodesZ) + (x*numNodesZ*numNodesY);
