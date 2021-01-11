@@ -27,7 +27,7 @@ public class CloudVolumeRaymarcher : MonoBehaviour {
     var verts = new List<Vector3>();
     var domeSphereData = MeshHelper.BuildDomeData(domeHeight, domeRadius, domeLongitudeSlices, domeLatitudeSlices, tris, verts);
 
-    var translation = terrainGrid.transform.position + new Vector3(terrainGrid.xUnitSize()/2f, 0, terrainGrid.zUnitSize()/2f);
+    var translation = terrainGrid.transform.position + new Vector3(terrainGrid.XUnitSize()/2f, 0, terrainGrid.ZUnitSize()/2f);
     domeSphereData.center += translation;
     for (int i = 0; i < verts.Count; i++) { verts[i] += translation; }
 

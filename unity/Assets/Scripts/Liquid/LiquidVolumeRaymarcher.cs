@@ -1,29 +1,30 @@
 ﻿using System;
 using UnityEngine;
+using UnityEditor;
+
+#pragma warning disable 649
 
 [ExecuteAlways]
 public class LiquidVolumeRaymarcher : MonoBehaviour {
-  private static readonly int JITTER_TEX_SIZE = 256;
-  
-  public Texture2D jitterTexture;
-  public RenderTexture nodeTexture;
 
-  // Assigned in Awake/Start
+  [SerializeField] private Texture2D jitterTexture;
+  [SerializeField] private RenderTexture nodeTexture;
+  [SerializeField] private TerrainGrid terrainGrid;
+
   private int volResolution;
   private Vector3 resBorder;
   private Vector3Int resBorderFrontInt;
   private Vector3Int resBorderBackInt;
   private MeshFilter meshFilter;
   private MeshRenderer meshRenderer;
-  private TerrainGrid terrainGrid;
-
+  
   public Vector3Int getBorderFront() { return resBorderFrontInt; }
   public Vector3Int getBorderBack()  { return resBorderBackInt;  }
   public int getFullResSize() { return volResolution; }
 
-  public void initAll() {
+  public void InitAll() {
     // Calculate the resolution of the 3D texture for rendering into the slices
-    var numNodesVec = new Vector3(terrainGrid.numNodesX(), terrainGrid.numNodesY(), terrainGrid.numNodesZ());
+    var numNodesVec = new Vector3(terrainGrid.NumNodesX(), terrainGrid.NumNodesY(), terrainGrid.NumNodesZ());
 
     // Calculate the maximum resolution (there must be at least one voxel per node on each axis 
     // plus 2 voxels for a border of 1 voxel on either side)
@@ -41,21 +42,15 @@ public class LiquidVolumeRaymarcher : MonoBehaviour {
     //Debug.Log("Resolution: " + volResolution + ", number of nodes: " + numNodesVec);
     //Debug.Log("Border (Float): " + resBorder + ", Front (Int): " + resBorderFrontInt + ", Back (Int): " + resBorderBackInt);
 
-    var volumeUnitSize = (Vector3)terrainGrid.unitSizeVec3();
-    // Set the raycasting material
-    if (!meshRenderer.sharedMaterial) {
-      meshRenderer.sharedMaterial = new Material(Resources.Load<Material>("Materials/LiquidRaymarchMat"));
-    }
+    var volumeUnitSize = (Vector3)terrainGrid.UnitSizeVec3();
     meshRenderer.sharedMaterial.SetVector("boundsMax", transform.localToWorldMatrix * volumeUnitSize);
     meshRenderer.sharedMaterial.SetVector("boundsMin", transform.localToWorldMatrix * new Vector3(0,0,0));
     meshRenderer.sharedMaterial.SetVector("borderFront", new Vector3(resBorderFrontInt.x, resBorderFrontInt.y, resBorderFrontInt.z));
     meshRenderer.sharedMaterial.SetVector("borderBack", new Vector3(resBorderBackInt.x, resBorderBackInt.y, resBorderBackInt.z));
     meshRenderer.sharedMaterial.SetFloat("resolution", volResolution);
-    meshRenderer.sharedMaterial.SetFloat("nodeVolume", Mathf.Pow(TerrainGrid.unitsPerNode(),3));
+    meshRenderer.sharedMaterial.SetFloat("nodeVolume", Mathf.Pow(TerrainGrid.UnitsPerNode(),3));
     meshRenderer.sharedMaterial.SetTexture("jitterTex", jitterTexture);
-    if (nodeTexture) {
-      meshRenderer.sharedMaterial.SetTexture("nodeTex", nodeTexture);
-    }
+    UpdateNodeTexture(nodeTexture);
 
     // Build the bounding box used to render the volume via raymarching between its faces
     var mesh = new Mesh();
@@ -67,26 +62,20 @@ public class LiquidVolumeRaymarcher : MonoBehaviour {
     meshFilter.sharedMesh = mesh;
   }
 
-  private void Start() {
-    if (terrainGrid == null) {
-      terrainGrid = TerrainGrid.FindTerrainGrid();
-    }
-  
+  private void Awake() {
     meshFilter = GetComponent<MeshFilter>();
-    if (!meshFilter) { meshFilter = gameObject.AddComponent<MeshFilter>(); }
     meshRenderer = GetComponent<MeshRenderer>();
-    if (!meshRenderer) { meshRenderer = gameObject.AddComponent<MeshRenderer>(); }
-    meshRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-    meshRenderer.allowOcclusionWhenDynamic = false;
-    meshRenderer.motionVectorGenerationMode = MotionVectorGenerationMode.ForceNoMotion;
-    if (!jitterTexture) { jitterTexture = TextureHelper.buildJitterTexture2D(JITTER_TEX_SIZE, true); }
-    initAll();
+
+    // Make sure we don't clobber the original material in play mode
+    if (Application.IsPlaying(gameObject)) {
+      meshRenderer.sharedMaterial = Instantiate<Material>(meshRenderer.sharedMaterial);
+    }
   }
 
-  public void updateNodeTexture(RenderTexture nodeTex) {
+  public void UpdateNodeTexture(RenderTexture nodeTex) {
     if (nodeTex != null) {
       meshRenderer.sharedMaterial.SetTexture("nodeTex", nodeTex);
-      nodeTexture = nodeTex;
     }
+    nodeTexture = nodeTex;
   }
 }

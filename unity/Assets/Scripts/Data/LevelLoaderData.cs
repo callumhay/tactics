@@ -3,7 +3,10 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 
 #pragma warning disable 649
-[CreateAssetMenu(fileName="New Level Loader", menuName="Tactics/LevelLoader")]
+
+// NB: the asset is created only once because it contains a singleton,
+// so we remove the capability of creating others commenting out "CreateAssetMenu" 
+//[CreateAssetMenu(fileName="New Level Loader", menuName="Tactics/LevelLoader")]
 public class LevelLoaderData : ScriptableObject {
   public static readonly string DEFAULT_LEVEL_STR = "tutorial";
   private static readonly string LEVELS_DIRECTORY = "Levels";
@@ -31,4 +34,10 @@ public class LevelLoaderData : ScriptableObject {
     return result;
   }
 
+  public class LevelLoaderManager : SingletonSO<LevelLoaderManager> {
+    public LevelData levelDataToLoad = null;
+  }
+  public LevelLoaderManager Instance() {
+    return LevelLoaderManager.Instance;
+  }
 }

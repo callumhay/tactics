@@ -14,7 +14,7 @@ public class TerrainGridToolWindow : EditorWindow {
     }
   }
 
-  public static int maxInset() { return (TerrainGrid.nodesPerUnit-1)/2 - 1; }
+  public static int maxInset() { return (TerrainGrid.NODES_PER_UNIT-1)/2 - 1; }
   private void updateSettingsIntValue(string settingName, int value) {
       var serializedObj = new SerializedObject(settings);
       serializedObj.Update();
@@ -124,7 +124,7 @@ public class TerrainGridToolWindow : EditorWindow {
         
         EditorGUILayout.Space();
         EditorGUILayout.PropertyField(groundUpOnlyProp);
-        EditorGUILayout.Slider(setLevelValProp, 1.0f, terrainGrid.yUnitSize(), "Set Level", GUILayout.ExpandWidth(true));
+        EditorGUILayout.Slider(setLevelValProp, 1.0f, terrainGrid.YUnitSize(), "Set Level", GUILayout.ExpandWidth(true));
         
         EditorGUILayout.Space();
         EditorGUILayout.Slider(matIntensityProp, 0.01f, 1.0f, "Material Intensity");
@@ -143,7 +143,7 @@ public class TerrainGridToolWindow : EditorWindow {
         EditorGUILayout.IntSlider(colInsetNegXAmtProp, 0, maxAllowableInset, "Column Inset/Outset -X", GUILayout.ExpandWidth(true));
         EditorGUILayout.IntSlider(colInsetZAmtProp, 0, maxAllowableInset, "Column Inset/Outset +Z", GUILayout.ExpandWidth(true));
         EditorGUILayout.IntSlider(colInsetNegZAmtProp, 0, maxAllowableInset, "Column Inset/Outset -Z", GUILayout.ExpandWidth(true));
-        EditorGUILayout.Slider(setLevelValProp, 1.0f, terrainGrid.yUnitSize(), "Set Level", GUILayout.ExpandWidth(true));
+        EditorGUILayout.Slider(setLevelValProp, 1.0f, terrainGrid.YUnitSize(), "Set Level", GUILayout.ExpandWidth(true));
         EditorGUILayout.Space();
         EditorGUILayout.PropertyField(paintMatProp);
         break;
@@ -159,7 +159,7 @@ public class TerrainGridToolWindow : EditorWindow {
         EditorGUILayout.PropertyField(showEmptyNodesProp, GUILayout.ExpandWidth(true));
         EditorGUILayout.PropertyField(showSurfaceNodesProp, GUILayout.ExpandWidth(true));
         EditorGUILayout.PropertyField(showAboveSurfaceNodesProp, GUILayout.ExpandWidth(true));
-        EditorGUILayout.Slider(setLevelValProp, 1.0f, terrainGrid.yUnitSize(), "Set Level", GUILayout.ExpandWidth(true));
+        EditorGUILayout.Slider(setLevelValProp, 1.0f, terrainGrid.YUnitSize(), "Set Level", GUILayout.ExpandWidth(true));
         EditorGUILayout.Space();
         EditorGUILayout.PropertyField(paintMatProp);
 
@@ -189,7 +189,7 @@ public class TerrainGridToolWindow : EditorWindow {
     var paintMode3D = (paintMode == TGTWSettings.PaintMode.Floating);
     var finalEditPt = editPt;
     if (gridSnaping) {
-      terrainGrid?.getGridSnappedPoint(ref finalEditPt);
+      terrainGrid?.GetGridSnappedPoint(ref finalEditPt);
     }
 
     bool groundFirst = groundUpOnly && paintType != TGTWSettings.PaintType.Water;
@@ -199,14 +199,14 @@ public class TerrainGridToolWindow : EditorWindow {
       case TGTWSettings.BrushType.Sphere:
         var radius = 0.5f * brushSize;
         nodes = paintMode3D ? 
-          terrainGrid?.getNodesInsideSphere(finalEditPt, radius, groundFirst, waterFirst, setLevelValue) : 
-          terrainGrid?.getNodesInsideProjXZCircle(finalEditPt, radius, groundFirst, waterFirst, setLevelValue);
+          terrainGrid?.GetNodesInsideSphere(finalEditPt, radius, groundFirst, waterFirst, setLevelValue) : 
+          terrainGrid?.GetNodesInsideProjXZCircle(finalEditPt, radius, groundFirst, waterFirst, setLevelValue);
         break;
       case TGTWSettings.BrushType.Cube:
         var bounds = new Bounds(finalEditPt, new Vector3(brushSize, brushSize, brushSize));
         nodes = paintMode3D ? 
-          terrainGrid?.getNodesInsideBox(bounds, groundFirst, waterFirst, setLevelValue) : 
-          terrainGrid?.getNodesInsideProjXZSquare(bounds, groundFirst, waterFirst, setLevelValue);
+          terrainGrid?.GetNodesInsideBox(bounds, groundFirst, waterFirst, setLevelValue) : 
+          terrainGrid?.GetNodesInsideProjXZSquare(bounds, groundFirst, waterFirst, setLevelValue);
         break;
       default:
         break;

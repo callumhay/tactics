@@ -21,6 +21,13 @@ public class LevelData : ScriptableObject {
   }
   */
 
+  public bool HasLiquid() {
+    foreach (var node in nodes) {
+      if (node.isLiquid()) { return true; }
+    }
+    return false;
+  }
+
   public static int node3DIndexToFlatIndex(int x, int y, int z, int numNodesY, int numNodesZ) {
     return z + (y*numNodesZ) + (x*numNodesZ*numNodesY);
   }
@@ -31,7 +38,7 @@ public class LevelData : ScriptableObject {
     return new Vector3Int(x,y,z);
   }
   public static int numNodesToSize(int numNodes) {
-    return (numNodes - 1)/(TerrainGrid.nodesPerUnit*TerrainColumn.SIZE - 1);
+    return (numNodes - 1)/(TerrainGrid.NODES_PER_UNIT*TerrainColumn.SIZE - 1);
   }
   
   /// <summary>
@@ -40,7 +47,7 @@ public class LevelData : ScriptableObject {
   /// <param name="size">Number of terrain columns.</param>
   /// <returns>Number of nodes spanning the given number of terrain columns.</returns>
   public static int sizeToNumNodes(int size) {
-    return (size*TerrainGrid.nodesPerUnit*TerrainColumn.SIZE) + 1 - size;
+    return (size*TerrainGrid.NODES_PER_UNIT*TerrainColumn.SIZE) + 1 - size;
   }
 
   public void updateFromNodes(in TerrainGridNode[,,] allNodes, in IEnumerable<TerrainGridNode> nodeUpdates) {
@@ -107,35 +114,3 @@ public class LevelData : ScriptableObject {
   }
 
 }
-
-
-/*
-[CustomEditor(typeof(LevelData))]
-class LevelDataEditor : Editor {
-  public override void OnInspectorGUI() {
-    //base.OnInspectorGUI();
-
-    levelData.levelName = EditorGUILayout.TextField("Level Name", levelData.levelName);
-
-    int newXSize = EditorGUILayout.IntSlider("X Size", levelData.xSize, 1, 32);
-    if (newXSize != levelData.xSize) { 
-      levelData.oldXSize = levelData.xSize;
-      levelData.xSize = newXSize;
-    }
-    int newYSize = EditorGUILayout.IntSlider("Y Size", levelData.ySize, 1, 32);
-    if (newYSize != levelData.ySize) { 
-      levelData.oldYSize = levelData.ySize;
-      levelData.ySize = newYSize;
-    }
-    int newZSize = EditorGUILayout.IntSlider("Z Size", levelData.zSize, 1, 32);
-    if (newZSize != levelData.zSize) { 
-      levelData.oldZSize = levelData.zSize;
-      levelData.zSize = newZSize;
-    }
-
-    EditorUtility.SetDirty(levelData);
-    AssetDatabase.SaveAssets();
-    
-  }
-}
-*/

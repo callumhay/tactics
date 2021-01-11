@@ -4,6 +4,7 @@ using UnityEngine;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine.Events;
+#pragma warning disable 649
 
 [ExecuteAlways]
 public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver {
@@ -23,66 +24,74 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     return terrainGrid;
   }
 
-  public static readonly int nodesPerUnit = 5;
+  public static readonly int NODES_PER_UNIT = 5;
 
   public LevelData levelData;
+  public GameObject columnsParent;
+  public GameObject terrainColumnPrefab;
+
+  [SerializeField] private LevelLoaderData levelLoader;
+
+  [SerializeField] private GameObject debrisPrefab;
+  [SerializeField] private FloatReference debrisUpdateFrequency;
+
+  [SerializeField] private LiquidCompute liquidCompute;
+  [SerializeField] private LiquidVolumeRaymarcher liquidVolumeRaymarcher;
+
+  // Live data used in the editor and in-game, note that we serialize these fields so that we can undo/redo edit operations
+  private float debrisTimeCounter = 0;
+  private TerrainGridNode[,,] nodes; // Does not include the outer "ghost" nodes with zeroed isovalues
+  private Dictionary<Vector3Int, TerrainColumn> terrainColumns = new Dictionary<Vector3Int, TerrainColumn>();
+  private Dictionary<GameObject, TerrainDebrisDiff> debrisNodeDict = new Dictionary<GameObject, TerrainDebrisDiff>();
+  private bool debrisToLiquidNeedsUpdate = false;
+  private Bedrock bedrock;
 
   public int xSize { get { return levelData.xSize; } }
   public int ySize { get { return levelData.ySize; } }
   public int zSize { get { return levelData.zSize; } }
 
-  public int xUnitSize() { return xSize * TerrainColumn.SIZE; }
-  public int yUnitSize() { return ySize * TerrainColumn.SIZE; }
-  public int zUnitSize() { return zSize * TerrainColumn.SIZE; }
-  public Vector3Int unitSizeVec3() { return new Vector3Int(xUnitSize(), yUnitSize(), zUnitSize()); }
+  public int XUnitSize() { return xSize * TerrainColumn.SIZE; }
+  public int YUnitSize() { return ySize * TerrainColumn.SIZE; }
+  public int ZUnitSize() { return zSize * TerrainColumn.SIZE; }
+  public Vector3Int UnitSizeVec3() { return new Vector3Int(XUnitSize(), YUnitSize(), ZUnitSize()); }
 
-  // Live data used in the editor and in-game, note that we serialize these fields so that we can undo/redo edit operations
-  private TerrainGridNode[,,] nodes; // Does not include the outer "ghost" nodes with zeroed isovalues
-  private Dictionary<Vector3Int, TerrainColumn> terrainColumns;
-  private Dictionary<GameObject, TerrainDebrisDiff> debrisNodeDict;
-  private bool debrisToLiquidNeedsUpdate = false;
+  public int NumNodesX() { return LevelData.sizeToNumNodes(xSize); }
+  public int NumNodesY() { return LevelData.sizeToNumNodes(ySize); }
+  public int NumNodesZ() { return LevelData.sizeToNumNodes(zSize); }
+  public int NumNodes()  { return NumNodesX()*NumNodesY()*NumNodesZ(); }
 
-  private Bedrock bedrock;
-  private TerrainLiquid terrainLiquid;
+  public static float UnitsPerNode() { return (((float)TerrainColumn.SIZE) / ((float)TerrainGrid.NODES_PER_UNIT-1)); }
+  public static float HalfUnitsPerNode() { return (0.5f * UnitsPerNode()); }
+  public static Vector3 UnitsPerNodeVec3() { var u = UnitsPerNode(); return new Vector3(u,u,u); }
+  public static Vector3 HalfUnitsPerNodeVec3() { var v = UnitsPerNodeVec3(); return 0.5f*v; }
+  public static float UnitVolumePerNode() { return Mathf.Pow(UnitsPerNode(),3f); }
+  public static int UnitsToNodeIndex(float unitVal) { return Mathf.FloorToInt(unitVal / UnitsPerNode()); }
+  public static float NodeIndexToUnits(int idx) { return idx*UnitsPerNode(); }
+  public static Vector3 NodeIndexToUnitsVec3(int x, int y, int z) { return NodeIndexToUnitsVec3(new Vector3Int(x,y,z)); }
+  public static Vector3 NodeIndexToUnitsVec3(in Vector3Int nodeIdx) {
+    var nodeUnitsVec = UnitsPerNodeVec3(); return Vector3.Scale(nodeIdx, nodeUnitsVec); 
+  }
 
-  public int numNodesX() { return LevelData.sizeToNumNodes(xSize); }
-  public int numNodesY() { return LevelData.sizeToNumNodes(ySize); }
-  public int numNodesZ() { return LevelData.sizeToNumNodes(zSize); }
-  public int numNodes()  { return numNodesX()*numNodesY()*numNodesZ(); }
-
-  public static float unitsPerNode() { return (((float)TerrainColumn.SIZE) / ((float)TerrainGrid.nodesPerUnit-1)); }
-  public static float halfUnitsPerNode() { return (0.5f * unitsPerNode()); }
-  public Vector3 unitsPerNodeVec3() { var u = unitsPerNode(); return new Vector3(u,u,u); }
-  public Vector3 halfUnitsPerNodeVec3() { var v = unitsPerNodeVec3(); return 0.5f*v; }
-
-  public static float unitVolumePerNode() { return Mathf.Pow(unitsPerNode(),3f); }
-
-  public static int unitsToNodeIndex(float unitVal) { return Mathf.FloorToInt(unitVal / unitsPerNode()); }
-  public Vector3Int unitsToNodeIndexVec3(float x, float y, float z) { 
+  public Vector3Int UnitsToNodeIndexVec3(float x, float y, float z) { 
     return new Vector3Int(
-      Mathf.Clamp(unitsToNodeIndex(x), 0, nodes.GetLength(0)-1), 
-      Mathf.Clamp(unitsToNodeIndex(y), 0, nodes.GetLength(1)-1), 
-      Mathf.Clamp(unitsToNodeIndex(z), 0, nodes.GetLength(2)-1));
+      Mathf.Clamp(UnitsToNodeIndex(x), 0, nodes.GetLength(0)-1), 
+      Mathf.Clamp(UnitsToNodeIndex(y), 0, nodes.GetLength(1)-1), 
+      Mathf.Clamp(UnitsToNodeIndex(z), 0, nodes.GetLength(2)-1));
   }
-  public Vector3Int unitsToNodeIndexVec3(in Vector3 unitPos) { return unitsToNodeIndexVec3(unitPos.x, unitPos.y, unitPos.z);}
-  public static float nodeIndexToUnits(int idx) { return idx*unitsPerNode(); }
-  public Vector3 nodeIndexToUnitsVec3(int x, int y, int z) { return nodeIndexToUnitsVec3(new Vector3Int(x,y,z)); }
-  public Vector3 nodeIndexToUnitsVec3(in Vector3Int nodeIdx) {
-    var nodeUnitsVec = unitsPerNodeVec3(); return Vector3.Scale(nodeIdx, nodeUnitsVec); 
-  }
+  public Vector3Int UnitsToNodeIndexVec3(in Vector3 unitPos) { return UnitsToNodeIndexVec3(unitPos.x, unitPos.y, unitPos.z);}
 
-  public TerrainColumn terrainColumn(in Vector2Int tcIdx) { return terrainColumn(new Vector3Int(tcIdx.x, 0, tcIdx.y)); }
-  public TerrainColumn terrainColumn(in Vector3Int tcIdx) { 
+  public TerrainColumn GetTerrainColumn(in Vector2Int tcIdx) { return GetTerrainColumn(new Vector3Int(tcIdx.x, 0, tcIdx.y)); }
+  public TerrainColumn GetTerrainColumn(in Vector3Int tcIdx) { 
     TerrainColumn result = null;
     terrainColumns?.TryGetValue(tcIdx, out result);
     return result;
   }
 
-  public void getGridSnappedPoint(ref Vector3 wsPt) {
+  public void GetGridSnappedPoint(ref Vector3 wsPt) {
     // Find the closest column center to the given point and snap to it
     var lsPt = wsPt - transform.position; // local space
 
-    var unitsPerTC = (unitsPerNode()*TerrainColumn.SIZE*(nodesPerUnit-1));
+    var unitsPerTC = (UnitsPerNode()*TerrainColumn.SIZE*(NODES_PER_UNIT-1));
     var oneOverUnitsPerTC = 1.0f / unitsPerTC;
     var halfUnitsPerTC = unitsPerTC / 2.0f;
 
@@ -97,13 +106,6 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     wsPt = (unitsPerTC * tcIdxPt) + new Vector3(halfUnitsPerTC,halfUnitsPerTC,halfUnitsPerTC) + transform.position;
   }
 
-  // Get the worldspace bounds of the grid
-  public Bounds wsBounds() { 
-    var b = new Bounds();
-    b.SetMinMax(transform.position, transform.position + new Vector3(xSize, ySize, zSize));
-    return b;
-  }
-
   public sealed class IndexRange {
     public int xStartIdx;
     public int xEndIdx;
@@ -113,32 +115,32 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     public int zEndIdx;
   }
 
-  private IndexRange getIndexRangeForBox(in Bounds bounds) {
-    return getIndexRangeForMinMax(bounds.min, bounds.max);
+  private IndexRange GetIndexRangeForBox(in Bounds bounds) {
+    return GetIndexRangeForMinMax(bounds.min, bounds.max);
   }
-  private IndexRange getIndexRangeForMinMax(in Vector3 min, in Vector3 max) {
+  private IndexRange GetIndexRangeForMinMax(in Vector3 min, in Vector3 max) {
     return new IndexRange {
-      xStartIdx = Mathf.Clamp(unitsToNodeIndex(min.x), 0, nodes.GetLength(0)-1),
-      xEndIdx   = Mathf.Clamp(unitsToNodeIndex(max.x), 0, nodes.GetLength(0)-1),
-      yStartIdx = Mathf.Clamp(unitsToNodeIndex(min.y), 0, nodes.GetLength(1)-1),
-      yEndIdx   = Mathf.Clamp(unitsToNodeIndex(max.y), 0, nodes.GetLength(1)-1),
-      zStartIdx = Mathf.Clamp(unitsToNodeIndex(min.z), 0, nodes.GetLength(2)-1),
-      zEndIdx   = Mathf.Clamp(unitsToNodeIndex(max.z), 0, nodes.GetLength(2)-1)
+      xStartIdx = Mathf.Clamp(UnitsToNodeIndex(min.x), 0, nodes.GetLength(0)-1),
+      xEndIdx   = Mathf.Clamp(UnitsToNodeIndex(max.x), 0, nodes.GetLength(0)-1),
+      yStartIdx = Mathf.Clamp(UnitsToNodeIndex(min.y), 0, nodes.GetLength(1)-1),
+      yEndIdx   = Mathf.Clamp(UnitsToNodeIndex(max.y), 0, nodes.GetLength(1)-1),
+      zStartIdx = Mathf.Clamp(UnitsToNodeIndex(min.z), 0, nodes.GetLength(2)-1),
+      zEndIdx   = Mathf.Clamp(UnitsToNodeIndex(max.z), 0, nodes.GetLength(2)-1)
     };
   }
 
-  public IndexRange getIndexRangeForTerrainColumn(in TerrainColumn terrainCol) {
-    return getIndexRangeForTerrainColumn(terrainCol.index);
+  public IndexRange GetIndexRangeForTerrainColumn(in TerrainColumn terrainCol) {
+    return GetIndexRangeForTerrainColumn(terrainCol.index);
   }
-  public IndexRange getIndexRangeForTerrainColumn(in Vector3Int terrainColIdx) {
-    var numNodesPerTCMinus1 = TerrainColumn.SIZE*TerrainGrid.nodesPerUnit-1;
+  public IndexRange GetIndexRangeForTerrainColumn(in Vector3Int terrainColIdx) {
+    var numNodesPerTCMinus1 = TerrainColumn.SIZE*TerrainGrid.NODES_PER_UNIT-1;
     var nodeXIdxStart = terrainColIdx.x * numNodesPerTCMinus1;
     var nodeZIdxStart = terrainColIdx.z * numNodesPerTCMinus1;
     return new IndexRange {
       xStartIdx = nodeXIdxStart,
       xEndIdx   = nodeXIdxStart + numNodesPerTCMinus1,
       yStartIdx = 0,
-      yEndIdx   = numNodesY() - 1,
+      yEndIdx   = NumNodesY() - 1,
       zStartIdx = nodeZIdxStart,
       zEndIdx   = nodeZIdxStart + numNodesPerTCMinus1
     };
@@ -150,7 +152,7 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
   ) {
 
     var tcNodes = new HashSet<TerrainGridNode>();
-    var tcIndices = getIndexRangeForTerrainColumn(terrainColIdx);
+    var tcIndices = GetIndexRangeForTerrainColumn(terrainColIdx);
     tcIndices.yEndIdx = Math.Min(tcIndices.yEndIdx, maxYNodeIdx);
 
     var allNodes = nodeSelector.HasFlag(TerrainNodeSelectors.All);
@@ -172,7 +174,7 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
             for (var z = tcIndices.zStartIdx; z <= tcIndices.zEndIdx; z++) {
               var currNode = nodes[x,y,z];
               if (currNode.isTerrain()) {
-                var neighbours = getNeighboursForNode(currNode);
+                var neighbours = GetNeighboursForNode(currNode);
                 if (surfaceNodes) {
                   // If any of the neighbours are empty then this is a surface node
                   foreach (var neighbour in neighbours) {
@@ -204,7 +206,7 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     return tcNodes;
   }
 
-  public List<TerrainGridNode> getNeighboursForNode(in TerrainGridNode node) {
+  public List<TerrainGridNode> GetNeighboursForNode(in TerrainGridNode node) {
     var neighbours = new List<TerrainGridNode>();
     var idx = node.gridIndex;
     // There are 6 potential neighbours...
@@ -217,10 +219,10 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     return neighbours;
   }
 
-  public List<TerrainGridNode> getNodesInsideBox(in Bounds box, bool groundFirst, bool liquidFirst, float setLevelUnits) {
+  public List<TerrainGridNode> GetNodesInsideBox(in Bounds box, bool groundFirst, bool liquidFirst, float setLevelUnits) {
     var result = new List<TerrainGridNode>();
-    var indices = getIndexRangeForBox(box);
-    var maxYIdx = unitsToNodeIndex(setLevelUnits);
+    var indices = GetIndexRangeForBox(box);
+    var maxYIdx = UnitsToNodeIndex(setLevelUnits);
     indices.yStartIdx = Math.Min(maxYIdx, indices.yStartIdx);
     indices.yEndIdx = Math.Min(maxYIdx, indices.yEndIdx);
 
@@ -250,12 +252,12 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     return result;
   }  
 
-  public List<TerrainGridNode> getNodesInsideSphere(in Vector3 center, float radius, bool groundFirst, bool liquidFirst, float setLevelUnits) {
+  public List<TerrainGridNode> GetNodesInsideSphere(in Vector3 center, float radius, bool groundFirst, bool liquidFirst, float setLevelUnits) {
     var lsCenter = center - transform.position; // Get the center in localspace
 
     // Narrow the search down to the nodes inside the sphere's bounding box
     var dia = 2*radius;
-    var nodesInBox = getNodesInsideBox(new Bounds(lsCenter, new Vector3(dia, dia, dia)), groundFirst, liquidFirst, setLevelUnits);
+    var nodesInBox = GetNodesInsideBox(new Bounds(lsCenter, new Vector3(dia, dia, dia)), groundFirst, liquidFirst, setLevelUnits);
 
     // Go through the list and only take the nodes inside the sphere
     var sqrRadius = radius*radius;
@@ -268,11 +270,11 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     return result;
   }
 
-  public List<TerrainGridNode> getNodesInsideProjXZCircle(in Vector3 center, float radius, bool groundFirst, bool liquidFirst, float setLevelUnits) {
+  public List<TerrainGridNode> GetNodesInsideProjXZCircle(in Vector3 center, float radius, bool groundFirst, bool liquidFirst, float setLevelUnits) {
     var lsCenter = center - transform.position; // Get the center in localspace
     
     // Find the highest y node in the xz coordinates with an isovalue
-    var isCenter = unitsToNodeIndexVec3(lsCenter); isCenter.y++;
+    var isCenter = UnitsToNodeIndexVec3(lsCenter); isCenter.y++;
     if (groundFirst || liquidFirst) {
       int startY = isCenter.y;
       var startXIdx = Mathf.FloorToInt(isCenter.x-radius);
@@ -293,12 +295,12 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
       while (isCenter.y > 1 && nodes[isCenter.x,isCenter.y-1,isCenter.z].isEmpty()) { isCenter.y--; }
       while (isCenter.y < nodes.GetLength(1)-1 && !nodes[isCenter.x,isCenter.y,isCenter.z].isEmpty()) { isCenter.y++; }
     }
-    isCenter.y = Mathf.Min(Mathf.Max(0, unitsToNodeIndex(setLevelUnits-radius)), isCenter.y);
+    isCenter.y = Mathf.Min(Mathf.Max(0, UnitsToNodeIndex(setLevelUnits-radius)), isCenter.y);
 
     // Get the nodes in a square box that encloses the circle
     var dia = 2*radius;
-    var box = new Bounds(nodeIndexToUnitsVec3(isCenter), new Vector3(dia, 1.5f*halfUnitsPerNode(), dia));
-    var indices = getIndexRangeForBox(box);
+    var box = new Bounds(NodeIndexToUnitsVec3(isCenter), new Vector3(dia, 1.5f*HalfUnitsPerNode(), dia));
+    var indices = GetIndexRangeForBox(box);
     var result = new List<TerrainGridNode>();
     var sqrRadius = radius*radius;
     for (int x = indices.xStartIdx; x <= indices.xEndIdx; x++) {
@@ -311,31 +313,34 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     }
     return result;
   }
-  public List<TerrainGridNode> getNodesInsideProjXZSquare(in Bounds box, bool groundFirst, bool liquidFirst, float setLevelUnits) {
+  public List<TerrainGridNode> GetNodesInsideProjXZSquare(in Bounds box, bool groundFirst, bool liquidFirst, float setLevelUnits) {
     var lsCenter = box.center - transform.position; // Get the center in localspace
     // Find the highest y node in the xz coordinates with an isovalue
-    var isCenter = unitsToNodeIndexVec3(lsCenter); isCenter.y++;
+    var isCenter = UnitsToNodeIndexVec3(lsCenter); isCenter.y++;
     while (isCenter.y > 1 && nodes[isCenter.x,isCenter.y-1,isCenter.z].isEmpty()) { isCenter.y--; }
     while (isCenter.y < nodes.GetLength(1)-1 && !nodes[isCenter.x,isCenter.y,isCenter.z].isEmpty()) { isCenter.y++; }
 
-    var projBox = new Bounds(nodeIndexToUnitsVec3(isCenter), new Vector3(box.size.x, 1.5f*halfUnitsPerNode(), box.size.z));
-    return getNodesInsideBox(projBox, groundFirst, liquidFirst, setLevelUnits);
+    var projBox = new Bounds(NodeIndexToUnitsVec3(isCenter), new Vector3(box.size.x, 1.5f*HalfUnitsPerNode(), box.size.z));
+    return GetNodesInsideBox(projBox, groundFirst, liquidFirst, setLevelUnits);
   }
 
 
-  public Vector3Int terrainColumnNodeIndex(in TerrainColumn terrainCol, in Vector3Int localIdx) {
+  public static Vector3Int TerrainColumnNodeIndex(in TerrainColumn terrainCol, in Vector3Int localIdx) {
+    return TerrainColumnNodeIndex(terrainCol.index, localIdx);
+  }
+  public static Vector3Int TerrainColumnNodeIndex(in Vector3Int terrainColIdx, in Vector3Int localIdx) {
     return new Vector3Int(
-      terrainCol.index.x * (TerrainGrid.nodesPerUnit * TerrainColumn.SIZE - 1), 0, 
-      terrainCol.index.z * (TerrainGrid.nodesPerUnit * TerrainColumn.SIZE - 1)
+      terrainColIdx.x * (TerrainGrid.NODES_PER_UNIT * TerrainColumn.SIZE - 1), 0, 
+      terrainColIdx.z * (TerrainGrid.NODES_PER_UNIT * TerrainColumn.SIZE - 1)
     ) + localIdx;
   }
 
-  public TerrainGridNode getNode(in Vector3Int nodeIdx) {
+  public TerrainGridNode GetNode(in Vector3Int nodeIdx) {
     // If the index is outside of the node grid then we're dealing with a "ghost" node
     if (nodeIdx.x < 0 || nodeIdx.x > this.nodes.GetLength(0)-1 ||
         nodeIdx.y < 0 || nodeIdx.y > this.nodes.GetLength(1)-1 ||
         nodeIdx.z < 0 || nodeIdx.z > this.nodes.GetLength(2)-1) {
-      var gridSpacePos = nodeIndexToUnitsVec3(nodeIdx);
+      var gridSpacePos = NodeIndexToUnitsVec3(nodeIdx);
       // NOTE: Since the node is outside the grid of TerrainColumns 
       // we don't associate any with this "ghost" node
       return new TerrainGridNode(gridSpacePos, nodeIdx, 0);
@@ -343,98 +348,74 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     return nodes[nodeIdx.x,nodeIdx.y,nodeIdx.z];
   }
 
-  private void loadLevelDataNodes() {
-    // Uncommenting this can wipe the entire levelData object... not great.
-    //if (levelData == null) {
-    //  levelData = ScriptableObjectUtility.LoadOrCreateAssetFromPath<LevelData>(LevelData.emptyLevelAssetPath);
-    //}
-
+  private void LoadLevelDataNodes() {
     if (levelData != null) {
       // When we load the nodes we are only loading their index and isovalue, the rest of
       // the information inside each node needs to be rebuilt (this is done in generateNodes).
       nodes = levelData.getNodesAs3DArray();
-      generateNodes();
+      GenerateNodes();
     }
   }
   public void OnBeforeSerialize() {
   }
   public void OnAfterDeserialize() {
-    loadLevelDataNodes();
+    LoadLevelDataNodes();
   }
 
   public void Awake() {
     if (Application.IsPlaying(gameObject)) {
-      // Setup various event listeners
-      gameObject.SetActive(false);
-      {
-      var onSleepEventListener = gameObject.AddComponent<GameEventListener>();
-      onSleepEventListener.unityEvent = new UnityEvent<GameObject>();
-      onSleepEventListener.unityEvent.AddListener(mergeDebrisIntoTerrain);
-      onSleepEventListener.gameEvent = Resources.Load<GameEvent>(GameEvent.DEBRIS_SLEEP_EVENT);
-      
-      var onDebrisMoveListener = gameObject.AddComponent<GameEventListener>();
-      onDebrisMoveListener.unityEvent = new UnityEvent<GameObject>();
-      onDebrisMoveListener.unityEvent.AddListener(updateMovingDebris);
-      onDebrisMoveListener.gameEvent = Resources.Load<GameEvent>(GameEvent.DEBRIS_MOVE_UPDATE_EVENT);
+      // If we're coming into this scene from the loading screen then we load the level it provides,
+      // otherwise take whatever level data is already set in the inspector.
+      // IMPORTANT NOTE: We must instantiate the level data in game mode or else we'll overwrite the asset while the game plays.
+      if (levelLoader.Instance().levelDataToLoad) {
+        levelData = Instantiate<LevelData>(levelLoader.Instance().levelDataToLoad);
       }
-      gameObject.SetActive(true);
+      else if (levelData != null) {
+        levelData = Instantiate<LevelData>(levelData);
+      }
 
-      // Important! We must instantiate the level data in game mode or else
-      // we'll overwrite the asset while the game plays
-      levelData = Instantiate<LevelData>(levelData);
-      loadLevelDataNodes();
+      LoadLevelDataNodes();
     }
   }
 
   void Start() {
     if (Application.IsPlaying(gameObject)) {
       // NOTE: When the application is running, we set up the nodes in Awake()
-      debrisNodeDict = new Dictionary<GameObject, TerrainDebrisDiff>();
-      // Build all the assets for the game that aren't stored in the level data
-      buildTerrainLiquid();
-      buildBedrock();
-      regenerateMeshes(buildTerrainColumns());
-      terrainPhysicsCleanup();
 
-      //Debug.Log("LEVEL NAME: " + levelData.name);
-      
-      //var caret = GameObject.Find("Square Selection Caret").GetComponent<SquareSelectionCaret>();
-      //caret.placeCaret(terrainColumn(new Vector2Int(0,0)));
+      // Build all the assets for the game that aren't stored in the level data
+      BuildTerrainLiquid();
+      BuildBedrock();
+      RegenerateMeshes(BuildTerrainColumns());
+      TerrainPhysicsCleanup();
     }
     #if UNITY_EDITOR
     else {
       if (levelData != null) {
-        loadLevelDataNodes(); // Always load the nodes first!
-        buildTerrainLiquid();
-        buildBedrock();
-        buildTerrainColumns();
-        regenerateMeshes(buildTerrainColumns());
+        LoadLevelDataNodes(); // Always load the nodes first!
+        BuildTerrainLiquid();
+        BuildBedrock();
+        BuildTerrainColumns();
+        RegenerateMeshes(BuildTerrainColumns());
         // No terrainPhysicsCleanup in editor!
       }
     }
     #endif
 
-    (var reflProbeGO, var reflProbePlacer) = ReflectionProbePlacer.buildOrFindReflProbes();
-    reflProbeGO.transform.SetParent(transform);
-    reflProbeGO.transform.SetAsFirstSibling();
-
-    
+    // TESTING saving scriptable object references
     //var saveSlot = ScriptableObject.CreateInstance<SaveSlotData>();
     //saveSlot.currentLevel = LevelLoaderData.loadLevelData(LevelLoaderData.DEFAULT_LEVEL_STR);
     //saveSlot.save();
     //Debug.Log("Saving slot data to " + saveSlot.saveFilepath());
-    
   }
 
-  public static readonly float debrisUpdateTime = DebrisCollisionMonitor.moveEventUpdateTime*2;
-  private float debrisTimeCounter = 0;
   void FixedUpdate() {
+    float debrisUpdateTime = (2f/debrisUpdateFrequency.value);
 
     debrisTimeCounter += Time.fixedDeltaTime;
     if (debrisToLiquidNeedsUpdate && debrisNodeDict != null && debrisNodeDict.Count > 0 && debrisTimeCounter >= debrisUpdateTime) {
       debrisTimeCounter = 0;
       debrisToLiquidNeedsUpdate = false;
-      terrainLiquid.liquidCompute.readUpdateNodesFromLiquid(nodes);
+      liquidCompute.ReadUpdateNodesFromLiquid(nodes);
 
       // Go through all the nodes that might be inside the debris, if any have liquid in them then we check to make sure
       // it's actually inside the debris and displace it to the closest empty non-terrain node if it is
@@ -455,16 +436,16 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
         var debrisGO = debrisDictPair.Key;
         var debrisRB = debrisGO.GetComponent<Rigidbody>();
         if (liquidAmt > 0) {
-          debrisRB.drag = 15*liquidAmt*terrainLiquid.liquidCompute.liquidDensity / debrisRB.mass;
+          debrisRB.drag = 15*liquidAmt*liquidCompute.liquidDensity / debrisRB.mass;
         }
         else {
           var debrisCollider = debrisGO.GetComponent<Collider>();
-          debrisRB.drag = TerrainDebris.getDrag(debrisCollider.bounds);
+          debrisRB.drag = TerrainDebris.GetDrag(debrisCollider.bounds);
         }
       }
-      var changedLiquidNodes = displaceNodeLiquid(affectedLiquidNodes, allCurrAffectedNodes);
+      var changedLiquidNodes = DisplaceNodeLiquid(affectedLiquidNodes, allCurrAffectedNodes);
       if (changedLiquidNodes.Count > 0) {
-        terrainLiquid.liquidCompute.writeUpdateDebrisDiffToLiquid(debrisNodeDict, changedLiquidNodes);
+        liquidCompute.WriteUpdateDebrisDiffToLiquid(debrisNodeDict, changedLiquidNodes);
       }
     }
     
@@ -474,10 +455,10 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
   /// Generates and fills data in for the non-serialized node data based on the serialized data (array of isovalues) alone.
   /// This method is meant to be as robust as possible so it can properly initialize the runtime node array in almost any state.
   /// </summary>
-  private void generateNodes() {
-    var numNodesX = this.numNodesX();
-    var numNodesY = this.numNodesY();
-    var numNodesZ = this.numNodesZ();
+  private void GenerateNodes() {
+    var numNodesX = this.NumNodesX();
+    var numNodesY = this.NumNodesY();
+    var numNodesZ = this.NumNodesZ();
 
     // We use a temporary array to preserve any existing nodes that are still in the grid
     TerrainGridNode[,,] tempNodes = new TerrainGridNode[numNodesX,numNodesY,numNodesZ];
@@ -485,9 +466,9 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     var tcXIndices = new List<int>();
     var tcZIndices = new List<int>();
     var tcIndices = new List<Vector3Int>();
-    var nodesPerTCMinus1 = TerrainColumn.SIZE*TerrainGrid.nodesPerUnit - 1;
+    var nodesPerTCMinus1 = TerrainColumn.SIZE*TerrainGrid.NODES_PER_UNIT - 1;
     for (int x = 0; x < numNodesX; x++) {
-      var xPos = nodeIndexToUnits(x);
+      var xPos = NodeIndexToUnits(x);
 
       // A node might be associated with more than one TerrainColumn, figure out
       // all the indices that can be tied to the node
@@ -499,7 +480,7 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
       }
 
       for (int z = 0; z < numNodesZ; z++) {
-        var zPos = nodeIndexToUnits(z);
+        var zPos = NodeIndexToUnits(z);
 
         // We also gather potential TerrainColumn indices on the z-axis, this combined
         // with the ones on the x-axis (see above) will make up all the potential associated TC indices
@@ -520,7 +501,7 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
         }
 
         for (int y = 0; y < numNodesY; y++) {
-          var yPos = nodeIndexToUnits(y);
+          var yPos = NodeIndexToUnits(y);
           var unitPos = new Vector3(xPos, yPos, zPos);
           var gridIdx = new Vector3Int(x,y,z);
 
@@ -552,11 +533,7 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     nodes = tempNodes;
   }
 
-  private List<TerrainColumn> buildTerrainColumns() {
-    if (terrainColumns == null) { 
-      terrainColumns = new Dictionary<Vector3Int, TerrainColumn>();
-    }
-
+  private List<TerrainColumn> BuildTerrainColumns() {
     var keysToRemove = new List<Vector3Int>();
     foreach (var entry in terrainColumns) {
       var idx = entry.Key;
@@ -565,17 +542,16 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
       }
     }
     foreach (var key in keysToRemove) {
-      terrainColumns[key].clear();
-      terrainColumns.Remove(key);
+      Destroy(terrainColumns[key]);
     }
 
+    terrainColumns.Clear();
     var newTerrainCols = new List<TerrainColumn>();
     for (int x = 0; x < xSize; x++) {
       for (int z = 0; z < zSize; z++) {
         var currIdx = new Vector3Int(x,0,z);
-        if (!terrainColumns.ContainsKey(currIdx)) {
-          var terrainCol = new TerrainColumn(currIdx, this);
-          terrainCol.gameObj.transform.SetParent(transform);
+        var terrainCol = TerrainColumn.GetUniqueTerrainColumn(this, currIdx);
+        if (terrainCol) {
           terrainColumns.Add(currIdx, terrainCol);
           newTerrainCols.Add(terrainCol);
         }
@@ -585,35 +561,35 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     return newTerrainCols;
   }
 
-  private void buildBedrock() {
-    bedrock = new Bedrock(this); 
-    bedrock.gameObj.transform.SetParent(transform); 
-    bedrock.gameObj.transform.SetAsFirstSibling();
+
+  private void BuildBedrock() {
+    bedrock = GetComponentInChildren<Bedrock>();
+    bedrock.UpdateMesh(this);
   }
-  private void buildTerrainLiquid() {
-    terrainLiquid = new TerrainLiquid();
-    terrainLiquid.gameObj.transform.SetParent(transform);
-    terrainLiquid.gameObj.transform.SetAsFirstSibling();
-    terrainLiquid.initAll(nodes);
-    terrainLiquid.liquidCompute.enableSimulation = Application.IsPlaying(gameObject);
+  private void BuildTerrainLiquid() {
+    // Order matters here
+    liquidVolumeRaymarcher.InitAll();
+    liquidCompute.InitAll();
+    liquidCompute.enableSimulation = Application.IsPlaying(gameObject);
+    liquidCompute.WriteUpdateNodesAndDebrisToLiquid(nodes, debrisNodeDict);
   }
 
-  private void regenerateMeshes(/*bool updateComputeBuffer = false*/) {
+  private void RegenerateMeshes() {
     foreach (var terrainCol in terrainColumns.Values) {
-      terrainCol.regenerateMesh();
+      terrainCol.RegenerateMesh(this);
     }
-    bedrock.regenerateMesh();
+    bedrock.UpdateMesh(this);
   }
 
-  private void regenerateMeshes(in ICollection<TerrainColumn> terrainCols) {
+  private void RegenerateMeshes(in ICollection<TerrainColumn> terrainCols) {
     foreach (var terrainCol in terrainCols) {
-      terrainCol.regenerateMesh();
+      terrainCol.RegenerateMesh(this);
     }
   }
 
-  private HashSet<TerrainColumn> regenerateMeshes(in IEnumerable<TerrainGridNode> nodes) {
-    var terrainCols = findAllAffectedTCs(nodes);
-    regenerateMeshes(terrainCols);
+  private HashSet<TerrainColumn> RegenerateMeshes(in IEnumerable<TerrainGridNode> nodes) {
+    var terrainCols = FindAllAffectedTCs(nodes);
+    RegenerateMeshes(terrainCols);
     return terrainCols;
   }
 
@@ -623,14 +599,14 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
   /// </summary>
   /// <param name="changedNodes">Nodes that have changed.</param>
   /// <returns>Unique set of TerrainColumns that are affected by the changed nodes.</returns>
-  private HashSet<TerrainColumn> findAllAffectedTCs(in IEnumerable<TerrainGridNode> changedNodes) {
+  private HashSet<TerrainColumn> FindAllAffectedTCs(in IEnumerable<TerrainGridNode> changedNodes) {
     var terrainCols = new HashSet<TerrainColumn>();
     foreach (var node in changedNodes) {
       Debug.Assert(node != null);
       foreach (var tcIndex in node.columnIndices) { terrainCols.Add(terrainColumns[tcIndex]); }
       // We also need to add TerrainColumns associated with any adjacent nodes to avoid seams and other artifacts
       // caused by the node/cube dependancies that exist at the edges of each TerrainColumn mesh
-      var neighbourNodes = getNeighboursForNode(node);
+      var neighbourNodes = GetNeighboursForNode(node);
       foreach (var neighbourNode in neighbourNodes) {
         foreach (var tcIndex in neighbourNode.columnIndices) { terrainCols.Add(terrainColumns[tcIndex]); }
       }
@@ -638,7 +614,7 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     return terrainCols;
   }
 
-  private TerrainDebris buildTerrainDebris(in HashSet<TerrainGridNode> nodes) {
+  private GameObject BuildTerrainDebris(in HashSet<TerrainGridNode> nodes) {
 
     // Find the index bounding box that includes all the given nodes
     var bbMin = new Vector3Int(int.MaxValue, int.MaxValue, int.MaxValue);
@@ -651,7 +627,7 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     boxBounds.SetMinMax(bbMin, bbMax);
 
     // Calculate the worldspace position of the debris based on the min/max indices of the nodes
-    var nodeUnits = unitsPerNode();
+    var nodeUnits = UnitsPerNode();
     var debrisCenterPos = nodeUnits * boxBounds.center;
 
     // Make the box wider on each side this allows us to fill the outer nodes
@@ -684,16 +660,18 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     }
 
     // TODO: Feed in the material for the debris here as well
-    var result = new TerrainDebris(debrisCenterPos);
-    result.gameObj.transform.SetParent(transform);
-    result.build(nodeCorners);
-    return result;
+    var debrisObj = Instantiate<GameObject>(debrisPrefab);
+    debrisObj.transform.position = debrisCenterPos;
+    debrisObj.transform.SetParent(transform);
+    debrisObj.GetComponent<TerrainDebris>().RegenerateMesh(nodeCorners);
+
+    return debrisObj;
   }
 
-  public HashSet<TerrainGridNode> findPeripheryNodes(in HashSet<TerrainGridNode> internalNodes) {
+  public HashSet<TerrainGridNode> FindPeripheryNodes(in HashSet<TerrainGridNode> internalNodes) {
     var peripheryNodes = new HashSet<TerrainGridNode>();
     foreach (var node in internalNodes) {
-      var neighbours = getNeighboursForNode(node);
+      var neighbours = GetNeighboursForNode(node);
       foreach (var neighbour in neighbours) {
         if (!internalNodes.Contains(neighbour)) { peripheryNodes.Add(neighbour); }
       }
@@ -701,8 +679,8 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     return peripheryNodes;
   }
 
-  private List<TerrainGridNode> displaceNodeLiquid(IEnumerable<TerrainGridNode> affectedLiquidNodes, HashSet<TerrainGridNode> displacedNodes) {
-    var peripheryNodes = findPeripheryNodes(displacedNodes);
+  private List<TerrainGridNode> DisplaceNodeLiquid(IEnumerable<TerrainGridNode> affectedLiquidNodes, HashSet<TerrainGridNode> displacedNodes) {
+    var peripheryNodes = FindPeripheryNodes(displacedNodes);
     var fillableNodes = new List<TerrainGridNode>();
     foreach (var peripheryNode in peripheryNodes) {
       if (!peripheryNode.isTerrain()) { fillableNodes.Add(peripheryNode); }
@@ -723,17 +701,17 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
   // This function updates a dictionary of debris nodes then in the FixedUpdate method 
   // we go through that dictionary and perform the proper read/write updates from/to the liquid simulation
   // and the liquid quantities in nodes - The debris needs to be treated as solid nodes while it moves without being a part of the nodes array
-  public void updateMovingDebris(GameObject debrisGO) {
+  public void UpdateMovingDebris(GameObject debrisGO) {
     var debrisCollider = debrisGO.GetComponent<Collider>();
     var debrisRenderer = debrisGO.GetComponent<Renderer>();
     var debrisWSBounds = debrisRenderer.bounds;
 
     // Find the bounds in node index space    
-    var nodeIdxRange = getIndexRangeForMinMax(debrisWSBounds.min - transform.position, debrisWSBounds.max - transform.position);
+    var nodeIdxRange = GetIndexRangeForMinMax(debrisWSBounds.min - transform.position, debrisWSBounds.max - transform.position);
 
     // Keep the nodes associated with the debris up-to-date in the debrisNodeDict
     var affectedNodes = new HashSet<TerrainGridNode>();
-    var closenessEpsilon = 0.5f*halfUnitsPerNode();
+    var closenessEpsilon = 0.5f*HalfUnitsPerNode();
     for (int x = nodeIdxRange.xStartIdx; x <= nodeIdxRange.xEndIdx; x++) {
       for (int y = nodeIdxRange.yStartIdx; y <= nodeIdxRange.yEndIdx; y++) {
         for (int z = nodeIdxRange.zStartIdx; z <= nodeIdxRange.zEndIdx; z++) {
@@ -759,23 +737,23 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     }
   }
 
-  public void mergeDebrisIntoTerrain(GameObject debrisGO) {
+  public void MergeDebrisIntoTerrain(GameObject debrisGO) {
     // We MUST read the current state of the fluid simulation first so that we know what nodes have liquid in them
     // so that it can be properly found and displaced by the merging debris
-    terrainLiquid.liquidCompute.readUpdateNodesFromLiquid(nodes);
+    liquidCompute.ReadUpdateNodesFromLiquid(nodes);
 
     // Get the bounding box of the debris in worldspace - we use this as a rough estimate
     // of which nodes we need to iterate through to convert the mesh back into nodes
     var debrisRenderer = debrisGO.GetComponent<Renderer>();
-    var debrisNodeMapper = debrisGO.GetComponent<DebrisNodeMapper>();
+    var debrisComponent = debrisGO.GetComponent<TerrainDebris>();
     var debrisWSBounds = debrisRenderer.bounds;
 
     // Find the bounds in node index space
-    var nodeIdxRange = getIndexRangeForMinMax(debrisWSBounds.min - transform.position, debrisWSBounds.max - transform.position);
+    var nodeIdxRange = GetIndexRangeForMinMax(debrisWSBounds.min - transform.position, debrisWSBounds.max - transform.position);
 
     // Go through each potential node and cast a ray from the center of that node (in any direction)
     // If the ray intersects with the inside of the debris' mesh then add back the isovalue for that node
-    var closenessEpsilon = 0.5f*halfUnitsPerNode();
+    var closenessEpsilon = 0.5f*HalfUnitsPerNode();
     var debrisCollider = debrisGO.GetComponent<Collider>();
     var affectedNodes = new HashSet<TerrainGridNode>();
     var affectedLiquidNodes = new List<TerrainGridNode>();
@@ -787,7 +765,7 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
           if (debrisCollider.IsPointInside(nodeWSPos, closenessEpsilon)) {
             // Map the world space position into the local space node index of the debris (via DebrisNodeMapper)
             // use this to determine what the original material was
-            var origCorner = debrisNodeMapper.mapFromWorldspace(nodeWSPos);
+            var origCorner = debrisComponent.MapFromWorldspace(nodeWSPos);
             node.isoVal = 1;
             node.materials = origCorner.materials;
             affectedNodes.Add(node);
@@ -800,34 +778,34 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     // If there were liquid values in the nodes where we added the debris back to the terrain then
     // we need to displace that water to the nearest non-terrain node
     if (affectedLiquidNodes.Count > 0) {
-      displaceNodeLiquid(affectedLiquidNodes, affectedNodes);
+      DisplaceNodeLiquid(affectedLiquidNodes, affectedNodes);
     }
 
     // Regenerate the new meshes which will incorporate the debris into the terrain
-    regenerateMeshes(affectedNodes);
+    RegenerateMeshes(affectedNodes);
     
     // Remove the debris now that it has been merged into the terrain nodes
     debrisNodeDict.Remove(debrisGO);
     Destroy(debrisGO);
 
     // Update the liquid simulation with the newly merged terrain nodes and any remaining debris
-    terrainLiquid.liquidCompute.writeUpdateNodesAndDebrisToLiquid(nodes, debrisNodeDict);
+    liquidCompute.WriteUpdateNodesAndDebrisToLiquid(nodes, debrisNodeDict);
   }
 
-  public HashSet<TerrainColumn> terrainPhysicsCleanup() {
-    return terrainPhysicsCleanup(new List<TerrainColumn>());
+  public HashSet<TerrainColumn> TerrainPhysicsCleanup() {
+    return TerrainPhysicsCleanup(new List<TerrainColumn>());
   }
-  public HashSet<TerrainColumn> terrainPhysicsCleanup(in IEnumerable<TerrainColumn> affectedTCs) {
+  public HashSet<TerrainColumn> TerrainPhysicsCleanup(in IEnumerable<TerrainColumn> affectedTCs) {
     Debug.Assert(Application.IsPlaying(gameObject), "This function should only be called while the application is playing.");
 
-    TerrainNodeTraverser.updateGroundedNodes(this, affectedTCs);
-    var islands = TerrainNodeTraverser.traverseNodeIslands(this);
+    TerrainNodeTraverser.UpdateGroundedNodes(this, affectedTCs);
+    var islands = TerrainNodeTraverser.TraverseNodeIslands(this);
     var resultTCs = new HashSet<TerrainColumn>(affectedTCs);
     foreach (var islandNodeSet in islands) {
       // Build debris for each island
-      var debris = buildTerrainDebris(islandNodeSet);
+      var debrisGO = BuildTerrainDebris(islandNodeSet);
       // Add the nodes occupied by the debris to the debris dictionary
-      debrisNodeDict.Add(debris.gameObj, new TerrainDebrisDiff(new HashSet<TerrainGridNode>(), islandNodeSet));
+      debrisNodeDict.Add(debrisGO, new TerrainDebrisDiff(new HashSet<TerrainGridNode>(), islandNodeSet));
       // And clear the isovalues for all the nodes that make up the debris (which is now a separate mesh)
       foreach (var node in islandNodeSet) {
         foreach (var tcIndex in node.columnIndices) { resultTCs.Add(terrainColumns[tcIndex]); }
@@ -835,11 +813,11 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
       }
     }
 
-    regenerateMeshes(resultTCs);
+    RegenerateMeshes(resultTCs);
 
     // Read/write from/to the liquid simulation
-    terrainLiquid.liquidCompute.readUpdateNodesFromLiquid(nodes);
-    terrainLiquid.liquidCompute.writeUpdateNodesAndDebrisToLiquid(nodes, debrisNodeDict);
+    liquidCompute.ReadUpdateNodesFromLiquid(nodes);
+    liquidCompute.WriteUpdateNodesAndDebrisToLiquid(nodes, debrisNodeDict);
 
     return resultTCs;
   }
@@ -852,14 +830,14 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     else 
     #endif
     {
-      var affectedTCs = findAllAffectedTCs(changedNodes);
-      terrainPhysicsCleanup(affectedTCs);
+      var affectedTCs = FindAllAffectedTCs(changedNodes);
+      TerrainPhysicsCleanup(affectedTCs);
     }
   }
 
   public void addLiquidToNodes(float liquidVolPercentage, in List<TerrainGridNode> nodes) {
     var changedNodes = new HashSet<TerrainGridNode>();
-    var maxNodeVol = unitVolumePerNode();
+    var maxNodeVol = UnitVolumePerNode();
     var liquidVol  = maxNodeVol*liquidVolPercentage;
     foreach (var node in nodes) {
       var prevVol = node.liquidVol;
@@ -940,10 +918,10 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
   }
   void delayedOnValidate() {
     if (levelData != null) {
-      loadLevelDataNodes();
-      buildTerrainLiquid();
-      buildBedrock();
-      regenerateMeshes(buildTerrainColumns());
+      LoadLevelDataNodes();
+      BuildTerrainLiquid();
+      BuildBedrock();
+      RegenerateMeshes(BuildTerrainColumns());
     }
   }
 
@@ -957,35 +935,32 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
 
   public float fastSampleHeight(int terrainColX, int terrainColZ) {
     if (nodes == null) { return 0f; }
-    int nodeIdxX = terrainColX*TerrainColumn.SIZE*(nodesPerUnit-1) + (nodesPerUnit/2)*TerrainColumn.SIZE;
-    int nodeIdxZ = terrainColZ*TerrainColumn.SIZE*(nodesPerUnit-1) + (nodesPerUnit/2)*TerrainColumn.SIZE;
+    int nodeIdxX = terrainColX*TerrainColumn.SIZE*(NODES_PER_UNIT-1) + (NODES_PER_UNIT/2)*TerrainColumn.SIZE;
+    int nodeIdxZ = terrainColZ*TerrainColumn.SIZE*(NODES_PER_UNIT-1) + (NODES_PER_UNIT/2)*TerrainColumn.SIZE;
     //Debug.Log("X: " + nodeIdxX + ", Z: " + nodeIdxZ + " Grid size: " + nodes.GetLength(0) + ", " + nodes.GetLength(1) + ", " + nodes.GetLength(2));
-    int numYNodes = numNodesY();
+    int numYNodes = NumNodesY();
     int finalYNodeIdx = 0;
     for (int y = 0; y < numYNodes-1; y++) {
       if (!nodes[nodeIdxX, y+1, nodeIdxZ].isTerrain()) { break; }
       finalYNodeIdx++;
     }
-    return finalYNodeIdx*unitsPerNode();
+    return finalYNodeIdx*UnitsPerNode();
   }
 
   public void updateNodesInEditor(in IEnumerable<TerrainGridNode> updateNodes) {
     if (Application.IsPlaying(gameObject)) { return; }
-    var affectedTCs = regenerateMeshes(updateNodes);
-    
+    var affectedTCs = RegenerateMeshes(updateNodes);
     // Update the liquid so we can see it in the editor
-    terrainLiquid.liquidCompute.writeUpdateNodesToLiquid(nodes);
-
+    liquidCompute.WriteUpdateNodesToLiquid(nodes);
+    // Update the LevelData - since we're in editor mode, this will directly change the asset permenantly
     levelData.updateFromNodes(nodes, updateNodes);
-    EditorUtility.SetDirty(levelData);
-    EditorSceneManager.MarkSceneDirty(gameObject.scene);
   }
 
   public void fillCoreMaterial() {
     // This is similar to a rasterization algorithm - we trace along each line of nodes, when we encounter a node
     // that is inside the terrain we begin filling nodes with the core material until we find a node that is no
     // longer inside the terrain.
-    int numXNodes = numNodesX(); int numYNodes = numNodesY(); int numZNodes = numNodesZ();
+    int numXNodes = NumNodesX(); int numYNodes = NumNodesY(); int numZNodes = NumNodesZ();
     bool inTerrainOnZ = false;
     for (int x = 0; x < numXNodes; x++) {
       for (int y = 0; y < numYNodes; y++) {
@@ -1030,13 +1005,13 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     float currHeight = fastSampleHeight(xIdx, zIdx);
     float heightChange = (newYPos - currHeight);
     //Debug.Log("Prev scale: " + currScale + ", New scale: " + newScale);
-    if (Mathf.Abs(heightChange) >= halfUnitsPerNode()) {
+    if (Mathf.Abs(heightChange) >= HalfUnitsPerNode()) {
       // Adjust the height of the terrain column based on the given change
       float newHeight = Mathf.Clamp(currHeight + heightChange, 0, Mathf.Min(maxHeight, TerrainColumn.SIZE*ySize));
       //Debug.Log("Prev Height: " + currHeight + ", New Height: " + newHeight);
 
-      var yStartNodeIdx = unitsToNodeIndex(currHeight);
-      var yEndNodeIdx = unitsToNodeIndex(newHeight);
+      var yStartNodeIdx = UnitsToNodeIndex(currHeight);
+      var yEndNodeIdx = UnitsToNodeIndex(newHeight);
       float isoVal = 1f;
       if (heightChange < 0) {
         // Removing nodes... swap values
@@ -1047,16 +1022,16 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
       }
 
       var editNodes = new List<TerrainGridNode>();
-      var idxRange = getIndexRangeForTerrainColumn(terrainCol);
-      idxRange.xStartIdx = (int)Mathf.Clamp(idxRange.xStartIdx + insetXAmount,  0, numNodesX()-1); 
-      idxRange.xEndIdx   = (int)Mathf.Clamp(idxRange.xEndIdx - insetNegXAmount, 0, numNodesX()-1);
-      idxRange.zStartIdx = (int)Mathf.Clamp(idxRange.zStartIdx + insetZAmount,  0, numNodesZ()-1); 
-      idxRange.zEndIdx   = (int)Mathf.Clamp(idxRange.zEndIdx - insetNegZAmount, 0, numNodesZ()-1);
+      var idxRange = GetIndexRangeForTerrainColumn(terrainCol);
+      idxRange.xStartIdx = (int)Mathf.Clamp(idxRange.xStartIdx + insetXAmount,  0, NumNodesX()-1); 
+      idxRange.xEndIdx   = (int)Mathf.Clamp(idxRange.xEndIdx - insetNegXAmount, 0, NumNodesX()-1);
+      idxRange.zStartIdx = (int)Mathf.Clamp(idxRange.zStartIdx + insetZAmount,  0, NumNodesZ()-1); 
+      idxRange.zEndIdx   = (int)Mathf.Clamp(idxRange.zEndIdx - insetNegZAmount, 0, NumNodesZ()-1);
 
       for (int x = idxRange.xStartIdx; x <= idxRange.xEndIdx; x++) {
         for (int y = yStartNodeIdx; y <= yEndNodeIdx; y++) {
           for (int z = idxRange.zStartIdx; z <= idxRange.zEndIdx; z++) {
-            editNodes.Add(getNode(new Vector3Int(x,y,z)));
+            editNodes.Add(GetNode(new Vector3Int(x,y,z)));
           }
         }
       }
@@ -1071,7 +1046,8 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     editPt = new Vector3(0,0,0);
 
     if (nodes == null) { return false; }
-    var gridBounds = wsBounds();
+    var gridBounds = new Bounds();
+    gridBounds.SetMinMax(transform.position, transform.position + new Vector3(xSize, ySize, zSize));
     float startDist = 0.0f;
 
     // NOTE: The IntersectRay method returns a positive number if we're outside the box and
@@ -1104,18 +1080,18 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     var lsEndPt = wsEndPt - transform.position;
 
     var currVoxelIdx = new Vector3Int(
-      (int)Mathf.Clamp(unitsToNodeIndex(lsStartPt.x), 0, nodes.GetLength(0)-1),
-      (int)Mathf.Clamp(unitsToNodeIndex(lsStartPt.y), 0, nodes.GetLength(1)-1),
-      (int)Mathf.Clamp(unitsToNodeIndex(lsStartPt.z), 0, nodes.GetLength(2)-1)
+      (int)Mathf.Clamp(UnitsToNodeIndex(lsStartPt.x), 0, nodes.GetLength(0)-1),
+      (int)Mathf.Clamp(UnitsToNodeIndex(lsStartPt.y), 0, nodes.GetLength(1)-1),
+      (int)Mathf.Clamp(UnitsToNodeIndex(lsStartPt.z), 0, nodes.GetLength(2)-1)
     );
     var lastVoxelIdx = new Vector3Int(
-      (int)Mathf.Clamp(unitsToNodeIndex(lsEndPt.x), 0, nodes.GetLength(0)-1),
-      (int)Mathf.Clamp(unitsToNodeIndex(lsEndPt.y), 0, nodes.GetLength(1)-1),
-      (int)Mathf.Clamp(unitsToNodeIndex(lsEndPt.z), 0, nodes.GetLength(2)-1)
+      (int)Mathf.Clamp(UnitsToNodeIndex(lsEndPt.x), 0, nodes.GetLength(0)-1),
+      (int)Mathf.Clamp(UnitsToNodeIndex(lsEndPt.y), 0, nodes.GetLength(1)-1),
+      (int)Mathf.Clamp(UnitsToNodeIndex(lsEndPt.z), 0, nodes.GetLength(2)-1)
     );
 
     // Distance along the ray to the next voxel border from the current position (tMax).
-    var nodeSize = unitsPerNode();
+    var nodeSize = UnitsPerNode();
     var stepVec = new Vector3Int(ray.direction.x >= 0 ? 1 : -1,ray.direction.y >= 0 ? 1 : -1,ray.direction.z >= 0 ? 1 : -1);
     var nextVoxelBoundary = new Vector3(
       (currVoxelIdx.x+stepVec.x) * nodeSize,

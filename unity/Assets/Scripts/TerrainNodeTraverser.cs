@@ -5,16 +5,14 @@ using UnityEngine;
 
 public partial class TerrainGrid : MonoBehaviour {
 
-
-
   // Class containing various static helper methods for traversing TerrainGridNodes
   public static class TerrainNodeTraverser {
 
     public static void updateGroundedNodes(in TerrainGrid terrainGrid) {
-      TerrainNodeTraverser.updateGroundedNodes(terrainGrid, new List<TerrainColumn>());
+      TerrainNodeTraverser.UpdateGroundedNodes(terrainGrid, new List<TerrainColumn>());
     }
 
-    public static void updateGroundedNodes(in TerrainGrid terrainGrid, in IEnumerable<TerrainColumn> affectedTCs) {
+    public static void UpdateGroundedNodes(in TerrainGrid terrainGrid, in IEnumerable<TerrainColumn> affectedTCs) {
       var queue = new Queue<TerrainGridNode>();
       if (affectedTCs.Count() > 0) {
         // When TerrainColumns are provided we only focus on traversing the nodes 
@@ -31,7 +29,7 @@ public partial class TerrainGrid : MonoBehaviour {
           var node = queue.Dequeue();
           if (node.isDefinitelyGrounded()) { allAffectedGroundedNodes.Add(node); }
           
-          var neighbours = terrainGrid.getNeighboursForNode(node)
+          var neighbours = terrainGrid.GetNeighboursForNode(node)
             .FindAll(n => n.isTerrain() && !allAffectedNodes.Contains(n));
           foreach (var neighbour in neighbours) {
             allAffectedNodes.Add(neighbour);
@@ -84,7 +82,7 @@ public partial class TerrainGrid : MonoBehaviour {
         //Debug.Log("Grounded node found.");
         node.isTraversalGrounded = true;
         traversedSet.Add(node);
-        var terrainNeighbours = terrainGrid.getNeighboursForNode(node).Where(n => n.isTerrain());
+        var terrainNeighbours = terrainGrid.GetNeighboursForNode(node).Where(n => n.isTerrain());
         foreach (var neighbour in terrainNeighbours) { queue.Enqueue(neighbour); }
       }
     }
@@ -93,7 +91,7 @@ public partial class TerrainGrid : MonoBehaviour {
       in TerrainGrid terrainGrid, in TerrainGridNode node, 
       ref HashSet<TerrainGridNode> islandNodes, ref HashSet<TerrainGridNode> traversedSet
     ) {
-      var terrainNeighbours = terrainGrid.getNeighboursForNode(node).Where(n => n.isTerrain());
+      var terrainNeighbours = terrainGrid.GetNeighboursForNode(node).Where(n => n.isTerrain());
       traversedSet.Add(node);
       islandNodes.Add(node);
       foreach (var neighbour in terrainNeighbours) {
@@ -105,7 +103,7 @@ public partial class TerrainGrid : MonoBehaviour {
 
     // This method MUST be called AFTER updateGroundedNodes in order to work correctly
     // It is assumed that we now know which nodes are grounded and which are not.
-    public static List<HashSet<TerrainGridNode>> traverseNodeIslands(in TerrainGrid terrainGrid) {
+    public static List<HashSet<TerrainGridNode>> TraverseNodeIslands(in TerrainGrid terrainGrid) {
       var islands = new List<HashSet<TerrainGridNode>>();
       var traversedSet = new HashSet<TerrainGridNode>();
 
@@ -135,7 +133,7 @@ public partial class TerrainGrid : MonoBehaviour {
     }
 
     private static void enqueueNodesInTerrainColumn(in TerrainGrid terrainGrid, in TerrainColumn terrainCol, ref Queue<TerrainGridNode> tcNodes) {
-      var tcIndices = terrainGrid.getIndexRangeForTerrainColumn(terrainCol);
+      var tcIndices = terrainGrid.GetIndexRangeForTerrainColumn(terrainCol);
       for (var x = tcIndices.xStartIdx; x <= tcIndices.xEndIdx; x++) {
         for (var y = tcIndices.yStartIdx; y <= tcIndices.yEndIdx; y++) {
           for (var z = tcIndices.zStartIdx; z < tcIndices.zEndIdx; z++) {

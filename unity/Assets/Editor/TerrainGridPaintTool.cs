@@ -153,7 +153,7 @@ public class TerrainGridTool : EditorTool {
           List<TerrainGridNode> nodes = settingsWindow.getAffectedNodesAtPoint(lastEditPt, terrainGrid);
           if (nodes != null) {
             redraw = nodes.Count > 0;
-            var halfUnitsPerNode = TerrainGrid.halfUnitsPerNode();
+            var halfUnitsPerNode = TerrainGrid.HalfUnitsPerNode();
             foreach (var node in nodes) {
               var currColour = node.editorUnselectedColour();
               currColour.a = 0.5f;
@@ -187,14 +187,14 @@ public class TerrainGridTool : EditorTool {
     var translation = terrainGrid.transform.position;
     var rot = new Quaternion(0,0,0,1);
     var maxInset = TerrainGridToolWindow.maxInset();
-    var halfUnitsPerNode = TerrainGrid.halfUnitsPerNode();
+    var halfUnitsPerNode = TerrainGrid.HalfUnitsPerNode();
     var insetFaceColour = new Color(1.0f, 1.0f, 0.0f, 0.5f);
     var insetOutlineColour = new Color(1f,1f,1f,0.5f);
-    var insetXUnits = settingsWindow.columnInsetXAmount*TerrainGrid.unitsPerNode();
-    var insetNegXUnits = settingsWindow.columnInsetNegXAmount*TerrainGrid.unitsPerNode();
-    var insetZUnits = settingsWindow.columnInsetZAmount*TerrainGrid.unitsPerNode();
-    var insetNegZUnits = settingsWindow.columnInsetNegZAmount*TerrainGrid.unitsPerNode();
-    var insetHandleSnap = TerrainGrid.unitsPerNode()*1.5f;
+    var insetXUnits = settingsWindow.columnInsetXAmount*TerrainGrid.UnitsPerNode();
+    var insetNegXUnits = settingsWindow.columnInsetNegXAmount*TerrainGrid.UnitsPerNode();
+    var insetZUnits = settingsWindow.columnInsetZAmount*TerrainGrid.UnitsPerNode();
+    var insetNegZUnits = settingsWindow.columnInsetNegZAmount*TerrainGrid.UnitsPerNode();
+    var insetHandleSnap = TerrainGrid.UnitsPerNode()*1.5f;
 
     for (int x = 0; x < terrainGrid.xSize; x++) {
       float insetXPos = x*TerrainColumn.SIZE;
@@ -203,7 +203,7 @@ public class TerrainGridTool : EditorTool {
 
         var zPos = z*TerrainColumn.SIZE + 0.5f*TerrainColumn.SIZE;
         var yPos = terrainGrid.fastSampleHeight(x,z) + halfUnitsPerNode;
-        var baseHandlePos = new Vector3(xPos, yPos+TerrainGrid.unitsPerNode(), zPos) + translation;
+        var baseHandlePos = new Vector3(xPos, yPos+TerrainGrid.UnitsPerNode(), zPos) + translation;
         var name = "TCHeightHandle(" + xPos + "," + zPos + ")";
         var controlId = EditorGUIUtility.GetControlID(name.GetHashCode(), FocusType.Keyboard);
 
@@ -257,7 +257,7 @@ public class TerrainGridTool : EditorTool {
         EditorGUI.BeginChangeCheck();
         Handles.color = Color.green;
         //Handles.zTest = UnityEngine.Rendering.CompareFunction.LessEqual;
-        var newPos = Handles.Slider(baseHandlePos, Vector3.up, 0.1f, Handles.CubeHandleCap, TerrainGrid.unitsPerNode());
+        var newPos = Handles.Slider(baseHandlePos, Vector3.up, 0.1f, Handles.CubeHandleCap, TerrainGrid.UnitsPerNode());
         if (EditorGUI.EndChangeCheck()) {
           Event.current.Use();
           Undo.RecordObject(terrainGrid.levelData, "Edited Terrain Column Height");
@@ -275,7 +275,7 @@ public class TerrainGridTool : EditorTool {
 
     var translation = terrainGrid.transform.position;
     var rot = new Quaternion(0,0,0,1);
-    var halfUnitsPerNode = TerrainGrid.halfUnitsPerNode();
+    var halfUnitsPerNode = TerrainGrid.HalfUnitsPerNode();
 
     for (int x = 0; x < terrainGrid.xSize; x++) {
       var xPos = x*TerrainColumn.SIZE + 0.5f*TerrainColumn.SIZE;
@@ -287,7 +287,7 @@ public class TerrainGridTool : EditorTool {
         var yPos = terrainGrid.fastSampleHeight(x,z) + halfUnitsPerNode;
         var pos = new Vector3(xPos, yPos, zPos) + translation;
 
-        var size = TerrainGrid.unitsPerNode();
+        var size = TerrainGrid.UnitsPerNode();
         if (Handles.Button(pos, rot, size, size, Handles.SphereHandleCap)) { 
           if (Event.current.modifiers != EventModifiers.Shift) {
             nodeEditSelectedColumns.Clear();
@@ -301,7 +301,7 @@ public class TerrainGridTool : EditorTool {
   private void drawTerrainColumnNodeEditHandles(in TerrainGrid terrainGrid) {
     
     Handles.zTest = UnityEngine.Rendering.CompareFunction.Always;
-    var nodeDrawSize = TerrainGrid.halfUnitsPerNode();
+    var nodeDrawSize = TerrainGrid.HalfUnitsPerNode();
     var translation = terrainGrid.transform.position;
     var rot = new Quaternion(0,0,0,1);
 
@@ -316,7 +316,7 @@ public class TerrainGridTool : EditorTool {
     var tempList = new List<TerrainGridNode>();
     foreach (var terrainColIdx in nodeEditSelectedColumns) {
       var nodes = terrainGrid.getNodesInTerrainColumn(new Vector3Int(terrainColIdx.x, 0, terrainColIdx.y), 
-        TerrainGrid.unitsToNodeIndex(settingsWindow.setLevelValue), nodeSelector);
+        TerrainGrid.UnitsToNodeIndex(settingsWindow.setLevelValue), nodeSelector);
       
       foreach (var node in nodes) {
         float toggleIsoVal = 1f;
@@ -344,7 +344,7 @@ public class TerrainGridTool : EditorTool {
     
     var faceColour = new Color(0.5f, 0.5f, 1.0f, 0.5f);
     var outlineColour = new Color(1, 1, 1, 0.75f);
-    var halfUnitsPerNode = TerrainGrid.halfUnitsPerNode();
+    var halfUnitsPerNode = TerrainGrid.HalfUnitsPerNode();
 
     var translation = terrainGrid.transform.position;
     for (int x = 0; x < terrainGrid.xSize; x++) {

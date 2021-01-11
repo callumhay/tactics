@@ -32,7 +32,7 @@ public class MarchingCubes {
   };
 
   public static void polygonizeMeshOnly(in CubeCorner[] corners, List<int> triangles, List<Vector3> vertices, bool removeNegYTris = true) {
-    polygonize(corners, null, triangles, vertices, removeNegYTris);
+    Polygonize(corners, null, triangles, vertices, removeNegYTris);
   }
 
   /// <summary>
@@ -44,7 +44,7 @@ public class MarchingCubes {
   /// <param name="triangles">The triangles appended to, representing triangles (indices in the vertices list).</param>
   /// <param name="vertices">The vertices appended to, represents the generated vertexes of the mesh.</param>
   /// <param name="removeNegYTris">If true any triangles with y-coordinate vertices < 0 will be removed. </param>
-  public static void polygonize(
+  public static void Polygonize(
     in CubeCorner[] corners, List<Tuple<Material[],float[]>> materials, 
     List<int> triangles, List<Vector3> vertices, bool removeNegYTris = true
   ) {

@@ -31,7 +31,7 @@ public class RainWeatherData : WeatherData {
     particleSystems = rainGO.GetComponentsInChildren<ParticleSystem>();
 
     // Make sure the rain is properly positioned over the terrain
-    var unitSize = (Vector3)terrain.unitSizeVec3();
+    var unitSize = (Vector3)terrain.UnitSizeVec3();
 
     var psShapeXZScale = unitSize;
     psShapeXZScale.x += 4*TerrainColumn.SIZE;

@@ -1,27 +1,16 @@
 ﻿using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering.HighDefinition;
+#pragma warning disable 649
 
 [ExecuteAlways]
 public class ReflectionProbePlacer : MonoBehaviour {
-  public static readonly string GAME_OBJ_NAME = "Reflection Probes";
   private static readonly float PROBE_HEIGHT_SPACING = 2*TerrainColumn.SIZE;
 
   [Range(1,10)] public int placementFrequency = 10; // Approx. number of columns squared per probe
+  [SerializeField] private TerrainGrid terrainGrid;
 
-  public static (GameObject, ReflectionProbePlacer) buildOrFindReflProbes() {
-    var reflProbeGO = GameObject.Find(GAME_OBJ_NAME);
-    if (!reflProbeGO) {
-      reflProbeGO = new GameObject(GAME_OBJ_NAME);
-    }
-    var reflProbePlacer = reflProbeGO.GetComponent<ReflectionProbePlacer>();
-    if (!reflProbePlacer) {
-      reflProbePlacer = reflProbeGO.AddComponent<ReflectionProbePlacer>();
-    }
-    return (reflProbeGO, reflProbePlacer);
-  }
-
-  private void regenerateProbes() {
+  public void RegenerateProbes() {
     // Track all of the existing child probes so that we know which ones are no longer in
     // use so that we can remove them
     var childrenToRemoveDict = new Dictionary<string, GameObject>();
@@ -29,17 +18,15 @@ public class ReflectionProbePlacer : MonoBehaviour {
       childrenToRemoveDict.Add(child.name, child.gameObject);
     }
 
-    var terrainGrid = TerrainGrid.FindTerrainGrid();
     float terrainSizeX = terrainGrid.xSize;
     float terrainSizeZ = terrainGrid.zSize;
 
     // Figure out how many probes to place
     int numProbesX = Mathf.CeilToInt(terrainSizeX / (float)placementFrequency);
     int numProbesZ = Mathf.CeilToInt(terrainSizeZ / (float)placementFrequency);
-    //int numProbes = numProbesX*numProbesZ;
 
-    float probeUnitsX = terrainGrid.xUnitSize() / (float)numProbesX;
-    float probeUnitsZ = terrainGrid.zUnitSize() / (float)numProbesZ;
+    float probeUnitsX = terrainGrid.XUnitSize() / (float)numProbesX;
+    float probeUnitsZ = terrainGrid.ZUnitSize() / (float)numProbesZ;
 
     float halfProbeUnitsX = probeUnitsX / 2f;
     float halfProbeUnitsZ = probeUnitsZ / 2f;
@@ -63,7 +50,7 @@ public class ReflectionProbePlacer : MonoBehaviour {
         for (int tcX = minXColIdx; tcX <= maxXColIdx; tcX++) {
           for (int tcZ = minZColIdx; tcZ <= maxZColIdx; tcZ++) {
             tempVec2Int.Set(tcX,tcZ);
-            var col = terrainGrid.terrainColumn(tempVec2Int);
+            var col = terrainGrid.GetTerrainColumn(tempVec2Int);
             if (col != null) { terrainCols.Add(col); }
           }
         }
@@ -72,7 +59,7 @@ public class ReflectionProbePlacer : MonoBehaviour {
         //float minColY = terrainGrid.yUnitSize() + PROBE_HEIGHT_SPACING;
         float maxColY = 0;
         foreach (var col in terrainCols) {
-          var bounds = col.bounds();
+          var bounds = col.Bounds();
           //minColY = Mathf.Min(minColY, bounds.max.y);
           maxColY = Mathf.Max(maxColY, bounds.max.y);
         }
@@ -127,11 +114,11 @@ public class ReflectionProbePlacer : MonoBehaviour {
   }
 
   private void Start() {
-    regenerateProbes();
+    RegenerateProbes();
   }
 
   private void OnValidate() {
-    Invoke("regenerateProbes", 0);
+    Invoke("RegenerateProbes", 0);
   }
 
 

@@ -1,6 +1,4 @@
-﻿using System.Collections;
-using System.Collections.Generic;
-using UnityEngine;
+﻿using UnityEngine;
 
 public class SquareSelectionCaret : MonoBehaviour {
   public static readonly float CARET_HEIGHT = 0.25f;
@@ -14,22 +12,21 @@ public class SquareSelectionCaret : MonoBehaviour {
   public float moveSpeed = 0.25f;
 
   public TerrainGrid terrainGrid;
-  private TerrainColumn.Landing currLanding;
 
+  private TerrainColumnLanding currLanding;
   private MeshFilter meshFilter;
   private MeshRenderer meshRenderer;
-
   private bool moveAxisInUse = false;
   private float moveTimeCount = 0f;
 
-  public void handleInput() {
+  public void HandleInput() {
     var horizInput = Input.GetAxisRaw("Horizontal");
     var vertInput  = Input.GetAxisRaw("Vertical");
     if (horizInput != 0 || vertInput != 0) {
       if (!moveAxisInUse) {
         moveAxisInUse = true;
         moveTimeCount = 0;
-        moveCaret(horizInput, vertInput);
+        MoveCaret(horizInput, vertInput);
       }
     }
     else {
@@ -37,10 +34,8 @@ public class SquareSelectionCaret : MonoBehaviour {
     }
   }
 
-  private void moveCaret(float xAxisDir, float yAxisDir) {
+  private void MoveCaret(float xAxisDir, float yAxisDir) {
     if (currLanding == null) { return; }
-    var terrainCol = currLanding.terrainColumn;
-    var terrainGrid = terrainCol.terrain;
 
     // Determine the direction the active camera is pointing in to figure out how to move the caret
     // based on the current controls - i.e., move the controls into worldspace
@@ -54,7 +49,7 @@ public class SquareSelectionCaret : MonoBehaviour {
 
     // Project the controls onto the x and z axis, based on which has a larger magnitude of
     // projected contribution, favour the horizontal projection when there are ties
-    var nextIndex = terrainCol.index;
+    var nextIndex = currLanding.terrainColIdx;
     var absAdjHorizX = Mathf.Abs(adjustedHoriz.x);
     var absAdjVertX  = Mathf.Abs(adjustedVert.x);
     var absAdjHorizZ = Mathf.Abs(adjustedHoriz.z);
@@ -79,24 +74,24 @@ public class SquareSelectionCaret : MonoBehaviour {
 
     nextIndex.x = (int)Mathf.Clamp(nextIndex.x + dirSign(xVal), 0, terrainGrid.xSize-1);
     nextIndex.z = (int)Mathf.Clamp(nextIndex.z + dirSign(zVal), 0, terrainGrid.zSize-1);
-    placeCaret(terrainGrid.terrainColumn(nextIndex));
+    PlaceCaret(terrainGrid.GetTerrainColumn(nextIndex));
     //Debug.Log("HORIZONTAL: " + adjustedHoriz + " xAxisDir: " + xAxisDir);
     //Debug.Log("VERTICAL: " + adjustedVert + " yAxisDir: " + yAxisDir);
   }
 
-  public void placeCaret(in TerrainColumn terrainCol) {
+  public void PlaceCaret(in TerrainColumn terrainCol) {
     if (terrainCol == null || terrainCol.landings.Count == 0) { return; }
-    var landing = closestLanding(terrainCol);
-    placeCaret(landing);
+    var landing = ClosestLanding(terrainCol);
+    PlaceCaret(landing);
   }
-  public void placeCaret(in TerrainColumn.Landing landing) {
+  public void PlaceCaret(in TerrainColumnLanding landing) {
     if (currLanding == landing || landing == null) { return; }
     var centerPos = landing.centerPosition();
-    transform.position = centerPos + caretLocalPosition();
+    transform.position = centerPos + CaretLocalPosition();
     if (currLanding != null) { 
-      currLanding.gameObj.SetActive(false);
+      currLanding.gameObject.SetActive(false);
     }
-    landing.gameObj.SetActive(true);
+    landing.gameObject.SetActive(true);
     currLanding = landing;
   }
 
@@ -119,12 +114,12 @@ public class SquareSelectionCaret : MonoBehaviour {
 
   void OnEnable() {
     if (currLanding == null) {
-      placeCaret(terrainGrid.terrainColumn(new Vector2Int(0,0)));
+      PlaceCaret(terrainGrid.GetTerrainColumn(new Vector2Int(0,0)));
     }
   }
 
   void Update() {
-    if (currLanding == null || currLanding.gameObj == null) { 
+    if (currLanding == null || currLanding.gameObject == null) { 
       gameObject.SetActive(false);
       return;
     }
@@ -133,7 +128,7 @@ public class SquareSelectionCaret : MonoBehaviour {
     currEulerAngles.y += rotationSpeed * Time.deltaTime;
     transform.localRotation = Quaternion.Euler(currEulerAngles);
 
-    handleInput();
+    HandleInput();
     moveTimeCount += Time.deltaTime;
     if (moveTimeCount > moveSpeed) {
       moveAxisInUse = false;
@@ -141,12 +136,13 @@ public class SquareSelectionCaret : MonoBehaviour {
     }
   }
 
-  private TerrainColumn.Landing closestLanding(in TerrainColumn terrainCol) {
+  private TerrainColumnLanding ClosestLanding(in TerrainColumn terrainCol) {
     if (currLanding == null && terrainCol.landings.Count > 0) { return terrainCol.landings[0]; }
-    TerrainColumn.Landing result = null;
+    TerrainColumnLanding result = null;
     float closestSqrDist = float.MaxValue;
+    var currPos = transform.position - CaretLocalPosition();
     foreach (var landing in terrainCol.landings) {
-      var sqrDist = Vector3.SqrMagnitude(landing.centerPosition() - transform.position);
+      var sqrDist = Vector3.SqrMagnitude(landing.centerPosition() - currPos);
       if (sqrDist < closestSqrDist) {
         result = landing;
         closestSqrDist = sqrDist;
@@ -155,7 +151,7 @@ public class SquareSelectionCaret : MonoBehaviour {
     return result;
   }
 
-  private Vector3 caretLocalPosition() {
+  private Vector3 CaretLocalPosition() {
     return new Vector3(0, TerrainColumn.MIN_LANDING_OVERHANG_UNITS-CARET_OVERHANG_SPACING, 0);
   }
 }

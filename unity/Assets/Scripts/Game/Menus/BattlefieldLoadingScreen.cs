@@ -6,13 +6,10 @@ using TMPro;
 
 #pragma warning disable 649
 public class BattlefieldLoadingScreen : MonoBehaviour {
-
-  // TODO: REMOVE STATIC! USE A GAME EVENT INSTEAD!!!
-  public static LevelData levelToLoad = null; // Used to load and pass instantiated level data to the loading scene
-  
   [SerializeField] private LevelLoaderData levelLoader;
   [SerializeField] private Image progressBar;
   [SerializeField] private TextMeshProUGUI levelNameText;
+  
 
   // This allows us to load multiple additive scenes so that we can make our scenes more modular
   // by including multiple scene loads which might have functionality shared across multiple levels
@@ -23,10 +20,11 @@ public class BattlefieldLoadingScreen : MonoBehaviour {
   }
 
   private void Start() {
+    var levelToLoad = levelLoader.Instance().levelDataToLoad;
     // Set any loading screen elements based on the level data
     if (levelToLoad == null) {
-      Debug.LogWarning("The static member '" + nameof(levelToLoad) + "' must be set on the " + this.GetType().Name + " before loading its scene, using default level: " + LevelLoaderData.DEFAULT_LEVEL_STR);
-      levelToLoad = LevelLoaderData.loadLevelData(LevelLoaderData.DEFAULT_LEVEL_STR);
+      Debug.LogWarning("No level data was found to load, using default level data instead: " + LevelLoaderData.DEFAULT_LEVEL_STR);
+      levelToLoad = levelLoader.Instance().levelDataToLoad = LevelLoaderData.loadLevelData(LevelLoaderData.DEFAULT_LEVEL_STR);
     }
     levelNameText.text = levelToLoad.levelName;
 
@@ -52,12 +50,11 @@ public class BattlefieldLoadingScreen : MonoBehaviour {
       progressBar.fillAmount = totalProgress;
       yield return new WaitForEndOfFrame();
     }
+  }
 
-    // TODO: Raise a game event to load the level in the battlefield!
-
-
+  private void OnDestroy() {
     // Clean up our resources before heading in to the game
-    yield return Resources.UnloadUnusedAssets();
+    Resources.UnloadUnusedAssets();
   }
  
 }
