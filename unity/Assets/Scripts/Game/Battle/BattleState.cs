@@ -1,13 +1,8 @@
 ﻿using System.Collections;
+using UnityEngine;
 
-public abstract class BattleState {
-  protected BattleSystem battleSystem;
-
-  public BattleState(BattleSystem _battleSystem) {
-    battleSystem = _battleSystem;
-  }
-
-  public virtual IEnumerator enter() { yield break; }
-  public virtual IEnumerator update() { yield break; }
-  public virtual IEnumerator exit() { yield break; }
+public abstract class BattleState : ScriptableObject {
+  public virtual IEnumerator EnterEvent(BattleStateMachine battleSM) { yield break; }
+  public virtual IEnumerator UpdateEvent(BattleStateMachine battleSM) { yield break; }
+  public virtual IEnumerator ExitEvent(BattleStateMachine battleSM) { yield break; }
 }
