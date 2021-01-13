@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using UnityEditor;
 
@@ -7,21 +8,13 @@ public class TerrainGridToolWindow : EditorWindow {
 
   private static TGTWSettings settings;
 
-  [InitializeOnLoadMethod]
-  private static void OnLoad() {
-    if (!settings) {
-      settings = ScriptableObjectUtility.LoadOrCreateAssetFromPath<TGTWSettings>(TGTWSettings.assetPath);
+  public CharacterTeamData Team { get {
+    CharacterTeamData teamData = null;
+    if (settings.selectedTeamIdx < settings.loadedTeams.Count()) { 
+      teamData = settings.loadedTeams[settings.selectedTeamIdx];
     }
-  }
-
-  public static int maxInset() { return (TerrainGrid.NODES_PER_UNIT-1)/2 - 1; }
-  private void updateSettingsIntValue(string settingName, int value) {
-      var serializedObj = new SerializedObject(settings);
-      serializedObj.Update();
-      serializedObj.FindProperty(settingName).intValue = value;
-      serializedObj.ApplyModifiedProperties();
-      Repaint();
-  }
+    return teamData;
+  }}
 
   public TGTWSettings.EditorType editorType { get { return settings.editorType; } }
   public TGTWSettings.PaintType paintType { get { return settings.paintType; } }
@@ -56,6 +49,22 @@ public class TerrainGridToolWindow : EditorWindow {
   public bool showSurfaceNodes { get { return settings.showSurfaceNodes; } }
   public bool showAboveSurfaceNodes { get { return settings.showAboveSurfaceNodes; } }
 
+  [InitializeOnLoadMethod]
+  private static void OnLoad() {
+    if (!settings) {
+      settings = AssetHelper.LoadOrCreateScriptableObjectFromPath<TGTWSettings>(TGTWSettings.assetPath);
+    }
+  }
+
+  public static int maxInset() { return (TerrainGrid.NODES_PER_UNIT-1)/2 - 1; }
+  private void updateSettingsIntValue(string settingName, int value) {
+      var serializedObj = new SerializedObject(settings);
+      serializedObj.Update();
+      serializedObj.FindProperty(settingName).intValue = value;
+      serializedObj.ApplyModifiedProperties();
+      Repaint();
+  }
+
   [MenuItem("Window/Terrain Grid Tool")]
   static void Open() {
     var window = GetWindow<TerrainGridToolWindow>();
@@ -79,14 +88,20 @@ public class TerrainGridToolWindow : EditorWindow {
     var prevFreePaintEditToggled = editorTypeEnumVal == TGTWSettings.EditorType.FreePaintEditor;
     var prevColumnEditToggled    = editorTypeEnumVal == TGTWSettings.EditorType.ColumnEditor;
     var prevNodeEditToggled      = editorTypeEnumVal == TGTWSettings.EditorType.NodeEditor;
+    var prevPlacementEditToggled = editorTypeEnumVal == TGTWSettings.EditorType.PlacementEditor;
 
     EditorGUILayout.BeginHorizontal();
     GUILayout.FlexibleSpace();
     var freePaintEditToggled = GUILayout.Toggle(prevFreePaintEditToggled, "Paint", "button", GUILayout.ExpandWidth(false));
     var columnEditToggled    = GUILayout.Toggle(prevColumnEditToggled, "Column Edit", "button", GUILayout.ExpandWidth(false));
     var nodeEditToggled      = GUILayout.Toggle(prevNodeEditToggled, "Node Edit", "button", GUILayout.ExpandWidth(false));
+    var placementEditToggled = GUILayout.Toggle(prevPlacementEditToggled, "Placement Edit", "button", GUILayout.ExpandWidth(false));
     GUILayout.FlexibleSpace();
+
+    EditorGUILayout.BeginVertical();
     EditorGUILayout.PropertyField(showGridProp);
+    EditorGUILayout.EndVertical();
+
     EditorGUILayout.EndHorizontal();
     EditorGUILayout.Space();
 
@@ -98,6 +113,9 @@ public class TerrainGridToolWindow : EditorWindow {
     }
     else if (nodeEditToggled != prevNodeEditToggled) {
       editorTypeProp.intValue = (int)TGTWSettings.EditorType.NodeEditor;
+    }
+    else if (placementEditToggled != prevPlacementEditToggled) {
+      editorTypeProp.intValue = (int)TGTWSettings.EditorType.PlacementEditor;
     }
     editorTypeEnumVal = (TGTWSettings.EditorType)editorTypeProp.intValue;
 
@@ -166,16 +184,45 @@ public class TerrainGridToolWindow : EditorWindow {
         break;
       } 
 
+      case TGTWSettings.EditorType.PlacementEditor: {
+        var selectedTeamIdxProp = serializedObj.FindProperty("selectedTeamIdx");
+        var loadedTeamsProp = serializedObj.FindProperty("loadedTeams");
+        var teamNames = TeamNames();
+        if (teamNames != null && teamNames.Count() > 0) {
+          selectedTeamIdxProp.intValue = EditorGUILayout.Popup("Team", selectedTeamIdxProp.intValue, TeamNames(), GUILayout.ExpandWidth(true));
+          EditorGUILayout.Space();
+        }
+        EditorGUILayout.PropertyField(loadedTeamsProp, GUILayout.ExpandWidth(true));
+
+        break;
+      }
+
       default:
         break;
     }
 
-    EditorGUILayout.Space();
-    if (GUILayout.Button(new GUIContent(){text = "Fill with Core Material", tooltip = "Paint core materials into all terrain interiors."})) {
-      terrainGrid.fillCoreMaterial();
+    if (editorTypeEnumVal != TGTWSettings.EditorType.PlacementEditor) {
+      EditorGUILayout.Space();
+      if (GUILayout.Button(new GUIContent(){text = "Fill with Core Material", tooltip = "Paint core materials into all terrain interiors."})) {
+        terrainGrid.fillCoreMaterial();
+      }
     }
 
     serializedObj.ApplyModifiedProperties();
+  }
+
+  private string[] TeamNames() {
+    var teamNames = new string[settings.loadedTeams.Count];
+    for (int i = 0; i < settings.loadedTeams.Count; i++) {
+      var currTeam = settings.loadedTeams[i];
+      if (currTeam) {
+        teamNames[i] = settings.loadedTeams[i].name;
+      }
+      else {
+        return null;
+      }
+    }
+    return teamNames;
   }
 
   public static TerrainGrid findTerrainGrid() {

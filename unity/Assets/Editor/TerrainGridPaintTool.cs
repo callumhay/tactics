@@ -38,18 +38,18 @@ public class TerrainGridTool : EditorTool {
   
   private void OnEnable() {
     //EditorTools.activeToolChanged += activeToolChanged;
-    SceneView.duringSceneGui += this.onSceneGUI;
+    SceneView.duringSceneGui += this.OnSceneGUI;
   }
   private void OnDisable() {
     //EditorTools.activeToolChanged -= activeToolChanged;
-    SceneView.duringSceneGui -= this.onSceneGUI;
+    SceneView.duringSceneGui -= this.OnSceneGUI;
   }
 
   void Awake() {
     settingsWindow = EditorWindow.GetWindow<TerrainGridToolWindow>();
   }
 
-  private bool noMouseEventModifiers(in Event e) {
+  private bool NoMouseEventModifiers(in Event e) {
     return e.modifiers == EventModifiers.None || e.modifiers == EventModifiers.Control;
   }
 
@@ -74,7 +74,7 @@ public class TerrainGridTool : EditorTool {
         var yOffset = settingsWindow.paintMode == TGTWSettings.PaintMode.Floating ? 0.5f*settingsWindow.brushSize : 0;
         if (terrainGrid.intersectEditorRay(wsRay, yOffset, out lastEditPt)) {
           editPtActive = true;
-          if (e.type == EventType.MouseDown && noMouseEventModifiers(e)) {
+          if (e.type == EventType.MouseDown && NoMouseEventModifiers(e)) {
             // Grab all the nodes inside the brush
             List<TerrainGridNode> nodes = settingsWindow.getAffectedNodesAtPoint(lastEditPt, terrainGrid);
             if (nodes == null) { return; }
@@ -99,8 +99,8 @@ public class TerrainGridTool : EditorTool {
       }
 
       case TGTWSettings.EditorType.ColumnEditor: {
-        drawTerrainColumnHeightEditHandles(terrainGrid);
-        if (noMouseEventModifiers(e)) {
+        DrawTerrainColumnHeightEditHandles(terrainGrid);
+        if (NoMouseEventModifiers(e)) {
           if (e.type == EventType.MouseDrag) {
             mouseDragCurrentPos = Event.current.mousePosition;
             if (!isDragging) {
@@ -129,8 +129,13 @@ public class TerrainGridTool : EditorTool {
       }
 
       case TGTWSettings.EditorType.NodeEditor: {
-        drawTerrainColumnSelectionHandles(terrainGrid);
-        drawTerrainColumnNodeEditHandles(terrainGrid);
+        DrawTerrainColumnSelectionHandles(terrainGrid);
+        DrawTerrainColumnNodeEditHandles(terrainGrid);
+        break;
+      }
+
+      case TGTWSettings.EditorType.PlacementEditor: {
+        DrawTerrainColumnButtons(terrainGrid);
         break;
       }
 
@@ -139,7 +144,7 @@ public class TerrainGridTool : EditorTool {
     }
   }
 
-  void onSceneGUI(SceneView sceneView) {
+  void OnSceneGUI(SceneView sceneView) {
     var terrainGrid = target as TerrainGrid;
     if (!InternalEditorUtility.isApplicationActive || !terrainGrid || !settingsWindow) { return; }
 
@@ -169,19 +174,24 @@ public class TerrainGridTool : EditorTool {
         break;
       }
 
+      case TGTWSettings.EditorType.PlacementEditor: {
+        DrawCharacterPlacements(terrainGrid);
+        break;
+      }
+
       default:
         break;
     }
 
     if (settingsWindow.showGridOverlay) {
       redraw = true;
-      drawTerrainGridOverlay(terrainGrid);
+      DrawTerrainGridOverlay(terrainGrid);
     }
 
     if (redraw) { sceneView.Repaint(); }
   }
 
-  private void drawTerrainColumnHeightEditHandles(in TerrainGrid terrainGrid) {
+  private void DrawTerrainColumnHeightEditHandles(in TerrainGrid terrainGrid) {
     Handles.zTest = UnityEngine.Rendering.CompareFunction.Always;
 
     var translation = terrainGrid.transform.position;
@@ -269,7 +279,7 @@ public class TerrainGridTool : EditorTool {
     }
   }
 
-  private void drawTerrainColumnSelectionHandles(in TerrainGrid terrainGrid) {
+  private void DrawTerrainColumnSelectionHandles(in TerrainGrid terrainGrid) {
     Handles.color = Color.green;
     Handles.zTest = UnityEngine.Rendering.CompareFunction.Always;
 
@@ -298,7 +308,7 @@ public class TerrainGridTool : EditorTool {
     }
   }
 
-  private void drawTerrainColumnNodeEditHandles(in TerrainGrid terrainGrid) {
+  private void DrawTerrainColumnNodeEditHandles(in TerrainGrid terrainGrid) {
     
     Handles.zTest = UnityEngine.Rendering.CompareFunction.Always;
     var nodeDrawSize = TerrainGrid.HalfUnitsPerNode();
@@ -338,7 +348,56 @@ public class TerrainGridTool : EditorTool {
     }
   }
 
-  private void drawTerrainGridOverlay(in TerrainGrid terrainGrid) {
+  private void DrawTerrainColumnButtons(in TerrainGrid terrainGrid) {
+    Handles.color = Color.white;
+    Handles.zTest = UnityEngine.Rendering.CompareFunction.LessEqual;
+
+    var halfUnitsPerNode = TerrainGrid.HalfUnitsPerNode();
+    var translation = terrainGrid.transform.position;
+    var rot = new Quaternion(0,0,0,1);
+    var buttonSize = 0.5f*TerrainColumn.HALF_SIZE;
+    var tcIdx = new Vector2Int();
+    for (int x = 0; x < terrainGrid.xSize; x++) {
+      var xPos = x*TerrainColumn.SIZE;
+      for (int z = 0; z < terrainGrid.zSize; z++) {
+
+        tcIdx.Set(x,z);
+        var terrainColumn = terrainGrid.GetTerrainColumn(tcIdx);
+        if (!terrainColumn) { return; }
+
+        var zPos = z*TerrainColumn.SIZE;
+        for (int i = 0; i < terrainColumn.landings.Count; i++) {
+          var landing = terrainColumn.landings[i];
+          var yPos = landing.AverageYPos() + buttonSize + 1e-4f;
+          var buttonPos = new Vector3(xPos + TerrainColumn.HALF_SIZE, yPos, zPos + TerrainColumn.HALF_SIZE) + translation;
+
+          if (Handles.Button(buttonPos, rot, buttonSize, buttonSize, Handles.CubeHandleCap)) {
+            // Add, Change or remove a placement...
+            Undo.RecordObject(terrainGrid.levelData, "Character Placement Change");
+            var placementLocation = new Vector3Int(x,i,z);
+            var existingPlacement = terrainGrid.levelData.GetPlacementAt(placementLocation);
+            var selectedPlacementTeam = settingsWindow.Team;
+            if (existingPlacement != null) {
+              // If the selected team is the same as the team set on this placement then we remove it, 
+              // otherwise we change it to the selected team
+              if (existingPlacement.Team == selectedPlacementTeam) {
+                terrainGrid.levelData.Placements.Remove(existingPlacement);
+              }
+              else {
+                existingPlacement.Team = selectedPlacementTeam;
+              }
+            }
+            else {
+              terrainGrid.levelData.Placements.Add(new CharacterPlacement(selectedPlacementTeam, placementLocation));
+            }
+          }
+        }
+
+      }
+    }
+  }
+
+  private void DrawTerrainGridOverlay(in TerrainGrid terrainGrid) {
     Handles.color = new Color(0.4f, 0.4f, 1.0f, 0.25f);
     Handles.zTest = UnityEngine.Rendering.CompareFunction.LessEqual;
     
@@ -364,4 +423,33 @@ public class TerrainGridTool : EditorTool {
     }
   }
 
+  private void DrawCharacterPlacements(in TerrainGrid terrainGrid) {
+    var outlineColour = new Color(1f,1f,1f,0.75f);
+    Handles.zTest = UnityEngine.Rendering.CompareFunction.LessEqual;
+
+    var translation = terrainGrid.transform.position;
+    foreach (var placement in terrainGrid.levelData.Placements) {
+      var terrainCol = terrainGrid.GetTerrainColumn(placement.Location);
+      if (terrainCol == null) { return; }
+      var landing = terrainCol.landings[placement.Location.y];
+      if (landing == null) { return; }
+
+      var position = landing.CenterPosition();
+      position.y = landing.MaxYPos() + TerrainGrid.HalfUnitsPerNode();
+      var colour = placement.Team.PlacementColour;
+      position.y += 1e-4f;
+      position.x -= TerrainColumn.HALF_SIZE;
+      position.z -= TerrainColumn.HALF_SIZE;
+
+      var quadVerts = new Vector3[4];
+      quadVerts[0] = position + translation;
+      quadVerts[1] = new Vector3(position.x+TerrainColumn.SIZE, position.y, position.z) + translation;
+      quadVerts[2] = new Vector3(position.x+TerrainColumn.SIZE, position.y, position.z+TerrainColumn.SIZE) + translation;
+      quadVerts[3] = new Vector3(position.x, position.y, position.z+TerrainColumn.SIZE) + translation;
+
+      Handles.DrawSolidRectangleWithOutline(quadVerts, new Color(colour.r, colour.g, colour.b, 0.5f), outlineColour);
+      Handles.Label(position, placement.Team.name);
+    }
+  }
+  
 }

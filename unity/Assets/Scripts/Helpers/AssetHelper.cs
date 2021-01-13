@@ -1,8 +1,9 @@
-﻿using UnityEngine;
+﻿using System.Collections.Generic;
+using UnityEngine;
 using UnityEditor;
 using System.IO;
  
-public static class ScriptableObjectUtility {
+public static class AssetHelper {
   /*
 	/// <summary>
 	//	This makes it easy to create, name and place unique new ScriptableObject asset files.
@@ -23,7 +24,17 @@ public static class ScriptableObjectUtility {
 	}
   */
 
-  public static T CreateAssetFromPath<T>(in string filePath) where T : ScriptableObject {
+  public static List<T> FindAssetsAtPath<T>(string path) where T : UnityEngine.Object {
+    var result = new List<T>();
+    var assets = AssetDatabase.FindAssets("t:" + typeof(T), new[]{path});
+    foreach (var guid in assets) {
+      var asset = AssetDatabase.LoadAssetAtPath<T>(AssetDatabase.GUIDToAssetPath(guid));
+      result.Add(asset);
+    }
+    return result;
+  }
+
+  public static T CreateScriptableObjectFromPath<T>(in string filePath) where T : ScriptableObject  {
     T asset = ScriptableObject.CreateInstance<T>();
 		AssetDatabase.CreateAsset(asset, filePath);
 		AssetDatabase.SaveAssets();
@@ -31,9 +42,9 @@ public static class ScriptableObjectUtility {
 		return asset;
   }
 
-  public static T LoadOrCreateAssetFromPath<T>(in string filepath) where T: ScriptableObject {
+  public static T LoadOrCreateScriptableObjectFromPath<T>(in string filepath) where T : ScriptableObject {
     var asset = AssetDatabase.LoadAssetAtPath<T>(filepath);
-    return asset ?? CreateAssetFromPath<T>(filepath);
+    return asset ?? CreateScriptableObjectFromPath<T>(filepath);
   }
 
 }

@@ -106,7 +106,7 @@ public class LiquidCompute : MonoBehaviour {
   //private void OnEnable() {
   //  InitAll();
   //}
-  
+
   private void OnDestroy() {
     ClearBuffersAndRTs();
   }
@@ -134,28 +134,26 @@ public class LiquidCompute : MonoBehaviour {
     var borderFront = volComponent.getBorderFront();
     var fullResSize = volComponent.getFullResSize();
 
-    // Don't reinitialize all the buffers unless we changed the dimensions
-    if (borderBack != currBorderBack || borderFront != currBorderFront || currFullResSize != fullResSize) {
-      currBorderBack = borderBack;
-      currBorderFront = borderFront;
-      currFullResSize = fullResSize;
+    currBorderBack = borderBack;
+    currBorderFront = borderFront;
+    currFullResSize = fullResSize;
 
-      var internalResSize = new Vector3Int(fullResSize, fullResSize, fullResSize) - (borderBack+borderFront);
-      //Debug.Log("Internal resolution size: " + internalResSize);
-      //Debug.Log("Border Front: " +  new Vector3(borderFront.x, borderFront.y, borderFront.z));
-      //Debug.Log("Border Back: " + new Vector3(borderBack.x, borderBack.y,borderBack.z));
+    var internalResSize = new Vector3Int(fullResSize, fullResSize, fullResSize) - (borderBack+borderFront);
+    //Debug.Log("Internal resolution size: " + internalResSize);
+    //Debug.Log("Border Front: " +  new Vector3(borderFront.x, borderFront.y, borderFront.z));
+    //Debug.Log("Border Back: " + new Vector3(borderBack.x, borderBack.y,borderBack.z));
 
-      liquidComputeShader.SetInts("borderBack", new int[]{borderBack.x, borderBack.y,borderBack.z});
-      liquidComputeShader.SetInts("borderFront", new int[]{borderFront.x, borderFront.y, borderFront.z});
-      liquidComputeShader.SetInts("internalSize", new int[]{internalResSize.x, internalResSize.y, internalResSize.z});
-      liquidComputeShader.SetInt("fullSize", fullResSize);
+    liquidComputeShader.SetInts("borderBack", new int[]{borderBack.x, borderBack.y,borderBack.z});
+    liquidComputeShader.SetInts("borderFront", new int[]{borderFront.x, borderFront.y, borderFront.z});
+    liquidComputeShader.SetInts("internalSize", new int[]{internalResSize.x, internalResSize.y, internalResSize.z});
+    liquidComputeShader.SetInt("fullSize", fullResSize);
 
-      numThreadGroups = fullResSize / NUM_THREADS_PER_BLOCK;
-      //Debug.Log("Number of thread groups: " + numThreadGroups); 
+    numThreadGroups = fullResSize / NUM_THREADS_PER_BLOCK;
+    //Debug.Log("Number of thread groups: " + numThreadGroups); 
 
-      InitBuffersAndRTs(fullResSize);
-      ClearNodes();
-    }
+    InitBuffersAndRTs(fullResSize);
+    ClearNodes();
+
   }
 
   private void InitBuffersAndRTs(int fullResSize) {

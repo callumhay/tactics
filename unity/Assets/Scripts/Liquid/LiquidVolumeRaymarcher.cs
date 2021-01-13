@@ -1,6 +1,5 @@
 ﻿using System;
 using UnityEngine;
-using UnityEditor;
 
 #pragma warning disable 649
 
@@ -9,6 +8,7 @@ public class LiquidVolumeRaymarcher : MonoBehaviour {
 
   [SerializeField] private Texture2D jitterTexture;
   [SerializeField] private RenderTexture nodeTexture;
+  [SerializeField] private Texture3D emptyNodeTex;
   [SerializeField] private TerrainGrid terrainGrid;
 
   private int volResolution;
@@ -50,7 +50,6 @@ public class LiquidVolumeRaymarcher : MonoBehaviour {
     meshRenderer.sharedMaterial.SetFloat("resolution", volResolution);
     meshRenderer.sharedMaterial.SetFloat("nodeVolume", Mathf.Pow(TerrainGrid.UnitsPerNode(),3));
     meshRenderer.sharedMaterial.SetTexture("jitterTex", jitterTexture);
-    UpdateNodeTexture(nodeTexture);
 
     // Build the bounding box used to render the volume via raymarching between its faces
     var mesh = new Mesh();
@@ -65,17 +64,13 @@ public class LiquidVolumeRaymarcher : MonoBehaviour {
   private void Awake() {
     meshFilter = GetComponent<MeshFilter>();
     meshRenderer = GetComponent<MeshRenderer>();
-
-    // Make sure we don't clobber the original material in play mode
-    if (Application.IsPlaying(gameObject)) {
-      meshRenderer.sharedMaterial = Instantiate<Material>(meshRenderer.sharedMaterial);
-    }
+    // Make sure we don't clobber the original material
+    meshRenderer.sharedMaterial = Instantiate<Material>(meshRenderer.sharedMaterial);
   }
 
   public void UpdateNodeTexture(RenderTexture nodeTex) {
-    if (nodeTex != null) {
-      meshRenderer.sharedMaterial.SetTexture("nodeTex", nodeTex);
-    }
+    if (nodeTex != null) { meshRenderer.sharedMaterial.SetTexture("nodeTex", nodeTex); }
+    else { meshRenderer.sharedMaterial.SetTexture("nodeTex", emptyNodeTex); }
     nodeTexture = nodeTex;
   }
 }

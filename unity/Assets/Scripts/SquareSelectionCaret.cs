@@ -86,7 +86,7 @@ public class SquareSelectionCaret : MonoBehaviour {
   }
   public void PlaceCaret(in TerrainColumnLanding landing) {
     if (currLanding == landing || landing == null) { return; }
-    var centerPos = landing.centerPosition();
+    var centerPos = landing.CenterPosition();
     transform.position = centerPos + CaretLocalPosition();
     if (currLanding != null) { 
       currLanding.gameObject.SetActive(false);
@@ -142,7 +142,7 @@ public class SquareSelectionCaret : MonoBehaviour {
     float closestSqrDist = float.MaxValue;
     var currPos = transform.position - CaretLocalPosition();
     foreach (var landing in terrainCol.landings) {
-      var sqrDist = Vector3.SqrMagnitude(landing.centerPosition() - currPos);
+      var sqrDist = Vector3.SqrMagnitude(landing.CenterPosition() - currPos);
       if (sqrDist < closestSqrDist) {
         result = landing;
         closestSqrDist = sqrDist;

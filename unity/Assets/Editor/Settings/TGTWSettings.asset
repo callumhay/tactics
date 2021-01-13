@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 98d9b1dd3dee9476ba6c0f6586489315, type: 3}
   m_Name: TGTWSettings
   m_EditorClassIdentifier: 
-  editorType: 0
+  editorType: 3
   paintType: 2
   paintMode: 1
   brushType: 1
@@ -27,6 +27,10 @@ MonoBehaviour:
   columnInsetNegXAmount: 0
   columnInsetZAmount: 0
   columnInsetNegZAmount: 0
+  selectedTeamIdx: 0
+  loadedTeams:
+  - {fileID: 11400000, guid: 5fe2b54306a6140589564147517d0d25, type: 2}
+  - {fileID: 11400000, guid: 23f427a9443d4478997745f7fde51b41, type: 2}
   showTerrainNodes: 1
   showEmptyNodes: 1
   showSurfaceNodes: 1

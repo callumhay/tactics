@@ -10,20 +10,19 @@ public abstract class WeatherData : ScriptableObject {
   [Range(0,1)] public float overcast = 0.1f; // Make protected and change in the child classes
 
 
-  public Vector2 windDirection() {
+  public Vector2 WindDirection() {
     return (new Vector2(windDirectionX,windDirectionZ)).normalized;
   }
 
-  public virtual void init(WeatherController weatherController) {
+  public virtual void InitWeather(WeatherController weatherController) {
     // Update the cloud wind direction to match the weather data
     var cloudComponent = Component.FindObjectOfType<CloudVolumeRaymarcher>();
     cloudComponent.setWeather(this);
   }
-  public virtual void update(WeatherController weatherController) {}
-
+  public virtual void UpdateWeather(WeatherController weatherController) {}
 
   protected void OnValidate() {
     var weatherComponent = Object.FindObjectOfType<WeatherController>();
-    init(weatherComponent);
+    InitWeather(weatherComponent);
   }
 }

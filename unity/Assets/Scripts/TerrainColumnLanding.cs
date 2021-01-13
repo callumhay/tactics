@@ -38,10 +38,17 @@ public class TerrainColumnLanding : MonoBehaviour {
     return string.Format("Landing [{0} - {1}]", min, max);
   }
 
-  public Vector3 centerPosition() {
+  public float MaxYPos() {
+    return TerrainGrid.NodeIndexToUnits(maxIdx.y);
+  } 
+  public float AverageYPos() {
+    return (TerrainGrid.NodeIndexToUnits(minIdx.y) + TerrainGrid.NodeIndexToUnits(maxIdx.y)) / 2f;
+  }
+
+  public Vector3 CenterPosition() {
     var minNodeIdx = TerrainGrid.TerrainColumnNodeIndex(terrainColIdx, Vector3Int.zero);
     var result = TerrainGrid.NodeIndexToUnitsVec3(minNodeIdx) + new Vector3(TerrainColumn.HALF_SIZE, 0, TerrainColumn.HALF_SIZE);
-    result.y = TerrainGrid.NodeIndexToUnits((minIdx.y+maxIdx.y)/2);
+    result.y = AverageYPos();
     return result;
   }
 

@@ -1,6 +1,4 @@
-﻿using System.Collections;
-using System.Collections.Generic;
-using UnityEngine;
+﻿using UnityEngine;
 
 public class Bedrock : MonoBehaviour {
   public static readonly float HEIGHT = 1.0f;

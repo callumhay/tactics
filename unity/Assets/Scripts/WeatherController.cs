@@ -7,7 +7,7 @@ public class WeatherController : MonoBehaviour {
   public TerrainGrid terrainGrid;
   public WeatherData weather;
 
-  void Start() {
+  private void Start() {
     if (terrainGrid == null) {
       terrainGrid = TerrainGrid.FindTerrainGrid();
     }
@@ -21,9 +21,10 @@ public class WeatherController : MonoBehaviour {
       // TODO: Default weather?
     }
     else {
-      weather.init(this);
+      weather.InitWeather(this);
     }
   }
 
   //void Update() { weather?.update(this); }
+
 }

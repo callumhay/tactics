@@ -1,6 +1,4 @@
-﻿using System.Collections;
-using System.Collections.Generic;
-using UnityEngine;
+﻿using UnityEngine;
 
 [CreateAssetMenu(fileName="RainData", menuName="Tactics/Weather/Rain")]
 public class RainWeatherData : WeatherData {
@@ -19,14 +17,16 @@ public class RainWeatherData : WeatherData {
   private ParticleSystem parentParticleSystem;
   private ParticleSystem[] particleSystems;
 
-  public override void init(WeatherController weatherController) {
+  public override void InitWeather(WeatherController weatherController) {
     if (!weatherController) { return; }
-    base.init(weatherController);
+    base.InitWeather(weatherController);
     
     var terrain = weatherController.terrainGrid;
 
     rainGO = weatherController.transform.Find(GAME_OBJ_NAME).gameObject;
     rainGO.transform.position = terrain.transform.position;
+    rainGO.SetActive(true);
+
     parentParticleSystem = rainGO.GetComponent<ParticleSystem>();
     particleSystems = rainGO.GetComponentsInChildren<ParticleSystem>();
 
@@ -41,7 +41,7 @@ public class RainWeatherData : WeatherData {
     psShapePos.y = unitSize.y + TerrainColumn.SIZE*2;
 
     // Depending on wind intensity we may need to move the emitter and/or have a larger emitter for the particle system
-    var windIntensityVec = windDirection() * windIntensity;
+    var windIntensityVec = WindDirection() * windIntensity;
 
     // Conservative estimate of lifetime
     var particleMinLifetime = (new Vector3(windIntensityVec.x, -psShapePos.y, windIntensityVec.y)).magnitude / 6.66f;
@@ -86,10 +86,8 @@ public class RainWeatherData : WeatherData {
 
     // Reinitialize and resimulate all the particle systems so we can visualize the changes immediately
     var rainParentPS = rainGO.GetComponent<ParticleSystem>();
-    rainParentPS.Simulate(2*particleMinLifetime, true, true, true);
+    rainParentPS.Simulate(5*particleMinLifetime, true, false, true);
     rainParentPS.Play(true);
-
-    rainGO.SetActive(true);
   }
 
 }

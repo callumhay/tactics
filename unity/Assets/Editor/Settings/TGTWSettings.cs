@@ -1,9 +1,10 @@
-﻿using UnityEngine;
+﻿using System.Collections.Generic;
+using UnityEngine;
 
 public class TGTWSettings : ScriptableObject {
   public static readonly string assetPath = "Assets/Editor/Settings/TGTWSettings.asset";
 
-  public enum EditorType  { FreePaintEditor = 0, ColumnEditor = 1, NodeEditor = 2 };
+  public enum EditorType  { FreePaintEditor = 0, ColumnEditor = 1, NodeEditor = 2, PlacementEditor = 3 };
   public enum PaintType { Terrain = 0, MaterialsOnly = 1, Water = 2 };
   public enum PaintMode { Projection = 0, Floating = 1 };
   public enum BrushType { Sphere = 0, Cube = 1 };
@@ -25,6 +26,9 @@ public class TGTWSettings : ScriptableObject {
   public int columnInsetNegXAmount = 0;
   public int columnInsetZAmount = 0;
   public int columnInsetNegZAmount = 0;
+
+  public int selectedTeamIdx = 0;
+  public List<CharacterTeamData> loadedTeams = new List<CharacterTeamData>();
 
   public bool showTerrainNodes = true;
   public bool showEmptyNodes = true;

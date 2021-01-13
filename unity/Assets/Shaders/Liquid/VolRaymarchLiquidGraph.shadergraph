@@ -16,7 +16,7 @@
             "typeInfo": {
                 "fullName": "UnityEditor.ShaderGraph.Internal.Texture3DShaderProperty"
             },
-            "JSONnodeData": "{\n    \"m_Guid\": {\n        \"m_GuidSerialized\": \"0e661610-bad3-4a18-ac9c-144ec62f91e7\"\n    },\n    \"m_Name\": \"nodeTex\",\n    \"m_DefaultReferenceName\": \"Texture3D_C9888DAA\",\n    \"m_OverrideReferenceName\": \"nodeTex\",\n    \"m_GeneratePropertyBlock\": true,\n    \"m_Precision\": 0,\n    \"m_GPUInstanced\": false,\n    \"m_Hidden\": false,\n    \"m_Value\": {\n        \"m_SerializedTexture\": \"{\\\"texture\\\":{\\\"instanceID\\\":0}}\",\n        \"m_Guid\": \"\"\n    },\n    \"m_Modifiable\": true\n}"
+            "JSONnodeData": "{\n    \"m_Guid\": {\n        \"m_GuidSerialized\": \"0e661610-bad3-4a18-ac9c-144ec62f91e7\"\n    },\n    \"m_Name\": \"nodeTex\",\n    \"m_DefaultReferenceName\": \"Texture3D_C9888DAA\",\n    \"m_OverrideReferenceName\": \"nodeTex\",\n    \"m_GeneratePropertyBlock\": true,\n    \"m_Precision\": 0,\n    \"m_GPUInstanced\": false,\n    \"m_Hidden\": false,\n    \"m_Value\": {\n        \"m_SerializedTexture\": \"{\\\"texture\\\":{\\\"fileID\\\":11700000,\\\"guid\\\":\\\"7eed3cb8286bd4bb4914e3c0f2271200\\\",\\\"type\\\":2}}\",\n        \"m_Guid\": \"\"\n    },\n    \"m_Modifiable\": true\n}"
         },
         {
             "typeInfo": {

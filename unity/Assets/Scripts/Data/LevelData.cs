@@ -10,16 +10,21 @@ public class LevelData : ScriptableObject {
 
   [Range(1,32)] public int xSize = 10, ySize = 10, zSize = 10; // Size in units (not nodes!) of the level
   public TerrainGridNode[] nodes;
-
-  /*
-  private void OnValidate() {
-    // This slows things down considerably... figure out a better way or just keep commented out
-    var terrainGrid = FindObjectOfType<TerrainGrid>();
-    if (terrainGrid != null) {
-      terrainGrid.OnValidate();
+  
+  
+  [SerializeField] private List<CharacterPlacement> placements = new List<CharacterPlacement>();
+  public List<CharacterPlacement> Placements { get { return placements; } }
+  
+  public CharacterPlacement GetPlacementAt(Vector3Int location) {
+    CharacterPlacement result = null;
+    foreach (var placement in placements) {
+      if (placement.Location == location) {
+        result = placement;
+        break;
+      }
     }
+    return result;
   }
-  */
 
   public bool HasLiquid() {
     foreach (var node in nodes) {

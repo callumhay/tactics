@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-
 // The contribution of a material is dependant on how many contributors there are and what their
 // contribution values are. The overall contribution is a weighted average of each contribution
 // divided by the sum of all contributions. The materials are then blended together based

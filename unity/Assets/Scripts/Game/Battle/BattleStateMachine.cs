@@ -8,7 +8,9 @@ public class BattleStateMachine : MonoBehaviour {
 
   [SerializeField] private TerrainGrid terrainGrid;
 
+  //[SerializeField] private StartingCutsceneBattleState startCutsceneState;
   [SerializeField] private FormationBattleState formationState;
+  //[SerializeField] private CommenceBattleState commenceState;
   //[SerializeField] private TurnBasedBattleState turnBasedState;
 
   protected BattleState currentState;
@@ -24,7 +26,7 @@ public class BattleStateMachine : MonoBehaviour {
   }
 
   private void Start() {
-    SetState(formationState);
+    //SetState(formationState);
   }
 
   private void Update() {
