@@ -7,6 +7,8 @@ using UnityEngine;
 public class BattleStateMachine : MonoBehaviour {
 
   [SerializeField] private TerrainGrid terrainGrid;
+  [SerializeField] private SquareSelectionCaret selectionCaret;
+  [SerializeField] private LevelLoaderData levelLoader;
 
   //[SerializeField] private StartingCutsceneBattleState startCutsceneState;
   [SerializeField] private FormationBattleState formationState;
@@ -16,6 +18,12 @@ public class BattleStateMachine : MonoBehaviour {
   protected BattleState currentState;
 
   public TerrainGrid TerrainGrid { get { return terrainGrid; } }
+  public SquareSelectionCaret SelectionCaret { get { return selectionCaret; } }
+  public LevelLoaderData LevelLoader { get { return levelLoader; } }
+
+  public void Init() {
+    SetState(formationState);
+  }
 
   public void SetState(BattleState nextState) {
     if (currentState != null) {
@@ -25,27 +33,23 @@ public class BattleStateMachine : MonoBehaviour {
     StartCoroutine(currentState.EnterEvent(this));
   }
 
-  private void Start() {
-    //SetState(formationState);
-  }
-
   private void Update() {
     StartCoroutine(currentState.UpdateEvent(this));
   }
 
-  /*
+
   public void SpawnCharacter(CharacterPlacement placement) {
      SpawnCharacter(placement.Location, placement.Character); 
   }
-  public void SpawnCharacter(Vector3Int location, Character character) {
+  public void SpawnCharacter(Vector3Int location, CharacterData character) {
     Debug.Assert(character != null, "Attempting to spawn a character that doesn't exist!");
 
     var terrainCol = terrainGrid.GetTerrainColumn(location);
     Debug.Assert(terrainCol != null, "No TerrainColumn found at location " + location + ". Check GameObject initialization ordering!");
 
-    
+
 
   }
-  */
+
 
 }

@@ -6,18 +6,18 @@ using UnityEngine;
 public class CharacterData : ScriptableObject {
 
   public string characterName;
-  [Range(1,99)] public int level;
-  [Range(0,99)] public int xp;
+  //[Range(1,99)] public int level;
+  //[Range(0,99)] public int xp;
 
   //[Header("Job Classes")]
   //public JobData primaryJob;   // Should never be null in-game
   //public JobData secondaryJob; // Can be null in-game
 
-  [Header("Primary Stats")]
-  public int strength;
-  public int speed;
-  public int constitution;
-  public int intelligence;
+  //[Header("Primary Stats")]
+  //public int strength;
+  //public int speed;
+  //public int constitution;
+  //public int intelligence;
 
   //[Header("Equipment")]
   //public HelmetData helmet;

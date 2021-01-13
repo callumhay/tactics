@@ -10,7 +10,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: cdf4dec60b794455782198d6dc80ab67, type: 3}
-  m_Name: PlayerTeam0
+  m_Name: AITeam0
   m_EditorClassIdentifier: 
-  placementColour: {r: 0, g: 0.84573746, b: 1, a: 1}
-  isPlayerControlled: 1
+  placementColour: {r: 1, g: 0, b: 0, a: 1}
+  isPlayerControlled: 0

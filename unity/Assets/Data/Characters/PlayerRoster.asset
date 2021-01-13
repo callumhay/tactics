@@ -9,8 +9,9 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: cdf4dec60b794455782198d6dc80ab67, type: 3}
-  m_Name: PlayerTeam0
+  m_Script: {fileID: 11500000, guid: 7d600781585a04915a1e0b6f7157f72e, type: 3}
+  m_Name: PlayerRoster
   m_EditorClassIdentifier: 
-  placementColour: {r: 0, g: 0.84573746, b: 1, a: 1}
-  isPlayerControlled: 1
+  characters:
+  - {fileID: 11400000, guid: 229750ebe86ec46e9a2a471cd3ddd84a, type: 2}
+  - {fileID: 11400000, guid: 61b99ae0efc1d40a0a535af361c67365, type: 2}

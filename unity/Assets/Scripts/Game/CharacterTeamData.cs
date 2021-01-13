@@ -6,6 +6,8 @@
 public class CharacterTeamData : ScriptableObject {
   
   [SerializeField] private Color placementColour;
+  [SerializeField] private bool isPlayerControlled;
 
   public Color PlacementColour { get { return placementColour; } }
+  public bool IsPlayerControlled { get { return isPlayerControlled; } }
 }

@@ -362,7 +362,18 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     LoadLevelDataNodes();
   }
 
-  public void Awake() {
+  /// <summary>
+  /// Called to initialize this in play mode from the Scene Manager.
+  /// </summary>
+  public void Init() {
+    // Build all the assets for the game that aren't stored in the level data
+    BuildTerrainLiquid();
+    BuildBedrock();
+    RegenerateMeshes(BuildTerrainColumns());
+    TerrainPhysicsCleanup();
+  }
+
+  private void Awake() {
     if (Application.IsPlaying(gameObject)) {
       // If we're coming into this scene from the loading screen then we load the level it provides,
       // otherwise take whatever level data is already set in the inspector.
@@ -378,18 +389,12 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     }
   }
 
-  void Start() {
-    if (Application.IsPlaying(gameObject)) {
-      // NOTE: When the application is running, we set up the nodes in Awake()
+  private void Start() {
+    // NOTE: When the application is running, we set up the nodes in Awake(),
+    // all other initialization is done via the scene manager and calling Init()
 
-      // Build all the assets for the game that aren't stored in the level data
-      BuildTerrainLiquid();
-      BuildBedrock();
-      RegenerateMeshes(BuildTerrainColumns());
-      TerrainPhysicsCleanup();
-    }
     #if UNITY_EDITOR
-    else {
+    if (!Application.IsPlaying(gameObject)) {
       if (levelData != null) {
         LoadLevelDataNodes(); // Always load the nodes first!
         BuildTerrainLiquid();
@@ -408,7 +413,7 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     //Debug.Log("Saving slot data to " + saveSlot.saveFilepath());
   }
 
-  void FixedUpdate() {
+  private void FixedUpdate() {
     float debrisUpdateTime = (2f/debrisUpdateFrequency.value);
 
     debrisTimeCounter += Time.fixedDeltaTime;
@@ -914,7 +919,9 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
   #if UNITY_EDITOR
 
   public void OnValidate() {
-    Invoke("delayedOnValidate", 0);
+    if (!Application.IsPlaying(gameObject)) {
+      Invoke("delayedOnValidate", 0);
+    }
   }
   void delayedOnValidate() {
     if (levelData != null) {

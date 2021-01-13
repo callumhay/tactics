@@ -13,14 +13,14 @@ public class LevelLoaderData : ScriptableObject {
 
   [SerializeField] private SceneReference battlefield;
 
-  private static string levelDataFromLevelStr(string levelStr) { return levelStr + "_level_data"; }
+  private static string LevelDataFromLevelStr(string levelStr) { return levelStr + "_level_data"; }
   
   // NOTE: This does not instantiate the data, use this for saving purposes, but not for the game state itself!
-  public static LevelData loadLevelData(string levelStr) {
-    return Resources.Load<LevelData>(LEVELS_DIRECTORY + "/" + levelDataFromLevelStr(levelStr));
+  public static LevelData LoadLevelData(string levelStr) {
+    return Resources.Load<LevelData>(LEVELS_DIRECTORY + "/" + LevelDataFromLevelStr(levelStr));
   }
 
-  public List<AsyncOperation> loadLevelSceneAsyncOperations(LevelData levelData) {
+  public List<AsyncOperation> LoadLevelSceneAsyncOperations(LevelData levelData) {
     var result = new List<AsyncOperation>();
 
     // Load core/base scenes
@@ -36,6 +36,7 @@ public class LevelLoaderData : ScriptableObject {
 
   public class LevelLoaderManager : SingletonSO<LevelLoaderManager> {
     public LevelData levelDataToLoad = null;
+    public PlayerRosterData playerRoster = null;
   }
   public LevelLoaderManager Instance() {
     return LevelLoaderManager.Instance;

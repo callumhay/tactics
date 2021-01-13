@@ -388,7 +388,7 @@ public class TerrainGridTool : EditorTool {
               }
             }
             else {
-              terrainGrid.levelData.Placements.Add(new CharacterPlacement(selectedPlacementTeam, placementLocation));
+              terrainGrid.levelData.Placements.Add(new CharacterPlacement(placementLocation, selectedPlacementTeam));
             }
           }
         }

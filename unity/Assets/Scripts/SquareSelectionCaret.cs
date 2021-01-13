@@ -1,17 +1,22 @@
 ﻿using UnityEngine;
 
+#pragma warning disable 649
+
 public class SquareSelectionCaret : MonoBehaviour {
   public static readonly float CARET_HEIGHT = 0.25f;
   public static readonly float CARET_OVERHANG_SPACING = CARET_HEIGHT/2f;
 
   [Range(0,360)]
   [Tooltip("Rotation speed of the caret in degrees per second")]
-  public float rotationSpeed = 45f;
+  [SerializeField]
+  private float rotationSpeed = 45f;
+
   [Range(0,1)]
   [Tooltip("Caret move speed when the direction is held down")]
-  public float moveSpeed = 0.25f;
+  [SerializeField]
+  private float moveSpeed = 0.25f;
 
-  public TerrainGrid terrainGrid;
+  [SerializeField] private TerrainGrid terrainGrid;
 
   private TerrainColumnLanding currLanding;
   private MeshFilter meshFilter;
@@ -95,15 +100,9 @@ public class SquareSelectionCaret : MonoBehaviour {
     currLanding = landing;
   }
 
-  void Start() {
-    if (terrainGrid == null) {
-      terrainGrid = TerrainGrid.FindTerrainGrid();
-    }
+  private void Awake() {
     meshFilter = GetComponent<MeshFilter>();
-    if (!meshFilter) { meshFilter = gameObject.AddComponent<MeshFilter>(); }
     meshRenderer = GetComponent<MeshRenderer>();
-    if (!meshRenderer) { meshRenderer = gameObject.AddComponent<MeshRenderer>(); }
-    meshRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
 
     // Scale and position the caret so that it's the right size and positioned
     // above whatever terrain column landing that it's highlighting
@@ -112,14 +111,16 @@ public class SquareSelectionCaret : MonoBehaviour {
     transform.localScale = new Vector3(scale,scale,scale);
   }
 
+  private void Start() { }
+
   void OnEnable() {
-    if (currLanding == null) {
-      PlaceCaret(terrainGrid.GetTerrainColumn(new Vector2Int(0,0)));
-    }
+    //if (currLanding == null) {
+    //  PlaceCaret(terrainGrid.GetTerrainColumn(new Vector2Int(0,0)));
+    //}
   }
 
   void Update() {
-    if (currLanding == null || currLanding.gameObject == null) { 
+    if (currLanding == null) { 
       gameObject.SetActive(false);
       return;
     }

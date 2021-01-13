@@ -24,12 +24,12 @@ public class BattlefieldLoadingScreen : MonoBehaviour {
     // Set any loading screen elements based on the level data
     if (levelToLoad == null) {
       Debug.LogWarning("No level data was found to load, using default level data instead: " + LevelLoaderData.DEFAULT_LEVEL_STR);
-      levelToLoad = levelLoader.Instance().levelDataToLoad = LevelLoaderData.loadLevelData(LevelLoaderData.DEFAULT_LEVEL_STR);
+      levelToLoad = levelLoader.Instance().levelDataToLoad = LevelLoaderData.LoadLevelData(LevelLoaderData.DEFAULT_LEVEL_STR);
     }
     levelNameText.text = levelToLoad.levelName;
 
     // Determine all the scenes we need to load asynchronously
-    asyncScenesToLoad = levelLoader.loadLevelSceneAsyncOperations(levelToLoad);
+    asyncScenesToLoad = levelLoader.LoadLevelSceneAsyncOperations(levelToLoad);
     StartCoroutine(asyncLoadScene());
   }
 

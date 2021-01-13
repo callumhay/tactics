@@ -1,6 +1,8 @@
 ﻿using System.Collections.Generic;
 using UnityEngine;
 
+#pragma warning disable 649
+
 [PreferBinarySerialization]
 [CreateAssetMenu(fileName="New Level", menuName="Tactics/Level")]
 public class LevelData : ScriptableObject {
@@ -11,10 +13,12 @@ public class LevelData : ScriptableObject {
   [Range(1,32)] public int xSize = 10, ySize = 10, zSize = 10; // Size in units (not nodes!) of the level
   public TerrainGridNode[] nodes;
   
-  
   [SerializeField] private List<CharacterPlacement> placements = new List<CharacterPlacement>();
+  [SerializeField] private int maxPlayerPlacements;
+
   public List<CharacterPlacement> Placements { get { return placements; } }
-  
+  public int MaxPlayerPlacements { get { return maxPlayerPlacements; } set { maxPlayerPlacements = value; } }
+
   public CharacterPlacement GetPlacementAt(Vector3Int location) {
     CharacterPlacement result = null;
     foreach (var placement in placements) {
@@ -22,6 +26,13 @@ public class LevelData : ScriptableObject {
         result = placement;
         break;
       }
+    }
+    return result;
+  }
+  public List<CharacterPlacement> GetPlayerControlledPlacements() {
+    var result = new List<CharacterPlacement>();
+    foreach (var placement in placements) {
+      if (placement.Team.IsPlayerControlled) { result.Add(placement); }
     }
     return result;
   }

@@ -13,15 +13,15 @@ MonoBehaviour:
   m_Name: TGTWSettings
   m_EditorClassIdentifier: 
   editorType: 3
-  paintType: 2
-  paintMode: 1
+  paintType: 0
+  paintMode: 0
   brushType: 1
   brushSize: 1
   matPaintIntensity: 0.25
   gridSnaping: 0
   showGridOverlay: 0
   groundUpOnly: 0
-  setLevelValue: 10
+  setLevelValue: 1
   paintMaterial: {fileID: 0}
   columnInsetXAmount: 0
   columnInsetNegXAmount: 0
@@ -29,8 +29,8 @@ MonoBehaviour:
   columnInsetNegZAmount: 0
   selectedTeamIdx: 0
   loadedTeams:
-  - {fileID: 11400000, guid: 5fe2b54306a6140589564147517d0d25, type: 2}
   - {fileID: 11400000, guid: 23f427a9443d4478997745f7fde51b41, type: 2}
+  - {fileID: 11400000, guid: 5fe2b54306a6140589564147517d0d25, type: 2}
   showTerrainNodes: 1
   showEmptyNodes: 1
   showSurfaceNodes: 1

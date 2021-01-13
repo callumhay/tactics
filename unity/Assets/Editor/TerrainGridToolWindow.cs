@@ -73,7 +73,7 @@ public class TerrainGridToolWindow : EditorWindow {
   }
 
   private void OnGUI() {
-    var terrainGrid = TerrainGridToolWindow.findTerrainGrid();
+    var terrainGrid = TerrainGrid.FindTerrainGrid();
     if (!terrainGrid) {
       EditorGUILayout.LabelField("Could not find TerrainGrid!");
       return;
@@ -187,11 +187,23 @@ public class TerrainGridToolWindow : EditorWindow {
       case TGTWSettings.EditorType.PlacementEditor: {
         var selectedTeamIdxProp = serializedObj.FindProperty("selectedTeamIdx");
         var loadedTeamsProp = serializedObj.FindProperty("loadedTeams");
+
+        var teamSet = new HashSet<CharacterTeamData>();
+        foreach (var placement in terrainGrid.levelData.Placements) {
+          teamSet.Add(placement.Team);
+        }
+        teamSet.UnionWith(settings.loadedTeams);
+        settings.loadedTeams = teamSet.ToList();
+
         var teamNames = TeamNames();
         if (teamNames != null && teamNames.Count() > 0) {
           selectedTeamIdxProp.intValue = EditorGUILayout.Popup("Team", selectedTeamIdxProp.intValue, TeamNames(), GUILayout.ExpandWidth(true));
-          EditorGUILayout.Space();
         }
+
+        var numPlayerPlacements = terrainGrid.levelData.GetPlayerControlledPlacements().Count;
+        terrainGrid.levelData.MaxPlayerPlacements = EditorGUILayout.IntSlider("Max Player Placements", terrainGrid.levelData.MaxPlayerPlacements, 1, numPlayerPlacements);
+        
+        EditorGUILayout.Space();
         EditorGUILayout.PropertyField(loadedTeamsProp, GUILayout.ExpandWidth(true));
 
         break;
@@ -223,12 +235,6 @@ public class TerrainGridToolWindow : EditorWindow {
       }
     }
     return teamNames;
-  }
-
-  public static TerrainGrid findTerrainGrid() {
-    var terrainGameObj = GameObject.Find(TerrainGrid.GAME_OBJ_NAME);
-    if (terrainGameObj) { return terrainGameObj.GetComponent<TerrainGrid>(); }
-    return null;
   }
 
   public List<TerrainGridNode> getAffectedNodesAtPoint(in Vector3 editPt, in TerrainGrid terrainGrid) {
