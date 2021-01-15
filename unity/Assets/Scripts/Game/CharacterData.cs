@@ -5,8 +5,8 @@ using UnityEngine;
 [CreateAssetMenu(fileName="New Character", menuName="Tactics/Character")]
 public class CharacterData : ScriptableObject {
 
-  public string characterName;
-  //[Range(1,99)] public int level;
+  [SerializeField] private string characterName;
+  [SerializeField] [Range(1,99)] private int level;
   //[Range(0,99)] public int xp;
 
   //[Header("Job Classes")]
@@ -47,5 +47,11 @@ public class CharacterData : ScriptableObject {
   //public float energyResist() {}
   //public float etherResist() {}
 
+  public string Name { get { return characterName; } set { characterName = value; } }
+  public int Level { get { return level; } }
 
+
+  public override string ToString() {
+    return Name;
+  }
 }

@@ -40,7 +40,7 @@ public class TerrainDebris : MonoBehaviour {
   }
 
   // Takes a 3D array of localspace nodes and generates the mesh for this debris
-  public void RegenerateMesh(CubeCorner[,,] lsNodes) {
+  public void RegenerateMesh(TerrainGrid terrainGrid, CubeCorner[,,] lsNodes) {
     var vertices = new List<Vector3>();
     var triangles = new List<int>();
     var materials = new List<Tuple<Material[],float[]>>();
@@ -69,7 +69,9 @@ public class TerrainDebris : MonoBehaviour {
     mesh.vertices = vertices.ToArray();
 
     // Split the mesh triangles up into their respective material groups (i.e., submeshes)
-    MeshHelper.Submeshify(ref mesh, ref meshRenderer, ref materials, triangles, MaterialHelper.defaultMaterial);
+    var terrainAssets = terrainGrid.terrainAssetContainer;
+    MeshHelper.Submeshify(ref mesh, ref meshRenderer, ref materials, triangles, 
+      terrainAssets.defaultTerrainMaterial, terrainAssets.triplanar3BlendMaterial);
 
     mesh.RecalculateNormals(MeshHelper.defaultSmoothingAngle, MeshHelper.defaultTolerance);
     mesh.RecalculateBounds();

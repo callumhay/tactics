@@ -271,15 +271,15 @@ public class TerrainGridToolWindow : EditorWindow {
   public void paintNodes(in List<TerrainGridNode> nodes, in TerrainGrid terrainGrid) {
     switch (paintType) {
       case TGTWSettings.PaintType.Terrain:
-        if (settings.paintMaterial) { terrainGrid?.addIsoValuesAndMaterialToNodes(1f, matPaintIntensity, settings.paintMaterial, nodes); }
-        else { terrainGrid?.addIsoValuesToNodes(1f, nodes); }
+        if (settings.paintMaterial) { terrainGrid?.AddIsoValuesAndMaterialToNodes(1f, matPaintIntensity, settings.paintMaterial, nodes); }
+        else { terrainGrid?.AddIsoValuesToNodes(1f, nodes); }
         break;
       case TGTWSettings.PaintType.MaterialsOnly:
         paintNodesWithMaterial(nodes, matPaintIntensity);
         terrainGrid?.updateNodesInEditor(nodes);
         break;
       case TGTWSettings.PaintType.Water:
-        terrainGrid?.addLiquidToNodes(1f, nodes);
+        terrainGrid?.AddLiquidToNodes(1f, nodes);
         break;
       default:
         break;
@@ -289,15 +289,15 @@ public class TerrainGridToolWindow : EditorWindow {
   public void eraseNodes(in List<TerrainGridNode> nodes, in TerrainGrid terrainGrid) {
     switch (paintType) {
       case TGTWSettings.PaintType.Terrain:
-        if (settings.paintMaterial) { terrainGrid?.addIsoValuesAndMaterialToNodes(-1f, -matPaintIntensity, settings.paintMaterial, nodes); }
-        else { terrainGrid?.addIsoValuesToNodes(-1f, nodes); }
+        if (settings.paintMaterial) { terrainGrid?.AddIsoValuesAndMaterialToNodes(-1f, -matPaintIntensity, settings.paintMaterial, nodes); }
+        else { terrainGrid?.AddIsoValuesToNodes(-1f, nodes); }
         break;
       case TGTWSettings.PaintType.MaterialsOnly:
         paintNodesWithMaterial(nodes, -matPaintIntensity);
         terrainGrid?.updateNodesInEditor(nodes);
         break;
       case TGTWSettings.PaintType.Water:
-        terrainGrid?.addLiquidToNodes(-1f, nodes);
+        terrainGrid?.AddLiquidToNodes(-1f, nodes);
         break;
       default:
         break;

@@ -1,6 +1,7 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 #pragma warning disable 649
 
@@ -12,14 +13,19 @@ public class BattleStateMachine : MonoBehaviour {
 
   //[SerializeField] private StartingCutsceneBattleState startCutsceneState;
   [SerializeField] private FormationBattleState formationState;
-  //[SerializeField] private CommenceBattleState commenceState;
+  [SerializeField] private CommenceBattleState commenceState;
   //[SerializeField] private TurnBasedBattleState turnBasedState;
 
-  protected BattleState currentState;
+  private BattleState currentState;
+  public Vector2 currentInputMoveVec { get; private set; } = new Vector2(0,0);
+
 
   public TerrainGrid TerrainGrid { get { return terrainGrid; } }
   public SquareSelectionCaret SelectionCaret { get { return selectionCaret; } }
   public LevelLoaderData LevelLoader { get { return levelLoader; } }
+
+  public FormationBattleState FormationState { get { return formationState; } }
+  public CommenceBattleState CommenceState { get { return commenceState; } }
 
   public void Init() {
     SetState(formationState);
@@ -37,6 +43,8 @@ public class BattleStateMachine : MonoBehaviour {
     StartCoroutine(currentState.UpdateEvent(this));
   }
 
+  
+
 
   public void SpawnCharacter(CharacterPlacement placement) {
      SpawnCharacter(placement.Location, placement.Character); 
@@ -50,6 +58,20 @@ public class BattleStateMachine : MonoBehaviour {
 
 
   }
+
+  // Player Input Functions ***********************
+  public void OnMove(InputAction.CallbackContext inputContext) {
+    currentInputMoveVec = inputContext.ReadValue<Vector2>();
+  }
+
+  public void OnSubmit(InputAction.CallbackContext inputContext) {
+    if (inputContext.performed) { currentState.OnSubmit(this); }
+  }
+
+  public void OnCancel(InputAction.CallbackContext inputContext) {
+    if (inputContext.performed) { currentState.OnCancel(this); }
+  }
+
 
 
 }

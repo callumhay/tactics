@@ -14,10 +14,8 @@ public class TerrainColumn : MonoBehaviour {
   public static readonly int MAX_LANDING_HEIGHT_DEVIATION_NODES = 1;
   public static readonly float BOUNDS_EPSILON = 1e-4f;
 
-  public GameObject landingPrefab;
-
-  public Vector3Int index { get; private set; } // Index within the TerrainGrid
-  public List<TerrainColumnLanding> landings { get; private set; }
+  public Vector3Int index { get; private set; } = new Vector3Int(0,0,0); // Index within the TerrainGrid
+  public List<TerrainColumnLanding> landings { get; private set; } = new List<TerrainColumnLanding>();
 
   // GameObject and Mesh data
   private MeshFilter meshFilter;
@@ -28,18 +26,21 @@ public class TerrainColumn : MonoBehaviour {
     var name = GetName(terrainColIdx);
 
     var terrainColGO = terrainGrid.columnsParent.transform.Find(name)?.gameObject;
-    if (terrainColGO) { DestroyImmediate(terrainColGO); }
+    if (!terrainColGO) { 
+      terrainColGO = PrefabUtility.InstantiatePrefab((UnityEngine.Object)terrainGrid.terrainAssetContainer.terrainColumnPrefab) as GameObject;
+    }
 
-    terrainColGO = PrefabUtility.InstantiatePrefab((UnityEngine.Object)terrainGrid.terrainColumnPrefab) as GameObject;
     terrainColGO.transform.SetParent(terrainGrid.columnsParent.transform);
     terrainColGO.name = name;
     terrainColGO.transform.position = TerrainColumn.SIZE * (Vector3)terrainColIdx;
 
     var terrainCol = terrainColGO.GetComponent<TerrainColumn>();
-    terrainCol.index = terrainColIdx;
-    terrainCol.meshFilter   = terrainColGO.GetComponent<MeshFilter>();
-    terrainCol.meshCollider = terrainColGO.GetComponent<MeshCollider>();
-    terrainCol.meshRenderer = terrainColGO.GetComponent<MeshRenderer>();
+    if (terrainCol) {
+      terrainCol.index = terrainColIdx;
+      terrainCol.meshFilter   = terrainColGO.GetComponent<MeshFilter>();
+      terrainCol.meshCollider = terrainColGO.GetComponent<MeshCollider>();
+      terrainCol.meshRenderer = terrainColGO.GetComponent<MeshRenderer>();
+    }
 
     return terrainCol;
   }
@@ -53,14 +54,6 @@ public class TerrainColumn : MonoBehaviour {
   public int NumNodesX() { return TerrainColumn.SIZE * TerrainGrid.NODES_PER_UNIT; }
   public int NumNodesY(TerrainGrid terrain) { return terrain.ySize  * TerrainGrid.NODES_PER_UNIT; }
   public int NumNodesZ() { return TerrainColumn.SIZE * TerrainGrid.NODES_PER_UNIT; }
-
-  private void ClearLandingRanges() {
-    if (landings != null) {
-      foreach (var landing in landings) {
-        GameObject.DestroyImmediate(landing);
-      }
-    }
-  }
 
   public void GetMeshMinMax(TerrainGrid terrain, out Vector3 minPt, out Vector3 maxPt, bool includeLevelBounds=true) {
     // When building the mesh for a TerrainColumn: 
@@ -114,7 +107,9 @@ public class TerrainColumn : MonoBehaviour {
     mesh.vertices = vertices.ToArray();
 
     // Split the mesh triangles up into their respective material groups (i.e., submeshes)
-    MeshHelper.Submeshify(ref mesh, ref meshRenderer, ref materials, triangles, MaterialHelper.defaultMaterial);
+    var terrainAssets = terrain.terrainAssetContainer;
+    MeshHelper.Submeshify(ref mesh, ref meshRenderer, ref materials, triangles, 
+      terrainAssets.defaultTerrainMaterial, terrainAssets.triplanar3BlendMaterial);
 
     Vector3 minPt, maxPt;
     GetMeshMinMax(terrain, out minPt, out maxPt);
@@ -128,9 +123,7 @@ public class TerrainColumn : MonoBehaviour {
   }
 
   private void RegenerateLandings(TerrainGrid terrain) {
-    ClearLandingRanges();
-    landings = new List<TerrainColumnLanding>();
-
+    landings.Clear();
     var idxRange = terrain.GetIndexRangeForTerrainColumn(this);
     idxRange.yEndIdx -= (MIN_LANDING_OVERHANG_NODES-1);
 
@@ -229,9 +222,11 @@ public class TerrainColumn : MonoBehaviour {
             landingMax.x += idxRange.xStartIdx;
             landingMax.z += idxRange.zStartIdx;
             // Create the landing...
-            var landing = TerrainColumnLanding.GetUniqueTerrainColumnLanding(this, landingMin, landingMax);
-            landing.RegenerateMesh(terrain, this);
-            landings.Add(landing);
+            var landing = TerrainColumnLanding.GetUniqueTerrainColumnLanding(this, terrain.terrainAssetContainer.terrainColumnLandingPrefab, landingMin, landingMax);
+            if (landing) {
+              landing.RegenerateMesh(terrain, this);
+              landings.Add(landing);
+            }
           }
         }
       }

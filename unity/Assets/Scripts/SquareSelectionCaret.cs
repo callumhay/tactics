@@ -1,4 +1,5 @@
 ﻿using UnityEngine;
+using UnityEngine.InputSystem;
 
 #pragma warning disable 649
 
@@ -17,21 +18,51 @@ public class SquareSelectionCaret : MonoBehaviour {
   private float moveSpeed = 0.25f;
 
   [SerializeField] private TerrainGrid terrainGrid;
+  //[Header("Materials")]
+  //[SerializeField] private Material defaultCaretMaterial;
+  //[SerializeField] private Material activeCaretMaterial;
 
-  private TerrainColumnLanding currLanding;
+  private TerrainColumnLanding currentLanding;
   private MeshFilter meshFilter;
   private MeshRenderer meshRenderer;
+
+  // Whether the player has "activated" the currently selected landing 
+  // i.e., They are performing some action within that selection 
+  // (they must cancel out in order to continue moving the caret)
+  private bool isSelectionActive = false;
+
+  // Input state variables
   private bool moveAxisInUse = false;
   private float moveTimeCount = 0f;
+  private Vector2 inputMoveVec = new Vector2(0,0);
+
+  public TerrainColumnLanding CurrentLanding { get { return currentLanding; } }
+
+  public bool IsSelectionActive { 
+    get { return isSelectionActive; } 
+    set { 
+      if (gameObject.activeSelf && currentLanding != null) {
+        currentLanding.SetActiveSelected(value);
+      }
+      isSelectionActive = value;
+    }
+  }
+
+  public void OnMoveCaret(InputAction.CallbackContext inputContext) {
+    inputMoveVec = inputContext.ReadValue<Vector2>();
+  }
 
   public void HandleInput() {
-    var horizInput = Input.GetAxisRaw("Horizontal");
-    var vertInput  = Input.GetAxisRaw("Vertical");
-    if (horizInput != 0 || vertInput != 0) {
+    if (isSelectionActive) { 
+      moveAxisInUse = false;
+      return;
+    }
+
+    if (inputMoveVec.x != 0 || inputMoveVec.y != 0) {
       if (!moveAxisInUse) {
         moveAxisInUse = true;
         moveTimeCount = 0;
-        MoveCaret(horizInput, vertInput);
+        MoveCaret(inputMoveVec.x, inputMoveVec.y);
       }
     }
     else {
@@ -40,7 +71,7 @@ public class SquareSelectionCaret : MonoBehaviour {
   }
 
   private void MoveCaret(float xAxisDir, float yAxisDir) {
-    if (currLanding == null) { return; }
+    if (currentLanding == null) { return; }
 
     // Determine the direction the active camera is pointing in to figure out how to move the caret
     // based on the current controls - i.e., move the controls into worldspace
@@ -54,7 +85,7 @@ public class SquareSelectionCaret : MonoBehaviour {
 
     // Project the controls onto the x and z axis, based on which has a larger magnitude of
     // projected contribution, favour the horizontal projection when there are ties
-    var nextIndex = currLanding.terrainColIdx;
+    var nextIndex = currentLanding.terrainColIdx;
     var absAdjHorizX = Mathf.Abs(adjustedHoriz.x);
     var absAdjVertX  = Mathf.Abs(adjustedVert.x);
     var absAdjHorizZ = Mathf.Abs(adjustedHoriz.z);
@@ -90,14 +121,14 @@ public class SquareSelectionCaret : MonoBehaviour {
     PlaceCaret(landing);
   }
   public void PlaceCaret(in TerrainColumnLanding landing) {
-    if (currLanding == landing || landing == null) { return; }
+    if (currentLanding == landing || landing == null) { return; }
     var centerPos = landing.CenterPosition();
     transform.position = centerPos + CaretLocalPosition();
-    if (currLanding != null) { 
-      currLanding.gameObject.SetActive(false);
+    if (currentLanding != null) { 
+      currentLanding.SetSelected(false); //gameObject.SetActive(false);
     }
-    landing.gameObject.SetActive(true);
-    currLanding = landing;
+    landing.SetSelected(true);//landing.gameObject.SetActive(true);
+    currentLanding = landing;
   }
 
   private void Awake() {
@@ -113,14 +144,18 @@ public class SquareSelectionCaret : MonoBehaviour {
 
   private void Start() { }
 
-  void OnEnable() {
-    //if (currLanding == null) {
-    //  PlaceCaret(terrainGrid.GetTerrainColumn(new Vector2Int(0,0)));
-    //}
+  private void OnEnable() {
+    if (currentLanding == null) { return; }
+    currentLanding.SetSelected(true);
+    currentLanding.SetActiveSelected(isSelectionActive);
+  }
+  private void OnDisable() {
+    if (currentLanding == null) { return; }
+    currentLanding.SetSelected(false);
   }
 
-  void Update() {
-    if (currLanding == null) { 
+  private void Update() {
+    if (currentLanding == null) { 
       gameObject.SetActive(false);
       return;
     }
@@ -138,7 +173,7 @@ public class SquareSelectionCaret : MonoBehaviour {
   }
 
   private TerrainColumnLanding ClosestLanding(in TerrainColumn terrainCol) {
-    if (currLanding == null && terrainCol.landings.Count > 0) { return terrainCol.landings[0]; }
+    if (currentLanding == null && terrainCol.landings.Count > 0) { return terrainCol.landings[0]; }
     TerrainColumnLanding result = null;
     float closestSqrDist = float.MaxValue;
     var currPos = transform.position - CaretLocalPosition();

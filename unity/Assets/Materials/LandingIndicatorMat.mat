@@ -1,5 +1,18 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
+--- !u!114 &-3043768101750268711
+MonoBehaviour:
+  m_ObjectHideFlags: 11
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: da692e001514ec24dbc4cca1949ff7e8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  version: 2
 --- !u!21 &2100000
 Material:
   serializedVersion: 6
@@ -7,7 +20,7 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: TerrainHighlightMat
+  m_Name: LandingIndicatorMat
   m_Shader: {fileID: -6465566751694194690, guid: 596ba7bbc3a6a4d24b844c414d78150f,
     type: 3}
   m_ShaderKeywords: _ALPHATEST_ON _BLENDMODE_ALPHA _DISABLE_SSR _ENABLE_FOG_ON_TRANSPARENT
@@ -234,8 +247,8 @@ Material:
     - _ZTestModeDistortion: 4
     - _ZTestTransparent: 4
     - _ZWrite: 0
-    - alpha: 0.05
-    - fresnelPower: 0.2
+    - alpha: 0.04
+    - fresnelPower: 0.286
     - glow: 0.7
     m_Colors:
     - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
@@ -254,19 +267,6 @@ Material:
     - _UVDetailsMappingMask: {r: 1, g: 0, b: 0, a: 0}
     - _UVMappingMask: {r: 1, g: 0, b: 0, a: 0}
     - _UVMappingMaskEmissive: {r: 1, g: 0, b: 0, a: 0}
-    - baseColour: {r: 3.9999995, g: 0.6910994, b: 0, a: 1}
-    - highlightColour: {r: 7.999999, g: 7.999999, b: 0.29319367, a: 1}
+    - baseColour: {r: 0, g: 2.418401, b: 5.3403134, a: 1}
+    - highlightColour: {r: 0, g: 3.6603174, b: 4.237095, a: 1}
   m_BuildTextureStacks: []
---- !u!114 &2145607536396450120
-MonoBehaviour:
-  m_ObjectHideFlags: 11
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: da692e001514ec24dbc4cca1949ff7e8, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  version: 2

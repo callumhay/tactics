@@ -1,9 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEditor;
-using UnityEditor.SceneManagement;
-using UnityEngine.Events;
+
 #pragma warning disable 649
 
 [ExecuteAlways]
@@ -28,15 +26,13 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
 
   public LevelData levelData;
   public GameObject columnsParent;
-  public GameObject terrainColumnPrefab;
-
+  
   [SerializeField] private LevelLoaderData levelLoader;
-
-  [SerializeField] private GameObject debrisPrefab;
   [SerializeField] private FloatReference debrisUpdateFrequency;
-
   [SerializeField] private LiquidCompute liquidCompute;
   [SerializeField] private LiquidVolumeRaymarcher liquidVolumeRaymarcher;
+
+  public TerrainSharedAssetContainer terrainAssetContainer { get; private set; }
 
   // Live data used in the editor and in-game, note that we serialize these fields so that we can undo/redo edit operations
   private float debrisTimeCounter = 0;
@@ -85,6 +81,12 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     TerrainColumn result = null;
     terrainColumns?.TryGetValue(tcIdx, out result);
     return result;
+  }
+
+  public TerrainColumnLanding GetLanding(CharacterPlacement placement) {
+    var location = placement.Location;
+    var terrainCol = GetTerrainColumn(location);
+    return terrainCol.landings[location.y];
   }
 
   public void GetGridSnappedPoint(ref Vector3 wsPt) {
@@ -174,7 +176,7 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
             for (var z = tcIndices.zStartIdx; z <= tcIndices.zEndIdx; z++) {
               var currNode = nodes[x,y,z];
               if (currNode.isTerrain()) {
-                var neighbours = GetNeighboursForNode(currNode);
+                var neighbours = Get6NeighboursForNode(currNode);
                 if (surfaceNodes) {
                   // If any of the neighbours are empty then this is a surface node
                   foreach (var neighbour in neighbours) {
@@ -206,16 +208,43 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     return tcNodes;
   }
 
-  public List<TerrainGridNode> GetNeighboursForNode(in TerrainGridNode node) {
+  public List<TerrainGridNode> Get6NeighboursForNode(in TerrainGridNode node) {
     var neighbours = new List<TerrainGridNode>();
     var idx = node.gridIndex;
-    // There are 6 potential neighbours...
     if (idx.x > 0) { neighbours.Add(nodes[idx.x-1,idx.y,idx.z]); }
     if (idx.x < nodes.GetLength(0)-1) { neighbours.Add(nodes[idx.x+1,idx.y,idx.z]); }
     if (idx.y > 0) { neighbours.Add(nodes[idx.x,idx.y-1,idx.z]); }
     if (idx.y < nodes.GetLength(1)-1) { neighbours.Add(nodes[idx.x,idx.y+1,idx.z]); }
     if (idx.z > 0) { neighbours.Add(nodes[idx.x,idx.y,idx.z-1]); }
     if (idx.z < nodes.GetLength(2)-1) { neighbours.Add(nodes[idx.x,idx.y,idx.z+1]); }
+    return neighbours;
+  }
+
+  private static readonly Vector3Int[] NEIGHBOUR_26_INDICES = new Vector3Int[]{
+    new Vector3Int(1,1,-1),  new Vector3Int(1,1,0),  new Vector3Int(1,1,1), 
+    new Vector3Int(1,0,-1),  new Vector3Int(1,0,0),  new Vector3Int(1,0,1),
+    new Vector3Int(1,-1,-1), new Vector3Int(1,-1,0), new Vector3Int(1,-1,1),
+
+    new Vector3Int(0,1,-1),  new Vector3Int(0,1,0),  new Vector3Int(0,1,1),
+    new Vector3Int(0,0,-1),                          new Vector3Int(0,0,1),
+    new Vector3Int(0,-1,-1), new Vector3Int(0,-1,0), new Vector3Int(0,-1,1),
+
+    new Vector3Int(-1,1,-1),  new Vector3Int(-1,1,0),  new Vector3Int(-1,1,1), 
+    new Vector3Int(-1,0,-1),  new Vector3Int(-1,0,0),  new Vector3Int(-1,0,1),
+    new Vector3Int(-1,-1,-1), new Vector3Int(-1,-1,0), new Vector3Int(-1,-1,1),
+  };
+  public List<TerrainGridNode> Get26NeighboursForNode(in TerrainGridNode node) {
+    var neighbours = new List<TerrainGridNode>();
+    var idx = node.gridIndex;
+
+    foreach (var neighbourIdx in NEIGHBOUR_26_INDICES) {
+      var currIdx = idx + neighbourIdx;
+      if (currIdx.x > 0 && currIdx.x < nodes.GetLength(0)-1 && 
+          currIdx.y > 0 && currIdx.y < nodes.GetLength(1)-1 &&
+          currIdx.z > 0 && currIdx.z < nodes.GetLength(2)-1) {
+        neighbours.Add(nodes[currIdx.x, currIdx.y, currIdx.z]);
+      }
+    }
     return neighbours;
   }
 
@@ -374,6 +403,9 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
   }
 
   private void Awake() {
+    terrainAssetContainer = GetComponent<TerrainSharedAssetContainer>();
+    Debug.Assert(terrainAssetContainer != null);
+
     if (Application.IsPlaying(gameObject)) {
       // If we're coming into this scene from the loading screen then we load the level it provides,
       // otherwise take whatever level data is already set in the inspector.
@@ -606,16 +638,18 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
   /// <returns>Unique set of TerrainColumns that are affected by the changed nodes.</returns>
   private HashSet<TerrainColumn> FindAllAffectedTCs(in IEnumerable<TerrainGridNode> changedNodes) {
     var terrainCols = new HashSet<TerrainColumn>();
+
+    // We need to consider to add TerrainColumns associated with any adjacent nodes to avoid seams and other artifacts
+    // caused by the node/cube dependancies that exist at the edges of each TerrainColumn mesh
+    var allAffectedNodes = new HashSet<TerrainGridNode>(changedNodes);
     foreach (var node in changedNodes) {
-      Debug.Assert(node != null);
-      foreach (var tcIndex in node.columnIndices) { terrainCols.Add(terrainColumns[tcIndex]); }
-      // We also need to add TerrainColumns associated with any adjacent nodes to avoid seams and other artifacts
-      // caused by the node/cube dependancies that exist at the edges of each TerrainColumn mesh
-      var neighbourNodes = GetNeighboursForNode(node);
-      foreach (var neighbourNode in neighbourNodes) {
-        foreach (var tcIndex in neighbourNode.columnIndices) { terrainCols.Add(terrainColumns[tcIndex]); }
-      }
+      allAffectedNodes.UnionWith(Get26NeighboursForNode(node));
     }
+
+    foreach (var node in allAffectedNodes) {
+      foreach (var tcIndex in node.columnIndices) { terrainCols.Add(terrainColumns[tcIndex]); }
+    }
+
     return terrainCols;
   }
 
@@ -665,10 +699,10 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     }
 
     // TODO: Feed in the material for the debris here as well
-    var debrisObj = Instantiate<GameObject>(debrisPrefab);
+    var debrisObj = Instantiate<GameObject>(terrainAssetContainer.debrisPrefab);
     debrisObj.transform.position = debrisCenterPos;
     debrisObj.transform.SetParent(transform);
-    debrisObj.GetComponent<TerrainDebris>().RegenerateMesh(nodeCorners);
+    debrisObj.GetComponent<TerrainDebris>().RegenerateMesh(this, nodeCorners);
 
     return debrisObj;
   }
@@ -676,7 +710,7 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
   public HashSet<TerrainGridNode> FindPeripheryNodes(in HashSet<TerrainGridNode> internalNodes) {
     var peripheryNodes = new HashSet<TerrainGridNode>();
     foreach (var node in internalNodes) {
-      var neighbours = GetNeighboursForNode(node);
+      var neighbours = Get6NeighboursForNode(node);
       foreach (var neighbour in neighbours) {
         if (!internalNodes.Contains(neighbour)) { peripheryNodes.Add(neighbour); }
       }
@@ -827,7 +861,7 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     return resultTCs;
   }
 
-  private void updateNodesInGameOrEditor(in IEnumerable<TerrainGridNode> changedNodes) {
+  private void UpdateNodesInGameOrEditor(in IEnumerable<TerrainGridNode> changedNodes) {
     #if UNITY_EDITOR
     if (!Application.IsPlaying(gameObject)) {
       updateNodesInEditor(changedNodes);
@@ -840,11 +874,11 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
     }
   }
 
-  public void addLiquidToNodes(float liquidVolPercentage, in List<TerrainGridNode> nodes) {
+  public void AddLiquidToNodes(float liquidVolPercentage, in List<TerrainGridNode> _nodes) {
     var changedNodes = new HashSet<TerrainGridNode>();
     var maxNodeVol = UnitVolumePerNode();
     var liquidVol  = maxNodeVol*liquidVolPercentage;
-    foreach (var node in nodes) {
+    foreach (var node in _nodes) {
       var prevVol = node.liquidVol;
       var prevIsoVal = node.isoVal;
 
@@ -853,26 +887,26 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
 
       if (node.liquidVol != prevVol || node.isoVal != prevIsoVal) { changedNodes.Add(node); }
     }
-    updateNodesInGameOrEditor(changedNodes);
+    UpdateNodesInGameOrEditor(changedNodes);
   }
 
-  public void addIsoValuesToNodes(float isoVal, in List<TerrainGridNode> nodes) {
+  public void AddIsoValuesToNodes(float isoVal, in List<TerrainGridNode> _nodes) {
     var changedNodes = new HashSet<TerrainGridNode>();
-    foreach (var node in nodes) {
+    foreach (var node in _nodes) {
       var prevIsoVal = node.isoVal;
 
       if (node.isLiquid()) { node.isoVal = 0f; } // If the node is liquid then we can't add land to it
       else { node.isoVal = Mathf.Clamp(node.isoVal + isoVal, 0, 1); }
-
+      
       if (node.isoVal != prevIsoVal) { changedNodes.Add(node); }
     }
-    updateNodesInGameOrEditor(changedNodes);
+    UpdateNodesInGameOrEditor(changedNodes);
   }
 
-  public void addIsoValuesAndMaterialToNodes(float isoVal, float matAmt, Material mat, in List<TerrainGridNode> nodes) {
+  public void AddIsoValuesAndMaterialToNodes(float isoVal, float matAmt, Material mat, in List<TerrainGridNode> _nodes) {
     var changedNodes = new HashSet<TerrainGridNode>();
-    var matToPaint = mat ? mat : MaterialHelper.defaultMaterial;
-    foreach (var node in nodes) {
+    var matToPaint = mat ? mat : terrainAssetContainer.defaultTerrainMaterial;
+    foreach (var node in _nodes) {
       var prevIsoVal = node.isoVal;
 
       if (node.isLiquid()) { node.isoVal = 0f; } // If the node is liquid then we can't add land to it
@@ -912,7 +946,7 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
         }
       }
     }
-    updateNodesInGameOrEditor(changedNodes);
+    UpdateNodesInGameOrEditor(changedNodes);
   }
 
   // Editor-Only Stuff ----------------------------------------------
@@ -1042,8 +1076,8 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
           }
         }
       }
-      if (mat) { addIsoValuesAndMaterialToNodes(isoVal, 1f, mat, editNodes); }
-      else { addIsoValuesToNodes(isoVal, editNodes); }
+      if (mat) { AddIsoValuesAndMaterialToNodes(isoVal, 1f, mat, editNodes); }
+      else { AddIsoValuesToNodes(isoVal, editNodes); }
     }
   }
 

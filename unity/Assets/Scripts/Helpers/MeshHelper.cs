@@ -430,7 +430,8 @@ public static class MeshHelper {
   }
 
   public static void Submeshify(ref Mesh mesh, ref MeshRenderer meshRenderer, 
-    in List<int> triangles, in List<Material> materials, in Material defaultMat
+    in List<int> triangles, in List<Material> materials, Material defaultMat, 
+    Material triplanar3BlendMat
   ) {
 
     Debug.Assert(triangles.Count == materials.Count);
@@ -473,7 +474,7 @@ public static class MeshHelper {
         Material multiMat = null;
         
         if (!multiMatDict.TryGetValue(matSet, out multiMat)) {
-          multiMat = new Material(Resources.Load<Material>("Materials/Triplanar3BlendMat"));
+          multiMat = new Material(triplanar3BlendMat);
 
           var m0GndTex   = m0.GetTexture("GroundTex");
           var m0GndNTex  = m0.GetTexture("GroundNormalTex");
@@ -565,7 +566,7 @@ public static class MeshHelper {
   
   public static void Submeshify(
     ref Mesh mesh, ref MeshRenderer meshRenderer, ref List<Tuple<Material[], float[]>> materials,
-    in List<int> triangles, in Material defaultMat
+    in List<int> triangles, Material defaultMat, Material triplanar3BlendMat
   ) {
 
     Debug.Assert(triangles.Count == materials.Count);
@@ -633,7 +634,7 @@ public static class MeshHelper {
       List<int> submeshList = null;
 
       if (!multiMatDict.TryGetValue(allMatSet, out multiMat)) {
-        multiMat = new Material(Resources.Load<Material>("Materials/Triplanar3BlendMat"));
+        multiMat = new Material(triplanar3BlendMat);
         
         float avgMetallic = 0;
         float avgSmoothness = 0;

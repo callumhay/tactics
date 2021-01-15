@@ -342,7 +342,7 @@ public class TerrainGridTool : EditorTool {
         if (Handles.Button(node.position + translation, rot, nodeDrawSize, nodeDrawSize, Handles.CubeHandleCap)) {
           tempList.Clear(); tempList.Add(node);
           Undo.RecordObject(terrainGrid.levelData, "Edited Terrain Node");
-          terrainGrid.addIsoValuesToNodes(toggleIsoVal, tempList);
+          terrainGrid.AddIsoValuesToNodes(toggleIsoVal, tempList);
         }
       }
     }

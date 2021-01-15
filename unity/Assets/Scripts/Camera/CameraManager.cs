@@ -1,4 +1,5 @@
 ﻿using UnityEngine;
+using UnityEngine.InputSystem;
 
 public class CameraManager : MonoBehaviour {
 
@@ -10,10 +11,8 @@ public class CameraManager : MonoBehaviour {
     debugCamera.gameObject.SetActive(false);
   }
 
-  private void Update() {
-    if (Input.GetKeyDown(KeyCode.C)) {
-      mainCamera.gameObject.SetActive(!mainCamera.gameObject.activeSelf);
-      debugCamera.gameObject.SetActive(!debugCamera.gameObject.activeSelf);
-    }
+  public void OnToggleDebugCamera(InputAction.CallbackContext inputContext) {
+    mainCamera.gameObject.SetActive(!mainCamera.gameObject.activeSelf);
+    debugCamera.gameObject.SetActive(!debugCamera.gameObject.activeSelf);
   }
 }

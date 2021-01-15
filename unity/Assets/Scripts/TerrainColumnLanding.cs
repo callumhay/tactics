@@ -12,25 +12,86 @@ public class TerrainColumnLanding : MonoBehaviour {
   private MeshFilter meshFilter;
   private MeshRenderer meshRenderer;
 
-  public static TerrainColumnLanding GetUniqueTerrainColumnLanding(TerrainColumn terrainCol, Vector3Int min, Vector3Int max) {
+  private bool isIdleIndicated  = false;
+  private bool isSelected       = false;
+  private bool isActiveSelected = false;
+
+  public void SetSelected(bool toggle) {
+    var assets = FindObjectOfType<TerrainSharedAssetContainer>();
+    if (toggle) {
+      if (!isActiveSelected) {
+        gameObject.SetActive(true);
+        meshRenderer.sharedMaterial = assets.selectedLandingMaterial;
+      }
+    }
+    else {
+      isActiveSelected = false; // If we're no longer selected then we can't be active
+      if (!isIdleIndicated) {
+        gameObject.SetActive(false);
+      }
+      else {
+        gameObject.SetActive(true);
+        meshRenderer.sharedMaterial = assets.indicatorLandingMaterial;
+      }
+    }
+    isSelected = toggle;
+  }
+  public void SetActiveSelected(bool toggle) {
+    var assets = FindObjectOfType<TerrainSharedAssetContainer>();
+    if (toggle) {
+      isSelected = true; // Must be selected to be active
+      gameObject.SetActive(true);
+      meshRenderer.sharedMaterial = assets.activeLandingMaterial;
+    }
+    else {
+      if (isSelected) {
+        gameObject.SetActive(true);
+        meshRenderer.sharedMaterial = assets.selectedLandingMaterial;
+      }
+      else if (isIdleIndicated) {
+        gameObject.SetActive(true);
+        meshRenderer.sharedMaterial = assets.indicatorLandingMaterial;
+      }
+      else {
+        gameObject.SetActive(false);
+      }
+    }
+    isActiveSelected = toggle;
+  }
+  public void SetIdleIndicated(bool toggle) {
+    var assets = FindObjectOfType<TerrainSharedAssetContainer>();
+    if (!isSelected && !isActiveSelected) {
+      if (toggle) {
+        gameObject.SetActive(true);
+        meshRenderer.sharedMaterial = assets.indicatorLandingMaterial;
+      }
+      else {
+        gameObject.SetActive(false);
+      }
+    }
+    isIdleIndicated = toggle;
+  }
+
+  public static TerrainColumnLanding GetUniqueTerrainColumnLanding(TerrainColumn terrainCol, GameObject prefab, Vector3Int min, Vector3Int max) {
     Debug.Assert(terrainCol != null && min.x <= max.x && min.y <= max.y && min.z <= max.z);
     var name = GetName(min, max);
     var landingGO = terrainCol.transform.Find(name)?.gameObject;
-    if (landingGO) {
-      DestroyImmediate(landingGO);
+    if (!landingGO) {
+      landingGO = PrefabUtility.InstantiatePrefab((UnityEngine.Object)prefab) as GameObject;
     }
     
-    landingGO = PrefabUtility.InstantiatePrefab((UnityEngine.Object)terrainCol.landingPrefab) as GameObject;
     landingGO.transform.SetParent(terrainCol.transform);
     landingGO.transform.localPosition = Vector3.zero;
     landingGO.name = name;
 
     var landing = landingGO.GetComponent<TerrainColumnLanding>();
-    landing.terrainColIdx = terrainCol.index;
-    landing.minIdx = min;
-    landing.maxIdx = max;
-    landing.meshFilter   = landingGO.GetComponent<MeshFilter>();
-    landing.meshRenderer = landingGO.GetComponent<MeshRenderer>();
+    if (landing) {
+      landing.terrainColIdx = terrainCol.index;
+      landing.minIdx = min;
+      landing.maxIdx = max;
+      landing.meshFilter   = landingGO.GetComponent<MeshFilter>();
+      landing.meshRenderer = landingGO.GetComponent<MeshRenderer>();
+    }
     return landing;
   }
 
@@ -135,7 +196,6 @@ public class TerrainColumnLanding : MonoBehaviour {
     }
 
     meshFilter.sharedMesh = mesh;
-
     gameObject.SetActive(false);
   }
 

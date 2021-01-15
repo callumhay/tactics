@@ -29,7 +29,7 @@ public partial class TerrainGrid : MonoBehaviour {
           var node = queue.Dequeue();
           if (node.isDefinitelyGrounded()) { allAffectedGroundedNodes.Add(node); }
           
-          var neighbours = terrainGrid.GetNeighboursForNode(node)
+          var neighbours = terrainGrid.Get6NeighboursForNode(node)
             .FindAll(n => n.isTerrain() && !allAffectedNodes.Contains(n));
           foreach (var neighbour in neighbours) {
             allAffectedNodes.Add(neighbour);
@@ -82,7 +82,7 @@ public partial class TerrainGrid : MonoBehaviour {
         //Debug.Log("Grounded node found.");
         node.isTraversalGrounded = true;
         traversedSet.Add(node);
-        var terrainNeighbours = terrainGrid.GetNeighboursForNode(node).Where(n => n.isTerrain());
+        var terrainNeighbours = terrainGrid.Get6NeighboursForNode(node).Where(n => n.isTerrain());
         foreach (var neighbour in terrainNeighbours) { queue.Enqueue(neighbour); }
       }
     }
@@ -91,7 +91,7 @@ public partial class TerrainGrid : MonoBehaviour {
       in TerrainGrid terrainGrid, in TerrainGridNode node, 
       ref HashSet<TerrainGridNode> islandNodes, ref HashSet<TerrainGridNode> traversedSet
     ) {
-      var terrainNeighbours = terrainGrid.GetNeighboursForNode(node).Where(n => n.isTerrain());
+      var terrainNeighbours = terrainGrid.Get6NeighboursForNode(node).Where(n => n.isTerrain());
       traversedSet.Add(node);
       islandNodes.Add(node);
       foreach (var neighbour in terrainNeighbours) {
