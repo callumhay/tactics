@@ -13,3 +13,4 @@ MonoBehaviour:
   m_Name: TestCharacterJimbo
   m_EditorClassIdentifier: 
   characterName: Jimbo
+  level: 2

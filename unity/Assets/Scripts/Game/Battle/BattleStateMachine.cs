@@ -1,6 +1,4 @@
-﻿using System.Collections;
-using System.Collections.Generic;
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.InputSystem;
 
 #pragma warning disable 649
@@ -8,8 +6,10 @@ using UnityEngine.InputSystem;
 public class BattleStateMachine : MonoBehaviour {
 
   [SerializeField] private TerrainGrid terrainGrid;
+  [SerializeField] private CharacterManager characterManager;
   [SerializeField] private SquareSelectionCaret selectionCaret;
-  [SerializeField] private LevelLoaderData levelLoader;
+  [SerializeField] private CharacterInfoAndPlacementUI infoAndPlacementUI;
+
 
   //[SerializeField] private StartingCutsceneBattleState startCutsceneState;
   [SerializeField] private FormationBattleState formationState;
@@ -17,17 +17,23 @@ public class BattleStateMachine : MonoBehaviour {
   //[SerializeField] private TurnBasedBattleState turnBasedState;
 
   private BattleState currentState;
+  private LevelLoaderData levelLoader;
+
   public Vector2 currentInputMoveVec { get; private set; } = new Vector2(0,0);
 
-
   public TerrainGrid TerrainGrid { get { return terrainGrid; } }
+  public CharacterManager CharacterManager { get { return characterManager; } }
   public SquareSelectionCaret SelectionCaret { get { return selectionCaret; } }
+  public CharacterInfoAndPlacementUI InfoAndPlacementUI { get { return infoAndPlacementUI; } }
   public LevelLoaderData LevelLoader { get { return levelLoader; } }
 
   public FormationBattleState FormationState { get { return formationState; } }
   public CommenceBattleState CommenceState { get { return commenceState; } }
 
-  public void Init() {
+  public void Init(LevelLoaderData lvlLoader) {
+    levelLoader = lvlLoader;
+    currentState = null;
+
     SetState(formationState);
   }
 
@@ -43,35 +49,19 @@ public class BattleStateMachine : MonoBehaviour {
     StartCoroutine(currentState.UpdateEvent(this));
   }
 
-  
-
-
-  public void SpawnCharacter(CharacterPlacement placement) {
-     SpawnCharacter(placement.Location, placement.Character); 
-  }
-  public void SpawnCharacter(Vector3Int location, CharacterData character) {
-    Debug.Assert(character != null, "Attempting to spawn a character that doesn't exist!");
-
-    var terrainCol = terrainGrid.GetTerrainColumn(location);
-    Debug.Assert(terrainCol != null, "No TerrainColumn found at location " + location + ". Check GameObject initialization ordering!");
-
-
-
-  }
-
-  // Player Input Functions ***********************
+  #region Input Events
   public void OnMove(InputAction.CallbackContext inputContext) {
     currentInputMoveVec = inputContext.ReadValue<Vector2>();
   }
-
   public void OnSubmit(InputAction.CallbackContext inputContext) {
-    if (inputContext.performed) { currentState.OnSubmit(this); }
+    if (inputContext.performed) { currentState.OnSubmitInputEvent(this); }
   }
-
   public void OnCancel(InputAction.CallbackContext inputContext) {
-    if (inputContext.performed) { currentState.OnCancel(this); }
+    if (inputContext.performed) { currentState.OnCancelInputEvent(this); }
   }
-
-
+  public void OnRemove(InputAction.CallbackContext inputContext) {
+    if (inputContext.performed) { currentState.OnRemoveInputEvent(this); }
+  }
+  #endregion
 
 }

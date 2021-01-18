@@ -84,10 +84,13 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
   }
 
   public TerrainColumnLanding GetLanding(CharacterPlacement placement) {
-    var location = placement.Location;
+    return GetLanding(placement.Location); 
+  }
+  public TerrainColumnLanding GetLanding(Vector3Int location) {
     var terrainCol = GetTerrainColumn(location);
     return terrainCol.landings[location.y];
   }
+
 
   public void GetGridSnappedPoint(ref Vector3 wsPt) {
     // Find the closest column center to the given point and snap to it
@@ -132,7 +135,7 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
   }
 
   public IndexRange GetIndexRangeForTerrainColumn(in TerrainColumn terrainCol) {
-    return GetIndexRangeForTerrainColumn(terrainCol.index);
+    return GetIndexRangeForTerrainColumn(terrainCol.location);
   }
   public IndexRange GetIndexRangeForTerrainColumn(in Vector3Int terrainColIdx) {
     var numNodesPerTCMinus1 = TerrainColumn.SIZE*TerrainGrid.NODES_PER_UNIT-1;
@@ -355,7 +358,7 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
 
 
   public static Vector3Int TerrainColumnNodeIndex(in TerrainColumn terrainCol, in Vector3Int localIdx) {
-    return TerrainColumnNodeIndex(terrainCol.index, localIdx);
+    return TerrainColumnNodeIndex(terrainCol.location, localIdx);
   }
   public static Vector3Int TerrainColumnNodeIndex(in Vector3Int terrainColIdx, in Vector3Int localIdx) {
     return new Vector3Int(
@@ -394,7 +397,27 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
   /// <summary>
   /// Called to initialize this in play mode from the Scene Manager.
   /// </summary>
-  public void Init() {
+  public void Init(LevelData level) {
+    if (!Application.IsPlaying(gameObject)) {
+      Debug.LogWarning("Init should not be called unless the game is playing!");
+      return;
+    }
+
+    // If we're coming into this scene from the loading screen then we load the level it provides,
+    // otherwise take whatever level data is already set in the inspector.
+    // IMPORTANT NOTE: We must instantiate the level data in game mode or else we'll overwrite the asset while the game plays.
+    if (level != null) {
+      levelData = Instantiate<LevelData>(level);
+    }
+    else if (levelData != null) {
+      levelData = Instantiate<LevelData>(levelData);
+    }
+    else {
+      Debug.LogError("No level data is available for loading the terrain!");
+      return;
+    }
+    LoadLevelDataNodes();
+
     // Build all the assets for the game that aren't stored in the level data
     BuildTerrainLiquid();
     BuildBedrock();
@@ -405,20 +428,6 @@ public partial class TerrainGrid : MonoBehaviour, ISerializationCallbackReceiver
   private void Awake() {
     terrainAssetContainer = GetComponent<TerrainSharedAssetContainer>();
     Debug.Assert(terrainAssetContainer != null);
-
-    if (Application.IsPlaying(gameObject)) {
-      // If we're coming into this scene from the loading screen then we load the level it provides,
-      // otherwise take whatever level data is already set in the inspector.
-      // IMPORTANT NOTE: We must instantiate the level data in game mode or else we'll overwrite the asset while the game plays.
-      if (levelLoader.Instance().levelDataToLoad) {
-        levelData = Instantiate<LevelData>(levelLoader.Instance().levelDataToLoad);
-      }
-      else if (levelData != null) {
-        levelData = Instantiate<LevelData>(levelData);
-      }
-
-      LoadLevelDataNodes();
-    }
   }
 
   private void Start() {

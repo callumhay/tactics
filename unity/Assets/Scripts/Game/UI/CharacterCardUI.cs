@@ -6,6 +6,7 @@ using TMPro;
 
 public class CharacterCardUI : MonoBehaviour {
   [SerializeField] private Image portrait;
+  [SerializeField] private Image backPanel;
   [SerializeField] private TextMeshProUGUI nameText;
   [SerializeField] private TextMeshProUGUI levelText;
 
@@ -13,6 +14,9 @@ public class CharacterCardUI : MonoBehaviour {
     // TODO: Portrait...
     nameText.text = character.Name;
     levelText.text = character.Level.ToString();
+  }
+  public void SetIsHighlighted(bool isHighlighted) {
+    backPanel.gameObject.SetActive(isHighlighted);
   }
 
 }

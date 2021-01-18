@@ -9,8 +9,8 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 1771e208026a14733a8a829a89845111, type: 3}
-  m_Name: TestCharacterBob
+  m_Script: {fileID: 11500000, guid: ee9f8f67f524d471e87041b4976d6ec6, type: 3}
+  m_Name: SelectionCaretMoveEvent
   m_EditorClassIdentifier: 
-  characterName: Bob
-  level: 1
+  DeveloperDescription: Triggered whenever the Square Selection Caret is moved to
+    a different location on the battlefield.

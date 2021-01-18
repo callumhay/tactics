@@ -12,3 +12,5 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ee9f8f67f524d471e87041b4976d6ec6, type: 3}
   m_Name: DebrisFellOffTerrainEvent
   m_EditorClassIdentifier: 
+  DeveloperDescription: Triggered when a piece of debris has officially fallen out
+    of view, off the terrain.

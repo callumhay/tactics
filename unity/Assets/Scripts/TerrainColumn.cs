@@ -14,7 +14,7 @@ public class TerrainColumn : MonoBehaviour {
   public static readonly int MAX_LANDING_HEIGHT_DEVIATION_NODES = 1;
   public static readonly float BOUNDS_EPSILON = 1e-4f;
 
-  public Vector3Int index { get; private set; } = new Vector3Int(0,0,0); // Index within the TerrainGrid
+  public Vector3Int location { get; private set; } = new Vector3Int(0,0,0); // Index/Location within the TerrainGrid
   public List<TerrainColumnLanding> landings { get; private set; } = new List<TerrainColumnLanding>();
 
   // GameObject and Mesh data
@@ -36,7 +36,7 @@ public class TerrainColumn : MonoBehaviour {
 
     var terrainCol = terrainColGO.GetComponent<TerrainColumn>();
     if (terrainCol) {
-      terrainCol.index = terrainColIdx;
+      terrainCol.location = terrainColIdx;
       terrainCol.meshFilter   = terrainColGO.GetComponent<MeshFilter>();
       terrainCol.meshCollider = terrainColGO.GetComponent<MeshCollider>();
       terrainCol.meshRenderer = terrainColGO.GetComponent<MeshRenderer>();
@@ -60,7 +60,7 @@ public class TerrainColumn : MonoBehaviour {
     // If we're at the near or far extents of the grid then we include one layer of the outside coordinates.
     // We do this to avoid culling the triangles that make up the outer walls of the terrain.
     var outerLayerAmt = TerrainGrid.UnitsPerNode();
-    minPt = new Vector3(includeLevelBounds ? Mathf.Min(index.x-outerLayerAmt,0) : 0, float.MinValue, includeLevelBounds ? Mathf.Min(index.z-outerLayerAmt,0) : 0);
+    minPt = new Vector3(includeLevelBounds ? Mathf.Min(location.x-outerLayerAmt,0) : 0, float.MinValue, includeLevelBounds ? Mathf.Min(location.z-outerLayerAmt,0) : 0);
     maxPt = new Vector3(TerrainColumn.SIZE, float.MaxValue, TerrainColumn.SIZE);
     if (includeLevelBounds) {
       var extentNodeIdx = TerrainGrid.TerrainColumnNodeIndex(this, new Vector3Int(NumNodesX(), NumNodesY(terrain), NumNodesZ()));
@@ -222,7 +222,7 @@ public class TerrainColumn : MonoBehaviour {
             landingMax.x += idxRange.xStartIdx;
             landingMax.z += idxRange.zStartIdx;
             // Create the landing...
-            var landing = TerrainColumnLanding.GetUniqueTerrainColumnLanding(this, terrain.terrainAssetContainer.terrainColumnLandingPrefab, landingMin, landingMax);
+            var landing = TerrainColumnLanding.GetUniqueTerrainColumnLanding(this, terrain.terrainAssetContainer.terrainColumnLandingPrefab, landingMin, landingMax, landings.Count);
             if (landing) {
               landing.RegenerateMesh(terrain, this);
               landings.Add(landing);

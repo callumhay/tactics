@@ -4,7 +4,7 @@
 /// Inherit from this base class to create a singleton for ScriptableObjects.
 /// e.g. public class MyClassName : Singleton<MyClassName> {}
 /// </summary>
-public class SingletonSO<T> : ScriptableObject where T : ScriptableObject {
+public class SingletonSO<T> : ScriptableObject where T : SingletonSO<T> {
   // Check to see if we're about to be destroyed.
   private static bool _shuttingDown = false;
   private static object _lock = new object();
@@ -27,6 +27,7 @@ public class SingletonSO<T> : ScriptableObject where T : ScriptableObject {
           // Create new instance if one doesn't already exist
           if (!_instance) {
             _instance = CreateInstance<T>();
+            //_instance.OnInit();
           }
         }
 
@@ -34,6 +35,8 @@ public class SingletonSO<T> : ScriptableObject where T : ScriptableObject {
       }
     }
   }
+
+  //protected virtual void OnInit() {}
 
   private void OnDestroy() {
     _shuttingDown = true;

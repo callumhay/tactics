@@ -7,17 +7,22 @@ public class SquareSelectionCaret : MonoBehaviour {
   public static readonly float CARET_HEIGHT = 0.25f;
   public static readonly float CARET_OVERHANG_SPACING = CARET_HEIGHT/2f;
 
+  [Header("Caret Settings")]
   [Range(0,360)]
   [Tooltip("Rotation speed of the caret in degrees per second")]
   [SerializeField]
   private float rotationSpeed = 45f;
-
   [Range(0,1)]
   [Tooltip("Caret move speed when the direction is held down")]
   [SerializeField]
   private float moveSpeed = 0.25f;
 
+  [Header("Required GameObjects")]
   [SerializeField] private TerrainGrid terrainGrid;
+
+  [Header("Events")]
+  [SerializeField] private GameObjectEvent onCaretMovedEvent;
+
   //[Header("Materials")]
   //[SerializeField] private Material defaultCaretMaterial;
   //[SerializeField] private Material activeCaretMaterial;
@@ -85,7 +90,7 @@ public class SquareSelectionCaret : MonoBehaviour {
 
     // Project the controls onto the x and z axis, based on which has a larger magnitude of
     // projected contribution, favour the horizontal projection when there are ties
-    var nextIndex = currentLanding.terrainColIdx;
+    var nextIndex = currentLanding.location;
     var absAdjHorizX = Mathf.Abs(adjustedHoriz.x);
     var absAdjVertX  = Mathf.Abs(adjustedVert.x);
     var absAdjHorizZ = Mathf.Abs(adjustedHoriz.z);
@@ -125,10 +130,11 @@ public class SquareSelectionCaret : MonoBehaviour {
     var centerPos = landing.CenterPosition();
     transform.position = centerPos + CaretLocalPosition();
     if (currentLanding != null) { 
-      currentLanding.SetSelected(false); //gameObject.SetActive(false);
+      currentLanding.SetSelected(false);
     }
-    landing.SetSelected(true);//landing.gameObject.SetActive(true);
+    landing.SetSelected(true);
     currentLanding = landing;
+    onCaretMovedEvent?.FireEvent(gameObject);
   }
 
   private void Awake() {

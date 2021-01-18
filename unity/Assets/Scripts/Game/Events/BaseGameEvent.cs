@@ -2,6 +2,9 @@
 using UnityEngine;
 
 public abstract class BaseGameEvent<T> : ScriptableObject {
+#if UNITY_EDITOR
+    [Multiline] public string DeveloperDescription = "";
+#endif
   private readonly List<IGameEventListener<T>> eventListeners = new List<IGameEventListener<T>>();
 
   public void FireEvent(T eventData) {

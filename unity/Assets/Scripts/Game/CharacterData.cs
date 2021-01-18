@@ -2,11 +2,13 @@
 using System.Collections.Generic;
 using UnityEngine;
 
+#pragma warning disable 649
+
 [CreateAssetMenu(fileName="New Character", menuName="Tactics/Character")]
 public class CharacterData : ScriptableObject {
 
-  [SerializeField] private string characterName;
-  [SerializeField] [Range(1,99)] private int level;
+  [SerializeField] private string characterName = string.Empty;
+  [SerializeField] [Range(1,99)] private int level = 1;
   //[Range(0,99)] public int xp;
 
   //[Header("Job Classes")]

@@ -5,7 +5,7 @@ using UnityEditor;
 [ExecuteAlways]
 public class TerrainColumnLanding : MonoBehaviour {
 
-  public Vector3Int terrainColIdx { get; private set; }
+  public Vector3Int location { get; private set; }
   public Vector3Int minIdx { get; private set; }
   public Vector3Int maxIdx { get; private set; }
 
@@ -72,7 +72,7 @@ public class TerrainColumnLanding : MonoBehaviour {
     isIdleIndicated = toggle;
   }
 
-  public static TerrainColumnLanding GetUniqueTerrainColumnLanding(TerrainColumn terrainCol, GameObject prefab, Vector3Int min, Vector3Int max) {
+  public static TerrainColumnLanding GetUniqueTerrainColumnLanding(TerrainColumn terrainCol, GameObject prefab, Vector3Int min, Vector3Int max, int landingIdx) {
     Debug.Assert(terrainCol != null && min.x <= max.x && min.y <= max.y && min.z <= max.z);
     var name = GetName(min, max);
     var landingGO = terrainCol.transform.Find(name)?.gameObject;
@@ -86,7 +86,7 @@ public class TerrainColumnLanding : MonoBehaviour {
 
     var landing = landingGO.GetComponent<TerrainColumnLanding>();
     if (landing) {
-      landing.terrainColIdx = terrainCol.index;
+      landing.location = new Vector3Int(terrainCol.location.x, landingIdx, terrainCol.location.z);
       landing.minIdx = min;
       landing.maxIdx = max;
       landing.meshFilter   = landingGO.GetComponent<MeshFilter>();
@@ -107,7 +107,7 @@ public class TerrainColumnLanding : MonoBehaviour {
   }
 
   public Vector3 CenterPosition() {
-    var minNodeIdx = TerrainGrid.TerrainColumnNodeIndex(terrainColIdx, Vector3Int.zero);
+    var minNodeIdx = TerrainGrid.TerrainColumnNodeIndex(location, Vector3Int.zero);
     var result = TerrainGrid.NodeIndexToUnitsVec3(minNodeIdx) + new Vector3(TerrainColumn.HALF_SIZE, 0, TerrainColumn.HALF_SIZE);
     result.y = AverageYPos();
     return result;
@@ -126,10 +126,10 @@ public class TerrainColumnLanding : MonoBehaviour {
       // Handle the special case where the ground is bedrock - just draw a plane at y==0
       var minTCIdx = TerrainGrid.TerrainColumnNodeIndex(terrainCol, Vector3Int.zero); // "global" index within the whole terrain
 
-      bool isTCXMinEdge = terrainCol.index.x == 0;
-      bool isTCXMaxEdge = terrainCol.index.x == terrain.xSize-1;
-      bool isTCZMinEdge = terrainCol.index.z == 0;
-      bool isTCZMaxEdge = terrainCol.index.z == terrain.zSize-1;
+      bool isTCXMinEdge = terrainCol.location.x == 0;
+      bool isTCXMaxEdge = terrainCol.location.x == terrain.xSize-1;
+      bool isTCZMinEdge = terrainCol.location.z == 0;
+      bool isTCZMaxEdge = terrainCol.location.z == terrain.zSize-1;
 
       var xMinInsetNodes = minIdx.x-minTCIdx.x;
       var zMinInsetNodes = minIdx.z-minTCIdx.z;
