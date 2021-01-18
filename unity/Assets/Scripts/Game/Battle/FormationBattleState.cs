@@ -111,14 +111,20 @@ public class FormationBattleState : BattleState {
         Debug.Assert(selectedStatus != null);
 
         if (!selectedStatus.isLocked) {
-          // TODO: If there's already a character placed at this location then we need to replace them
-          // and update the placement statuses appropriately
-          
-
           var characterData = infoAndPlacementUI.GetSelectedCharacter();
           Debug.Assert(characterData != null);
-          battleSM.CharacterManager.PlaceCharacter(foundPlacement.Location, characterData);
-          selectedStatus.characterData = characterData;
+
+          // If there's already a character placed at this location then we need to replace them
+          // and update the placement statuses appropriately
+          if (selectedStatus.characterData != characterData) {
+            if (selectedStatus.characterData != null) {
+              // Remove the previous character from the placement location
+              battleSM.CharacterManager.RemoveCharacter(foundPlacement.Location);
+            }
+
+            battleSM.CharacterManager.PlaceCharacter(foundPlacement.Location, characterData);
+            selectedStatus.characterData = characterData;
+          }
         }
 
         // Deactivate the selection

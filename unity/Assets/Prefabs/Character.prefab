@@ -173,6 +173,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   characterData: {fileID: 0}
+  bodyRenderer: {fileID: 7869347143941135064}
 --- !u!1 &7869347145112510745
 GameObject:
   m_ObjectHideFlags: 0
