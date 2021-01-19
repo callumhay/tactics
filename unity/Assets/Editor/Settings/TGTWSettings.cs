@@ -27,6 +27,7 @@ public class TGTWSettings : ScriptableObject {
   public int columnInsetZAmount = 0;
   public int columnInsetNegZAmount = 0;
 
+  public CharacterData placementCharacterData;
   public int selectedTeamIdx = 0;
   public List<CharacterTeamData> loadedTeams = new List<CharacterTeamData>();
 

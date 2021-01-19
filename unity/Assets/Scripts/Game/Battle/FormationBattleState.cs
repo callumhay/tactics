@@ -105,6 +105,7 @@ public class FormationBattleState : BattleState {
 
       // If the selection is already active then this means the player is placing a character
       if (selectionCaret.IsSelectionActive && infoAndPlacementUI.IsRosterSelectionActive) {
+
         // Place the selected character in the level and update their placement status
         var selectedLocation = selectionCaret.CurrentLanding.location;
         var selectedStatus = playerPlacementStatuses.Find(x => x.location == foundPlacement.Location);
@@ -120,6 +121,16 @@ public class FormationBattleState : BattleState {
             if (selectedStatus.characterData != null) {
               // Remove the previous character from the placement location
               battleSM.CharacterManager.RemoveCharacter(foundPlacement.Location);
+              selectedStatus.characterData = null;
+            }
+
+            // Another special case to consider is that the player is placing a character that has already
+            // been placed elsewhere that isn't locked
+            var existingStatus = playerPlacementStatuses.Find(x => x.characterData == characterData);
+            if (existingStatus != null) {
+              if (existingStatus.isLocked) { return; } // This shouldn't happen
+              battleSM.CharacterManager.RemoveCharacter(existingStatus.location);
+              existingStatus.characterData = null;
             }
 
             battleSM.CharacterManager.PlaceCharacter(foundPlacement.Location, characterData);

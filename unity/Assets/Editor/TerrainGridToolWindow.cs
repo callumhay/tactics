@@ -8,46 +8,45 @@ public class TerrainGridToolWindow : EditorWindow {
 
   private static TGTWSettings settings;
 
-  public CharacterTeamData Team { get {
+  public CharacterTeamData PlacementTeam { get {
     CharacterTeamData teamData = null;
     if (settings.selectedTeamIdx < settings.loadedTeams.Count()) { 
       teamData = settings.loadedTeams[settings.selectedTeamIdx];
     }
     return teamData;
   }}
-
-  public TGTWSettings.EditorType editorType { get { return settings.editorType; } }
-  public TGTWSettings.PaintType paintType { get { return settings.paintType; } }
-  public TGTWSettings.PaintMode paintMode { get { return settings.paintMode; } }
-  public TGTWSettings.BrushType brushType { get { return settings.brushType; } }
-  public Material paintMaterial { get { return settings.paintMaterial; } }
-  public float brushSize { get { return settings.brushSize; } }
-  public float matPaintIntensity { get { return settings.matPaintIntensity; } }
-  public bool gridSnaping { get { return settings.gridSnaping; } }
-  public bool showGridOverlay { get { return settings.showGridOverlay; } }
-  public bool groundUpOnly { get { return settings.groundUpOnly; } }
-  public float setLevelValue { get { return settings.setLevelValue; } }
-  public int columnInsetXAmount { 
+  public CharacterData PlacementCharacterData { get { return settings.placementCharacterData; } }
+  public TGTWSettings.EditorType EditorType { get { return settings.editorType; } }
+  public TGTWSettings.PaintType PaintType { get { return settings.paintType; } }
+  public TGTWSettings.PaintMode PaintMode { get { return settings.paintMode; } }
+  public TGTWSettings.BrushType BrushType { get { return settings.brushType; } }
+  public Material PaintMaterial { get { return settings.paintMaterial; } }
+  public float BrushSize { get { return settings.brushSize; } }
+  public float MaterialPaintIntensity { get { return settings.matPaintIntensity; } }
+  public bool GridSnaping { get { return settings.gridSnaping; } }
+  public bool ShowGridOverlay { get { return settings.showGridOverlay; } }
+  public bool GroundUpOnly { get { return settings.groundUpOnly; } }
+  public float SetLevelValue { get { return settings.setLevelValue; } }
+  public int ColumnInsetXAmount { 
     get { return settings.columnInsetXAmount; }
     set { updateSettingsIntValue("columnInsetXAmount", value); }
    }
-  public int columnInsetNegXAmount { 
+  public int ColumnInsetNegXAmount { 
     get { return settings.columnInsetNegXAmount; } 
     set { updateSettingsIntValue("columnInsetNegXAmount", value); }
   }
-  public int columnInsetZAmount { 
+  public int ColumnInsetZAmount { 
     get { return settings.columnInsetZAmount; } 
     set { updateSettingsIntValue("columnInsetZAmount", value); }
   }
-  public int columnInsetNegZAmount { 
+  public int ColumnInsetNegZAmount { 
     get { return settings.columnInsetNegZAmount; } 
     set { updateSettingsIntValue("columnInsetNegZAmount", value); }
   }
-
-  public bool showTerrainNodes { get { return settings.showTerrainNodes; } }
-  public bool showEmptyNodes { get { return settings.showEmptyNodes; } }
-  public bool showSurfaceNodes { get { return settings.showSurfaceNodes; } }
-  public bool showAboveSurfaceNodes { get { return settings.showAboveSurfaceNodes; } }
+  public bool ShowTerrainNodes { get { return settings.showTerrainNodes; } }
+  public bool ShowEmptyNodes { get { return settings.showEmptyNodes; } }
+  public bool ShowSurfaceNodes { get { return settings.showSurfaceNodes; } }
+  public bool ShowAboveSurfaceNodes { get { return settings.showAboveSurfaceNodes; } }
 
   [InitializeOnLoadMethod]
   private static void OnLoad() {
@@ -97,11 +96,7 @@ public class TerrainGridToolWindow : EditorWindow {
     var nodeEditToggled      = GUILayout.Toggle(prevNodeEditToggled, "Node Edit", "button", GUILayout.ExpandWidth(false));
     var placementEditToggled = GUILayout.Toggle(prevPlacementEditToggled, "Placement Edit", "button", GUILayout.ExpandWidth(false));
     GUILayout.FlexibleSpace();
-
-    EditorGUILayout.BeginVertical();
     EditorGUILayout.PropertyField(showGridProp);
-    EditorGUILayout.EndVertical();
-
     EditorGUILayout.EndHorizontal();
     EditorGUILayout.Space();
 
@@ -185,6 +180,7 @@ public class TerrainGridToolWindow : EditorWindow {
       } 
 
       case TGTWSettings.EditorType.PlacementEditor: {
+        var placementCharacterProp = serializedObj.FindProperty("placementCharacterData");
         var selectedTeamIdxProp = serializedObj.FindProperty("selectedTeamIdx");
         var loadedTeamsProp = serializedObj.FindProperty("loadedTeams");
 
@@ -197,11 +193,17 @@ public class TerrainGridToolWindow : EditorWindow {
 
         var teamNames = TeamNames();
         if (teamNames != null && teamNames.Count() > 0) {
-          selectedTeamIdxProp.intValue = EditorGUILayout.Popup("Team", selectedTeamIdxProp.intValue, TeamNames(), GUILayout.ExpandWidth(true));
+          selectedTeamIdxProp.intValue = EditorGUILayout.Popup(
+            "Placement Team", selectedTeamIdxProp.intValue, TeamNames(), GUILayout.ExpandWidth(true)
+          );
         }
 
+        EditorGUILayout.PropertyField(placementCharacterProp, GUILayout.ExpandWidth(true));
+
         var numPlayerPlacements = terrainGrid.levelData.GetPlayerControlledPlacements().Count;
-        terrainGrid.levelData.MaxPlayerPlacements = EditorGUILayout.IntSlider("Max Player Placements", terrainGrid.levelData.MaxPlayerPlacements, 1, numPlayerPlacements);
+        terrainGrid.levelData.MaxPlayerPlacements = EditorGUILayout.IntSlider(
+          "Max Player Placements", terrainGrid.levelData.MaxPlayerPlacements, 1, numPlayerPlacements
+        );
         
         EditorGUILayout.Space();
         EditorGUILayout.PropertyField(loadedTeamsProp, GUILayout.ExpandWidth(true));
@@ -239,27 +241,27 @@ public class TerrainGridToolWindow : EditorWindow {
 
   public List<TerrainGridNode> getAffectedNodesAtPoint(in Vector3 editPt, in TerrainGrid terrainGrid) {
     List<TerrainGridNode> nodes = null;
-    var paintMode3D = (paintMode == TGTWSettings.PaintMode.Floating);
+    var paintMode3D = (PaintMode == TGTWSettings.PaintMode.Floating);
     var finalEditPt = editPt;
-    if (gridSnaping) {
+    if (GridSnaping) {
       terrainGrid?.GetGridSnappedPoint(ref finalEditPt);
     }
 
-    bool groundFirst = groundUpOnly && paintType != TGTWSettings.PaintType.Water;
-    bool waterFirst  = groundUpOnly && paintType == TGTWSettings.PaintType.Water;
+    bool groundFirst = GroundUpOnly && PaintType != TGTWSettings.PaintType.Water;
+    bool waterFirst  = GroundUpOnly && PaintType == TGTWSettings.PaintType.Water;
     
-    switch (brushType) {
+    switch (BrushType) {
       case TGTWSettings.BrushType.Sphere:
-        var radius = 0.5f * brushSize;
+        var radius = 0.5f * BrushSize;
         nodes = paintMode3D ? 
-          terrainGrid?.GetNodesInsideSphere(finalEditPt, radius, groundFirst, waterFirst, setLevelValue) : 
-          terrainGrid?.GetNodesInsideProjXZCircle(finalEditPt, radius, groundFirst, waterFirst, setLevelValue);
+          terrainGrid?.GetNodesInsideSphere(finalEditPt, radius, groundFirst, waterFirst, SetLevelValue) : 
+          terrainGrid?.GetNodesInsideProjXZCircle(finalEditPt, radius, groundFirst, waterFirst, SetLevelValue);
         break;
       case TGTWSettings.BrushType.Cube:
-        var bounds = new Bounds(finalEditPt, new Vector3(brushSize, brushSize, brushSize));
+        var bounds = new Bounds(finalEditPt, new Vector3(BrushSize, BrushSize, BrushSize));
         nodes = paintMode3D ? 
-          terrainGrid?.GetNodesInsideBox(bounds, groundFirst, waterFirst, setLevelValue) : 
-          terrainGrid?.GetNodesInsideProjXZSquare(bounds, groundFirst, waterFirst, setLevelValue);
+          terrainGrid?.GetNodesInsideBox(bounds, groundFirst, waterFirst, SetLevelValue) : 
+          terrainGrid?.GetNodesInsideProjXZSquare(bounds, groundFirst, waterFirst, SetLevelValue);
         break;
       default:
         break;
@@ -269,13 +271,13 @@ public class TerrainGridToolWindow : EditorWindow {
   }
 
   public void paintNodes(in List<TerrainGridNode> nodes, in TerrainGrid terrainGrid) {
-    switch (paintType) {
+    switch (PaintType) {
       case TGTWSettings.PaintType.Terrain:
-        if (settings.paintMaterial) { terrainGrid?.AddIsoValuesAndMaterialToNodes(1f, matPaintIntensity, settings.paintMaterial, nodes); }
+        if (settings.paintMaterial) { terrainGrid?.AddIsoValuesAndMaterialToNodes(1f, MaterialPaintIntensity, settings.paintMaterial, nodes); }
         else { terrainGrid?.AddIsoValuesToNodes(1f, nodes); }
         break;
       case TGTWSettings.PaintType.MaterialsOnly:
-        paintNodesWithMaterial(nodes, matPaintIntensity);
+        paintNodesWithMaterial(nodes, MaterialPaintIntensity);
         terrainGrid?.updateNodesInEditor(nodes);
         break;
       case TGTWSettings.PaintType.Water:
@@ -287,13 +289,13 @@ public class TerrainGridToolWindow : EditorWindow {
   }
   
   public void eraseNodes(in List<TerrainGridNode> nodes, in TerrainGrid terrainGrid) {
-    switch (paintType) {
+    switch (PaintType) {
       case TGTWSettings.PaintType.Terrain:
-        if (settings.paintMaterial) { terrainGrid?.AddIsoValuesAndMaterialToNodes(-1f, -matPaintIntensity, settings.paintMaterial, nodes); }
+        if (settings.paintMaterial) { terrainGrid?.AddIsoValuesAndMaterialToNodes(-1f, -MaterialPaintIntensity, settings.paintMaterial, nodes); }
         else { terrainGrid?.AddIsoValuesToNodes(-1f, nodes); }
         break;
       case TGTWSettings.PaintType.MaterialsOnly:
-        paintNodesWithMaterial(nodes, -matPaintIntensity);
+        paintNodesWithMaterial(nodes, -MaterialPaintIntensity);
         terrainGrid?.updateNodesInEditor(nodes);
         break;
       case TGTWSettings.PaintType.Water:

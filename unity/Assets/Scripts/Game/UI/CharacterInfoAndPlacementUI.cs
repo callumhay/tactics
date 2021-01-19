@@ -117,13 +117,14 @@ public class CharacterInfoAndPlacementUI : MonoBehaviour {
     ShowCharacter(playerRoster.Characters[selectedIndex]);
   }
 
-  private void ShowCharacter(CharacterData character) {
-    if (!character) { 
+  private void ShowCharacter(CharacterData characterData) {
+    if (!characterData) { 
       displayedCharacterCard.gameObject.SetActive(false);
       return;
     }
-    displayedCharacterCard.SetCharacter(character);
+    displayedCharacterCard.SetCharacter(characterData);
     displayedCharacterCard.SetIsHighlighted(IsPlacementEnabled && isRosterSelectionActive);
+    displayedCharacterCard.SetIsGreyedOut(placementStatuses.Find(x => x.characterData == characterData) != null);
     displayedCharacterCard.gameObject.SetActive(true);
   }
 

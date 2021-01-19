@@ -2,12 +2,15 @@
 using System.Collections.Generic;
 using UnityEngine;
 
+#pragma warning disable 649
+
 [ExecuteAlways]
 public class CloudVolumeRaymarcher : MonoBehaviour {
 
   public static readonly float CLOUD_CONTAINER_THICKNESS = 500;
 
-  public TerrainGrid terrainGrid;
+  [SerializeField] private TerrainGrid terrainGrid;
+
   public float cloudHeight = 500;
   public int domeLongitudeSlices = 10;
   public int domeLatitudeSlices  = 13;
@@ -55,19 +58,15 @@ public class CloudVolumeRaymarcher : MonoBehaviour {
     }
   }
 
-  private void Start() {
-    if (terrainGrid == null) {
-      terrainGrid = TerrainGrid.FindTerrainGrid();
-    }
-
+  private void Awake() {
     meshFilter = GetComponent<MeshFilter>();
-    if (!meshFilter) { meshFilter = gameObject.AddComponent<MeshFilter>(); }
     meshRenderer = GetComponent<MeshRenderer>();
-    if (!meshRenderer) { meshRenderer = gameObject.AddComponent<MeshRenderer>(); }
     meshRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
     meshRenderer.allowOcclusionWhenDynamic = false;
     meshRenderer.motionVectorGenerationMode = MotionVectorGenerationMode.ForceNoMotion;
+  }
 
+  private void Start() {
     initAll();
   }
 

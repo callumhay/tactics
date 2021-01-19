@@ -66,12 +66,12 @@ public class TerrainGridTool : EditorTool {
     
     var e = Event.current;
   
-    switch (settingsWindow.editorType) {
+    switch (settingsWindow.EditorType) {
       case TGTWSettings.EditorType.FreePaintEditor: {
         //HandleUtility.AddDefaultControl(GUIUtility.GetControlID(FocusType.Passive));
 
         var wsRay = HandleUtility.GUIPointToWorldRay(e.mousePosition);
-        var yOffset = settingsWindow.paintMode == TGTWSettings.PaintMode.Floating ? 0.5f*settingsWindow.brushSize : 0;
+        var yOffset = settingsWindow.PaintMode == TGTWSettings.PaintMode.Floating ? 0.5f*settingsWindow.BrushSize : 0;
         if (terrainGrid.intersectEditorRay(wsRay, yOffset, out lastEditPt)) {
           editPtActive = true;
           if (e.type == EventType.MouseDown && NoMouseEventModifiers(e)) {
@@ -151,7 +151,7 @@ public class TerrainGridTool : EditorTool {
     bool redraw = false;
     var rot = new Quaternion(0,0,0,1);
 
-    switch (settingsWindow.editorType) {
+    switch (settingsWindow.EditorType) {
       case TGTWSettings.EditorType.FreePaintEditor: {
         if (editPtActive && Event.current.type == EventType.Repaint) {
           // Draw all the nodes that the tool is colliding with / affecting
@@ -183,7 +183,7 @@ public class TerrainGridTool : EditorTool {
         break;
     }
 
-    if (settingsWindow.showGridOverlay) {
+    if (settingsWindow.ShowGridOverlay) {
       redraw = true;
       DrawTerrainGridOverlay(terrainGrid);
     }
@@ -200,10 +200,10 @@ public class TerrainGridTool : EditorTool {
     var halfUnitsPerNode = TerrainGrid.HalfUnitsPerNode();
     var insetFaceColour = new Color(1.0f, 1.0f, 0.0f, 0.5f);
     var insetOutlineColour = new Color(1f,1f,1f,0.5f);
-    var insetXUnits = settingsWindow.columnInsetXAmount*TerrainGrid.UnitsPerNode();
-    var insetNegXUnits = settingsWindow.columnInsetNegXAmount*TerrainGrid.UnitsPerNode();
-    var insetZUnits = settingsWindow.columnInsetZAmount*TerrainGrid.UnitsPerNode();
-    var insetNegZUnits = settingsWindow.columnInsetNegZAmount*TerrainGrid.UnitsPerNode();
+    var insetXUnits = settingsWindow.ColumnInsetXAmount*TerrainGrid.UnitsPerNode();
+    var insetNegXUnits = settingsWindow.ColumnInsetNegXAmount*TerrainGrid.UnitsPerNode();
+    var insetZUnits = settingsWindow.ColumnInsetZAmount*TerrainGrid.UnitsPerNode();
+    var insetNegZUnits = settingsWindow.ColumnInsetNegZAmount*TerrainGrid.UnitsPerNode();
     var insetHandleSnap = TerrainGrid.UnitsPerNode()*1.5f;
 
     for (int x = 0; x < terrainGrid.xSize; x++) {
@@ -236,7 +236,7 @@ public class TerrainGridTool : EditorTool {
         var xInsetVal = Handles.Slider(xInsetBaseHandlePos, Vector3.right, 0.1f, Handles.SphereHandleCap, insetHandleSnap);
         if (EditorGUI.EndChangeCheck()) {
           Event.current.Use();
-          settingsWindow.columnInsetXAmount = Mathf.RoundToInt(Mathf.Clamp((xInsetVal.x-xInsetBaseHandlePos.x) / insetHandleSnap, 0, maxInset));
+          settingsWindow.ColumnInsetXAmount = Mathf.RoundToInt(Mathf.Clamp((xInsetVal.x-xInsetBaseHandlePos.x) / insetHandleSnap, 0, maxInset));
         }
         // Negative X Handle
         var negXInsetBaseHandlePos = (quadVerts[1] + quadVerts[2]) / 2f;
@@ -244,7 +244,7 @@ public class TerrainGridTool : EditorTool {
         var negXInsetVal = Handles.Slider(negXInsetBaseHandlePos, Vector3.left, 0.1f, Handles.SphereHandleCap, insetHandleSnap);
         if (EditorGUI.EndChangeCheck()) {
           Event.current.Use();
-          settingsWindow.columnInsetNegXAmount = Mathf.RoundToInt(Mathf.Clamp((negXInsetBaseHandlePos.x-negXInsetVal.x) / insetHandleSnap, 0, maxInset));
+          settingsWindow.ColumnInsetNegXAmount = Mathf.RoundToInt(Mathf.Clamp((negXInsetBaseHandlePos.x-negXInsetVal.x) / insetHandleSnap, 0, maxInset));
         }
         // Positive Z Handle
         var zInsetBaseHandlePos = (quadVerts[0] + quadVerts[1]) / 2f;
@@ -252,7 +252,7 @@ public class TerrainGridTool : EditorTool {
         var zInsetVal = Handles.Slider(zInsetBaseHandlePos, Vector3.forward, 0.1f, Handles.SphereHandleCap, insetHandleSnap);
         if (EditorGUI.EndChangeCheck()) {
           Event.current.Use();
-          settingsWindow.columnInsetZAmount = Mathf.RoundToInt(Mathf.Clamp((zInsetVal.z-zInsetBaseHandlePos.x) / insetHandleSnap, 0, maxInset));
+          settingsWindow.ColumnInsetZAmount = Mathf.RoundToInt(Mathf.Clamp((zInsetVal.z-zInsetBaseHandlePos.x) / insetHandleSnap, 0, maxInset));
         }
         // Negative Z Handle
         var negZInsetBaseHandlePos = (quadVerts[2] + quadVerts[3]) / 2f;
@@ -260,7 +260,7 @@ public class TerrainGridTool : EditorTool {
         var negZInsetVal = Handles.Slider(negZInsetBaseHandlePos, Vector3.back, 0.1f, Handles.SphereHandleCap, insetHandleSnap);
         if (EditorGUI.EndChangeCheck()) {
           Event.current.Use();
-          settingsWindow.columnInsetNegZAmount = Mathf.RoundToInt(Mathf.Clamp((negZInsetBaseHandlePos.z-negZInsetVal.z) / insetHandleSnap, 0, maxInset));
+          settingsWindow.ColumnInsetNegZAmount = Mathf.RoundToInt(Mathf.Clamp((negZInsetBaseHandlePos.z-negZInsetVal.z) / insetHandleSnap, 0, maxInset));
         }
         
         // Draw and allow for manipulation of the column height
@@ -271,9 +271,9 @@ public class TerrainGridTool : EditorTool {
         if (EditorGUI.EndChangeCheck()) {
           Event.current.Use();
           Undo.RecordObject(terrainGrid.levelData, "Edited Terrain Column Height");
-          terrainGrid.changeTerrainColumnHeight(x, z, newPos.y, settingsWindow.setLevelValue, 
-            settingsWindow.columnInsetXAmount, settingsWindow.columnInsetNegXAmount,
-            settingsWindow.columnInsetZAmount, settingsWindow.columnInsetNegZAmount, settingsWindow.paintMaterial);
+          terrainGrid.changeTerrainColumnHeight(x, z, newPos.y, settingsWindow.SetLevelValue, 
+            settingsWindow.ColumnInsetXAmount, settingsWindow.ColumnInsetNegXAmount,
+            settingsWindow.ColumnInsetZAmount, settingsWindow.ColumnInsetNegZAmount, settingsWindow.PaintMaterial);
         }
       }
     }
@@ -319,24 +319,24 @@ public class TerrainGridTool : EditorTool {
     var emptyColour   = new Color(1f,0f,1f,0.33f);
 
     var nodeSelector = TerrainGrid.TerrainNodeSelectors.None;
-    if (settingsWindow.showSurfaceNodes) { nodeSelector |= TerrainGrid.TerrainNodeSelectors.Surface; }
-    if (settingsWindow.showAboveSurfaceNodes) { nodeSelector |= TerrainGrid.TerrainNodeSelectors.AboveSurface; }
+    if (settingsWindow.ShowSurfaceNodes) { nodeSelector |= TerrainGrid.TerrainNodeSelectors.Surface; }
+    if (settingsWindow.ShowAboveSurfaceNodes) { nodeSelector |= TerrainGrid.TerrainNodeSelectors.AboveSurface; }
     if (nodeSelector == TerrainGrid.TerrainNodeSelectors.None) { nodeSelector = TerrainGrid.TerrainNodeSelectors.All; }
     
     var tempList = new List<TerrainGridNode>();
     foreach (var terrainColIdx in nodeEditSelectedColumns) {
       var nodes = terrainGrid.getNodesInTerrainColumn(new Vector3Int(terrainColIdx.x, 0, terrainColIdx.y), 
-        TerrainGrid.UnitsToNodeIndex(settingsWindow.setLevelValue), nodeSelector);
+        TerrainGrid.UnitsToNodeIndex(settingsWindow.SetLevelValue), nodeSelector);
       
       foreach (var node in nodes) {
         float toggleIsoVal = 1f;
         if (node.isTerrain()) {
           toggleIsoVal = -1f;
-          if (!settingsWindow.showTerrainNodes) { continue; }
+          if (!settingsWindow.ShowTerrainNodes) { continue; }
           Handles.color = terrainColour;
         }
         else {
-          if (!settingsWindow.showEmptyNodes) { continue; }
+          if (!settingsWindow.ShowEmptyNodes) { continue; }
           Handles.color = emptyColour;
         }
         if (Handles.Button(node.position + translation, rot, nodeDrawSize, nodeDrawSize, Handles.CubeHandleCap)) {
@@ -345,6 +345,37 @@ public class TerrainGridTool : EditorTool {
           terrainGrid.AddIsoValuesToNodes(toggleIsoVal, tempList);
         }
       }
+    }
+  }
+
+  private void OnAddPlacement(object o) {
+    var placementLocation = (Vector3Int)o;
+    var terrainGrid = TerrainGrid.FindTerrainGrid();
+    if (terrainGrid) {
+      Undo.RecordObject(terrainGrid.levelData, "Adding Character Placement");
+      // TODO: Character
+      terrainGrid.levelData.Placements.Add(new CharacterPlacement(
+        placementLocation, settingsWindow.PlacementTeam, settingsWindow.PlacementCharacterData
+      ));
+    }
+  }
+  private void OnUpdatePlacement(object o) {
+    var placementLocation = (Vector3Int)o;
+    var terrainGrid = TerrainGrid.FindTerrainGrid();
+    var existingPlacement = terrainGrid?.levelData.GetPlacementAt(placementLocation);
+    if (terrainGrid && existingPlacement != null) {
+      Undo.RecordObject(terrainGrid.levelData, "Updating Character Placement");
+      existingPlacement.Team = settingsWindow.PlacementTeam;
+      existingPlacement.Character = settingsWindow.PlacementCharacterData;
+    }
+  }
+  private void OnRemovePlacement(object o) {
+    var placementLocation = (Vector3Int)o;
+    var terrainGrid = TerrainGrid.FindTerrainGrid();
+    var existingPlacement = terrainGrid?.levelData.GetPlacementAt(placementLocation);
+    if (terrainGrid && existingPlacement != null) {      
+      Undo.RecordObject(terrainGrid.levelData, "Removing Character Placement");
+      terrainGrid.levelData.Placements.Remove(existingPlacement);
     }
   }
 
@@ -372,24 +403,19 @@ public class TerrainGridTool : EditorTool {
           var buttonPos = new Vector3(xPos + TerrainColumn.HALF_SIZE, yPos, zPos + TerrainColumn.HALF_SIZE) + translation;
 
           if (Handles.Button(buttonPos, rot, buttonSize, buttonSize, Handles.CubeHandleCap)) {
-            // Add, Change or remove a placement...
-            Undo.RecordObject(terrainGrid.levelData, "Character Placement Change");
             var placementLocation = new Vector3Int(x,i,z);
             var existingPlacement = terrainGrid.levelData.GetPlacementAt(placementLocation);
-            var selectedPlacementTeam = settingsWindow.Team;
-            if (existingPlacement != null) {
-              // If the selected team is the same as the team set on this placement then we remove it, 
-              // otherwise we change it to the selected team
-              if (existingPlacement.Team == selectedPlacementTeam) {
-                terrainGrid.levelData.Placements.Remove(existingPlacement);
-              }
-              else {
-                existingPlacement.Team = selectedPlacementTeam;
-              }
+            var selectedPlacementTeam = settingsWindow.PlacementTeam;
+
+            var menu = new GenericMenu();
+            if (existingPlacement == null) {
+              menu.AddItem(new GUIContent("Add Placement"), false, OnAddPlacement, placementLocation);
             }
             else {
-              terrainGrid.levelData.Placements.Add(new CharacterPlacement(placementLocation, selectedPlacementTeam));
+              menu.AddItem(new GUIContent("Update Placement"), false, OnUpdatePlacement, placementLocation);
+              menu.AddItem(new GUIContent("Remove Placement"), false, OnRemovePlacement, placementLocation);
             }
+            menu.ShowAsContext();
           }
         }
 
@@ -449,6 +475,9 @@ public class TerrainGridTool : EditorTool {
 
       Handles.DrawSolidRectangleWithOutline(quadVerts, new Color(colour.r, colour.g, colour.b, 0.5f), outlineColour);
       Handles.Label(position, placement.Team.name);
+      if (placement.Character != null) {
+        Handles.Label(position + new Vector3(0,0.25f,0), placement.Character.Name);
+      }
     }
   }
   

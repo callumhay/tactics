@@ -7,6 +7,7 @@ using TMPro;
 public class CharacterCardUI : MonoBehaviour {
   [SerializeField] private Image portrait;
   [SerializeField] private Image backPanel;
+  [SerializeField] private Image greyOutPanel;
   [SerializeField] private TextMeshProUGUI nameText;
   [SerializeField] private TextMeshProUGUI levelText;
 
@@ -17,6 +18,9 @@ public class CharacterCardUI : MonoBehaviour {
   }
   public void SetIsHighlighted(bool isHighlighted) {
     backPanel.gameObject.SetActive(isHighlighted);
+  }
+  public void SetIsGreyedOut(bool isGreyedOut) {
+    greyOutPanel.gameObject.SetActive(isGreyedOut);
   }
 
 }
