@@ -353,8 +353,7 @@ public class TerrainGridTool : EditorTool {
     var terrainGrid = TerrainGrid.FindTerrainGrid();
     if (terrainGrid) {
       Undo.RecordObject(terrainGrid.levelData, "Adding Character Placement");
-      // TODO: Character
-      terrainGrid.levelData.Placements.Add(new CharacterPlacement(
+      terrainGrid.levelData.AddPlacement(new CharacterPlacement(
         placementLocation, settingsWindow.PlacementTeam, settingsWindow.PlacementCharacterData
       ));
     }
@@ -363,17 +362,18 @@ public class TerrainGridTool : EditorTool {
     var placementLocation = (Vector3Int)o;
     var terrainGrid = TerrainGrid.FindTerrainGrid();
     var existingPlacement = terrainGrid?.levelData.GetPlacementAt(placementLocation);
-    if (terrainGrid && existingPlacement != null) {
+    if (terrainGrid) {
       Undo.RecordObject(terrainGrid.levelData, "Updating Character Placement");
-      existingPlacement.Team = settingsWindow.PlacementTeam;
-      existingPlacement.Character = settingsWindow.PlacementCharacterData;
+      terrainGrid.levelData.UpdatePlacement(new CharacterPlacement(
+        placementLocation, settingsWindow.PlacementTeam, settingsWindow.PlacementCharacterData
+      ));
     }
   }
   private void OnRemovePlacement(object o) {
     var placementLocation = (Vector3Int)o;
     var terrainGrid = TerrainGrid.FindTerrainGrid();
     var existingPlacement = terrainGrid?.levelData.GetPlacementAt(placementLocation);
-    if (terrainGrid && existingPlacement != null) {      
+    if (terrainGrid && existingPlacement != null) {    
       Undo.RecordObject(terrainGrid.levelData, "Removing Character Placement");
       terrainGrid.levelData.Placements.Remove(existingPlacement);
     }
@@ -476,7 +476,7 @@ public class TerrainGridTool : EditorTool {
       Handles.DrawSolidRectangleWithOutline(quadVerts, new Color(colour.r, colour.g, colour.b, 0.5f), outlineColour);
       Handles.Label(position, placement.Team.name);
       if (placement.Character != null) {
-        Handles.Label(position + new Vector3(0,0.25f,0), placement.Character.Name);
+        Handles.Label(position + new Vector3(0,0.5f,0), placement.Character.Name);
       }
     }
   }

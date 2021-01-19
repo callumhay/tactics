@@ -13,4 +13,6 @@ MonoBehaviour:
   m_Name: TestCharacterMrFoo
   m_EditorClassIdentifier: 
   characterName: Mr. Foo
+  portrait: {fileID: 21300000, guid: 7857068c75ee44e73aa1dfacfa34e465, type: 3}
   level: 3
+  colour: {r: 1, g: 0.6020689, b: 0, a: 1}

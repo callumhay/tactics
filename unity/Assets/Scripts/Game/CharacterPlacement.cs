@@ -17,8 +17,8 @@ public class CharacterPlacement {
   [SerializeField] private CharacterData character;
 
   public Vector3Int Location { get { return location; } }
-  public CharacterTeamData Team { get { return team; } set { team = value; } }
-  public CharacterData Character { get { return character; } set { character = value; } }
+  public CharacterTeamData Team { get { return team; } }
+  public CharacterData Character { get { return character; } }
   
   public CharacterPlacement(Vector3Int _location, CharacterTeamData _team, CharacterData _character = null) {
     location = _location;

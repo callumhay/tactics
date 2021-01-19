@@ -1,6 +1,6 @@
-﻿using System.Collections;
-using System.Collections.Generic;
-using UnityEngine;
+﻿using UnityEngine;
+
+#pragma warning disable 649
 
 public class Character : MonoBehaviour {
 
@@ -13,6 +13,7 @@ public class Character : MonoBehaviour {
 
   public void Init(CharacterData c) {
     characterData = c;
+    bodyRenderer.material.SetColor("_BaseColor", c.Colour);
 
     // Temporary: Change the colour of the body of the character so we can distiguish one from another
     //bodyRenderer.material.SetColor("_BaseColor")

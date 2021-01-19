@@ -27,7 +27,9 @@ MonoBehaviour:
   columnInsetNegXAmount: 0
   columnInsetZAmount: 0
   columnInsetNegZAmount: 0
-  selectedTeamIdx: 0
+  placementCharacterData: {fileID: 11400000, guid: c03fe15bd0e2e47198705b79aeb9685c,
+    type: 2}
+  selectedTeamIdx: 1
   loadedTeams:
   - {fileID: 11400000, guid: 23f427a9443d4478997745f7fde51b41, type: 2}
   - {fileID: 11400000, guid: 5fe2b54306a6140589564147517d0d25, type: 2}

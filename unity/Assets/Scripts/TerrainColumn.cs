@@ -7,7 +7,7 @@ using UnityEditor;
 public class TerrainColumn : MonoBehaviour {
   public static readonly int SIZE = 1;
   public static readonly float HALF_SIZE = SIZE * 0.5f;
-  public static readonly float MIN_LANDING_OVERHANG_UNITS = SIZE*2;
+  public static readonly float MIN_LANDING_OVERHANG_UNITS = SIZE*2.25f;
   public static readonly int MIN_LANDING_OVERHANG_NODES = (int)(TerrainGrid.NODES_PER_UNIT*MIN_LANDING_OVERHANG_UNITS);
   public static readonly int MIN_ADJACENT_LANDING_NODES_ON_AXIS = (TerrainGrid.NODES_PER_UNIT*SIZE)-2;
   public static readonly int NUM_ADJACENT_LANDING_NODES = (TerrainGrid.NODES_PER_UNIT*SIZE)-1;

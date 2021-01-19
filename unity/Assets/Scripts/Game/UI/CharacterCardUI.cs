@@ -15,6 +15,7 @@ public class CharacterCardUI : MonoBehaviour {
     // TODO: Portrait...
     nameText.text = character.Name;
     levelText.text = character.Level.ToString();
+    portrait.sprite = character.Portrait;
   }
   public void SetIsHighlighted(bool isHighlighted) {
     backPanel.gameObject.SetActive(isHighlighted);

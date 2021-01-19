@@ -31,6 +31,15 @@ public class FormationBattleState : BattleState {
         playerPlacements.Add(placement);
         playerPlacementStatuses.Add(new PlacementStatus(placement.Location, placement.Character, placement.Character != null));
       }
+      else {
+        // Non-player controlled character placement
+        if (placement.Character) {
+          battleSM.CharacterManager.PlaceCharacter(placement.Location, placement.Character);
+        }
+        else {
+          Debug.LogWarning("Non-player controlled placement found without a character assigned at " + placement.Location);
+        }
+      }
     }
 
     // Add indicator for each player placement
@@ -173,6 +182,7 @@ public class FormationBattleState : BattleState {
     
     if (battleSM.CharacterManager.RemoveCharacter(foundPlacement.Location)) {
       placementStatus.characterData = null;
+      battleSM.InfoAndPlacementUI.Refresh();
     }
     else {
       Debug.Assert(false);

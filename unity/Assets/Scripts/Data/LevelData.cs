@@ -20,15 +20,33 @@ public class LevelData : ScriptableObject {
   public int MaxPlayerPlacements { get { return maxPlayerPlacements; } set { maxPlayerPlacements = value; } }
 
   public CharacterPlacement GetPlacementAt(Vector3Int location) {
-    CharacterPlacement result = null;
-    foreach (var placement in placements) {
-      if (placement.Location == location) {
-        result = placement;
-        break;
+    return placements.Find(x => x.Location == location);
+  }
+
+  public void AddPlacement(CharacterPlacement p) {
+    Debug.Assert(p != null);
+    if (p.Character != null) {
+      // Can't add a duplicate Character placement, if one exists for the character
+      // in the given placement then remove it from the existing placement
+      var foundIdx = placements.FindIndex(x => x.Character == p.Character);
+      if (foundIdx >= 0) { 
+        var origPlacement = placements[foundIdx];
+        placements[foundIdx] = new CharacterPlacement(origPlacement.Location, origPlacement.Team, null);
       }
     }
-    return result;
+    placements.Add(p);
   }
+
+  public bool UpdatePlacement(CharacterPlacement updatedPlacement) {
+    Debug.Assert(updatedPlacement != null);
+    var existingPlacement = GetPlacementAt(updatedPlacement.Location);
+    if (existingPlacement == null) { return false; }
+    placements.Remove(existingPlacement);
+    AddPlacement(updatedPlacement);
+    return true;
+  }
+
+
   public List<CharacterPlacement> GetPlayerControlledPlacements() {
     var result = new List<CharacterPlacement>();
     foreach (var placement in placements) {

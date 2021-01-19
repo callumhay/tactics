@@ -13,4 +13,6 @@ MonoBehaviour:
   m_Name: TestCharacterJimbo
   m_EditorClassIdentifier: 
   characterName: Jimbo
+  portrait: {fileID: 21300000, guid: 335f9dbb879f84b619cb120651e7692e, type: 3}
   level: 2
+  colour: {r: 0, g: 1, b: 0.00427413, a: 1}

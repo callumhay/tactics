@@ -1,6 +1,7 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.UI;
 
 #pragma warning disable 649
 
@@ -8,7 +9,12 @@ using UnityEngine;
 public class CharacterData : ScriptableObject {
 
   [SerializeField] private string characterName = string.Empty;
+  [SerializeField] private Sprite portrait;
   [SerializeField] [Range(1,99)] private int level = 1;
+
+
+ 
+
   //[Range(0,99)] public int xp;
 
   //[Header("Job Classes")]
@@ -49,8 +55,15 @@ public class CharacterData : ScriptableObject {
   //public float energyResist() {}
   //public float etherResist() {}
 
-  public string Name { get { return characterName; } set { characterName = value; } }
+  public string Name { get { return characterName; } }
+  public Sprite Portrait { get { return portrait; } }
   public int Level { get { return level; } }
+
+ 
+
+  // TODO: For debugging only, remove this eventually
+  [SerializeField] private Color colour = new Color(0,0,1,1);
+  public Color Colour { get { return colour; } }
 
 
   public override string ToString() {

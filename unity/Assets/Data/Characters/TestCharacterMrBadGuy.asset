@@ -10,9 +10,9 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 1771e208026a14733a8a829a89845111, type: 3}
-  m_Name: TestCharacterBob
+  m_Name: TestCharacterMrBadGuy
   m_EditorClassIdentifier: 
-  characterName: Bob
-  portrait: {fileID: 21300000, guid: 41314b51ae48c4d4e8714f199b1894c9, type: 3}
+  characterName: Mr. Bad Guy
+  portrait: {fileID: 21300000, guid: 92384ace3757d43848fdfc5f38ff7270, type: 3}
   level: 1
-  colour: {r: 0, g: 0, b: 1, a: 1}
+  colour: {r: 1, g: 0.008883749, b: 0, a: 1}

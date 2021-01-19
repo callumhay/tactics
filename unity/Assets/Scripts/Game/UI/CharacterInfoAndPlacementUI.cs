@@ -74,7 +74,7 @@ public class CharacterInfoAndPlacementUI : MonoBehaviour {
   }
   #endregion
 
-  private void Refresh() {
+  public void Refresh() {
     var selectedLanding = selectionCaret.CurrentLanding;
     if (!selectedLanding) {
       ShowCharacter(null);
@@ -92,7 +92,7 @@ public class CharacterInfoAndPlacementUI : MonoBehaviour {
       var idx = placementStatuses.FindIndex(x => x.location == selectedLanding.location);
       if (idx < 0) { SetSelectedIndex(INVALID_SELECTED_IDX); }
       else {
-        if (selectedIndex == INVALID_SELECTED_IDX) { SetSelectedIndex(0); }
+        if (selectedIndex == INVALID_SELECTED_IDX) { SetSelectedIndexToNextAvailable(); }
         else { ShowCharacterAtSelectedIndex(); }
       }
     }
@@ -106,6 +106,28 @@ public class CharacterInfoAndPlacementUI : MonoBehaviour {
       selectedIndex = Mathf.Clamp(value, 0, playerRoster.Characters.Count);
     }
     ShowCharacterAtSelectedIndex();
+  }
+  private void SetSelectedIndexToNextAvailable() {
+    var index = INVALID_SELECTED_IDX;
+
+    // Determine what characters have already been placed
+    var alreadyPlacedCharacters = new HashSet<CharacterData>();
+    foreach (var status in placementStatuses) {
+      if (status.characterData != null) { alreadyPlacedCharacters.Add(status.characterData); }
+    }
+
+    // Find the next unplaced character index starting at the currently selected index
+    var startingIdx = Mathf.Max(0,selectedIndex);
+    for (int i = startingIdx; i < (startingIdx + playerRoster.Characters.Count); i++) {
+      var currIdx = i % playerRoster.Characters.Count;
+      var currCharacter = playerRoster.Characters[currIdx];
+      if (!alreadyPlacedCharacters.Contains(currCharacter)) {
+        index = currIdx;
+        break;
+      }
+    }
+
+    SetSelectedIndex(index);
   }
 
   private void ShowCharacterAtSelectedIndex() {
