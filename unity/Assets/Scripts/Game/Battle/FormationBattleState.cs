@@ -66,7 +66,7 @@ public class FormationBattleState : BattleState {
       selectionCaret.PlaceCaret(landing);
       selectionCaret.gameObject.SetActive(true);
       infoAndPlacementUI.gameObject.SetActive(true);
-      infoAndPlacementUI.Init(playerPlacementStatuses, battleSM.LevelLoader.Instance().playerRoster);
+      infoAndPlacementUI.Init(playerPlacementStatuses, battleSM.LevelLoader.Instance().playerRoster, levelData.MaxPlayerPlacements);
     }
     else {
       // TODO: There's nothing for the player to do in this state, all characters that can be placed have

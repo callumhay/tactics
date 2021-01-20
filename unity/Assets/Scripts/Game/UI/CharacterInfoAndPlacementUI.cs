@@ -26,7 +26,8 @@ public class CharacterInfoAndPlacementUI : MonoBehaviour {
   [Header("Required Game Objects")]
   [SerializeField] private CharacterManager characterManager;
   [SerializeField] private SquareSelectionCaret selectionCaret;
-  [SerializeField] private CharacterCardUI displayedCharacterCard;
+  [SerializeField] private CharacterCardUI displayedCharacterCardUI;
+  [SerializeField] private RemainingPlacementUI remainingPlacementUI;
 
   [Header("UI State Info")]
   [SerializeField] private List<PlacementStatus> placementStatuses = new List<PlacementStatus>();
@@ -54,10 +55,12 @@ public class CharacterInfoAndPlacementUI : MonoBehaviour {
     return playerRoster.Characters[selectedIndex];
   }
 
-  public void Init(List<PlacementStatus> initialPlacementStatuses=null, PlayerRosterData roster=null) {
+  public void Init(List<PlacementStatus> initialPlacementStatuses=null, PlayerRosterData roster=null, int maxPlacements=0) {
     placementStatuses = initialPlacementStatuses ?? new List<PlacementStatus>();
     playerRoster = roster;
+    remainingPlacementUI.SetMaxPlacements(maxPlacements);
     SetSelectedIndex(0);
+    Refresh();
   }
 
   public void OnCaretMovedEvent(GameObject _) { Refresh(); }
@@ -96,6 +99,19 @@ public class CharacterInfoAndPlacementUI : MonoBehaviour {
         else { ShowCharacterAtSelectedIndex(); }
       }
     }
+
+    if (IsPlacementEnabled) {
+      int numPlaced = 0;
+      foreach (var placement in placementStatuses) {
+        if (placement.characterData != null) { numPlaced++; }
+      }
+      remainingPlacementUI.SetNumPlaced(numPlaced);
+      remainingPlacementUI.gameObject.SetActive(true);
+    }
+    else {
+      remainingPlacementUI.gameObject.SetActive(false);
+    }
+
   }
 
   private void SetSelectedIndex(int value) {
@@ -133,7 +149,7 @@ public class CharacterInfoAndPlacementUI : MonoBehaviour {
   private void ShowCharacterAtSelectedIndex() {
     if (!IsPlacementEnabled) { return; }
     if (selectedIndex == INVALID_SELECTED_IDX) { 
-      displayedCharacterCard.gameObject.SetActive(false);
+      displayedCharacterCardUI.gameObject.SetActive(false);
       return;
     }
     ShowCharacter(playerRoster.Characters[selectedIndex]);
@@ -141,13 +157,13 @@ public class CharacterInfoAndPlacementUI : MonoBehaviour {
 
   private void ShowCharacter(CharacterData characterData) {
     if (!characterData) { 
-      displayedCharacterCard.gameObject.SetActive(false);
+      displayedCharacterCardUI.gameObject.SetActive(false);
       return;
     }
-    displayedCharacterCard.SetCharacter(characterData);
-    displayedCharacterCard.SetIsHighlighted(IsPlacementEnabled && isRosterSelectionActive);
-    displayedCharacterCard.SetIsGreyedOut(placementStatuses.Find(x => x.characterData == characterData) != null);
-    displayedCharacterCard.gameObject.SetActive(true);
+    displayedCharacterCardUI.SetCharacter(characterData);
+    displayedCharacterCardUI.SetIsHighlighted(IsPlacementEnabled && isRosterSelectionActive);
+    displayedCharacterCardUI.SetIsGreyedOut(placementStatuses.Find(x => x.characterData == characterData) != null);
+    displayedCharacterCardUI.gameObject.SetActive(true);
   }
 
   private void Awake() {
